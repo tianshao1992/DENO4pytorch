@@ -128,6 +128,8 @@ env*/
 ENV*/
 venv*/
 venv/
+.idea
+.idea/
 
 # Spyder project settings
 .spyderproject
