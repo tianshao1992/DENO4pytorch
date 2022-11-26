@@ -33,7 +33,6 @@ def default(value, d):
     return d if value is None else value
 
 
-
 class CarDataset(Dataset):
     """
     :param results, list
@@ -49,7 +48,7 @@ class CarDataset(Dataset):
         # 根据 idx 取出其中一个
         _, Re, q, x, f, c, r = self.results[idx]
         n_points = min(x.shape[0], self.seq_len)
-        Re = np.tile(np.array(Re).reshape((1, -1)), [self.seq_len, 1]).astype(np.float32) / 2.0e7 # Re normalization
+        Re = np.tile(np.array(Re).reshape((1, -1)), [self.seq_len, 1]).astype(np.float32) / 2.0e7  # Re normalization
         Q = np.tile(q[::self.profile_skip, :].reshape((1, -1)), [self.seq_len, 1]).astype(np.float32)
         Q = np.concatenate((Re, Q), axis=1)
         f = f[:, (0, 1, -1)]
@@ -73,46 +72,49 @@ class CarDataset(Dataset):
     def __len__(self):  # 总数据的多少
         return len(self.results)
 
-class DataNormer():
-    """
-        data normalization at last dimension
-    """
-    def __init__(self, data, method="min-max"):
-        axis = tuple(range(len(data.shape) - 1))
-        self.method = method
-        if method == "min-max":
-            self.max = np.max(data, axis=axis)
-            self.min = np.min(data, axis=axis)
 
-        elif method == "mean-std":
-            self.mean = np.mean(data, axis=axis)
-            self.std = np.std(data, axis=axis)
+# loss function with rel/abs Lp loss
+class FieldsLpLoss(object):
+    def __init__(self, d=2, p=2, size_average=True, reduction=True):
+        super(FieldsLpLoss, self).__init__()
 
-    def norm(self, x):
-        if torch.is_tensor(x):
-            if self.method == "min-max":
-                x = 2 * (x - torch.tensor(self.min, device=x.device)) \
-                    / (torch.tensor(self.max, device=x.device) - torch.tensor(self.min, device=x.device)) - 1
-            elif self.method == "mean-std":
-                x = (x - torch.tensor(self.mean, device=x.device)) / (torch.tensor(self.std, device=x.device))
-        else:
-            if self.method == "min-max":
-                x = 2 * (x - self.min) / (self.max - self.min) - 1
-            elif self.method == "mean-std":
-                x = (x - self.mean) / (self.std)
+        # Dimension and Lp-norm type are postive
+        assert d > 0 and p > 0
 
-        return x
+        self.d = d
+        self.p = p
+        self.reduction = reduction
+        self.size_average = size_average
 
-    def back(self, x):
-        if torch.is_tensor(x):
-            if self.method == "min-max":
-                x = (x + 1) / 2 * (torch.tensor(self.max, device=x.device)
-                                   - torch.tensor(self.min, device=x.device)) + torch.tensor(self.min, device=x.device)
-            elif self.method == "mean-std":
-                x = x * (torch.tensor(self.std, device=x.device)) + torch.tensor(self.mean, device=x.device)
-        else:
-            if self.method == "min-max":
-                x = (x + 1) / 2 * (self.max - self.min) + self.min
-            elif self.method == "mean-std":
-                x = x * (self.std) + self.mean
-        return x
+    def abs(self, x, y):
+        num_examples = x.size()[0]
+
+        # Assume uniform mesh
+        # h = 1.0 / (x.size()[1] - 1.0) (h ** (self.d / self.p)) *
+
+        all_norms = torch.norm(x.reshape(num_examples, -1) - y.reshape(num_examples, -1), self.p, 1)
+
+        if self.reduction:
+            if self.size_average:
+                return torch.mean(all_norms)
+            else:
+                return torch.sum(all_norms)
+
+        return all_norms
+
+    def rel(self, x, y):
+        num_examples = x.size()[0]
+
+        diff_norms = torch.norm(x.reshape(num_examples, -1) - y.reshape(num_examples, -1), self.p, 1)
+        y_norms = torch.norm(y.reshape(num_examples, -1), self.p, 1)
+
+        if self.reduction:
+            if self.size_average:
+                return torch.mean(diff_norms / y_norms)
+            else:
+                return torch.sum(diff_norms / y_norms)
+
+        return diff_norms / y_norms
+
+    def __call__(self, x, y):
+        return self.rel(x, y)

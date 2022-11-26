@@ -77,6 +77,7 @@ class MatLoader(object):
         self._load_file()
 
     def _load_file(self):
+
         try:
             self.data = sio.loadmat(self.file_path)
             self.old_mat = True

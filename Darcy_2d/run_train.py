@@ -14,9 +14,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from process_data import DataNormer, MatLoader
 from Models.FNOs import FNO2d
-from visual_data import MatplotlibVision
+from Utilizes.loss_metrics import FieldsLpLoss
+from Utilizes.visual_data import MatplotlibVision
 
-from tqdm import trange, tqdm
 import matplotlib.pyplot as plt
 import time
 import os
@@ -25,8 +25,8 @@ import os
 class Net(FNO2d):
     """use basic model to build the network"""
 
-    def __init__(self, num_channels, modes, width, depth, steps, padding, activation):
-        super(Net, self).__init__(num_channels, modes, width, depth, steps, padding, activation)
+    def __init__(self, in_dim, out_dim, modes, width, depth, steps, padding, activation='gelu'):
+        super(Net, self).__init__(in_dim, out_dim, modes, width, depth, steps, padding, activation)
 
     def feature_transform(self, x):
         """
@@ -44,7 +44,7 @@ class Net(FNO2d):
         return torch.cat((gridx, gridy), dim=-1).to(x.device)
 
 
-def train(dataloader, netmodel, lossfunc, optimizer, scheduler):
+def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     """
     Args:
         data_loader: output fields at last time step
@@ -55,7 +55,7 @@ def train(dataloader, netmodel, lossfunc, optimizer, scheduler):
     """
 
     train_loss = 0
-    for xx, yy in dataloader:
+    for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
         gd = netmodel.feature_transform(xx)
@@ -70,10 +70,10 @@ def train(dataloader, netmodel, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss
+    return train_loss / (batch + 1)
 
 
-def valid(dataloader, netmodel, lossfunc):
+def valid(dataloader, netmodel, device, lossfunc):
     """
     Args:
         data_loader: input coordinates
@@ -82,7 +82,7 @@ def valid(dataloader, netmodel, lossfunc):
     """
     valid_loss = 0
     with torch.no_grad():
-        for xx, yy in dataloader:
+        for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
             gd = netmodel.feature_transform(xx)
@@ -91,10 +91,10 @@ def valid(dataloader, netmodel, lossfunc):
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss
+    return valid_loss / (batch + 1)
 
 
-def inference(dataloader, netmodel):
+def inference(dataloader, netmodel, device):
     """
     Args:
         dataloader: input coordinates
@@ -109,7 +109,7 @@ def inference(dataloader, netmodel):
         pred = netmodel(xx, gd)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return gd.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -128,28 +128,32 @@ if __name__ == "__main__":
     else:
         device = torch.device('cpu')
 
+    train_file = 'data/piececonst_r421_N1024_smooth1.mat'
+    valid_file = 'data/piececonst_r421_N1024_smooth2.mat'
 
-    train_file = 'data/piececonst_r241_N1024_smooth1.mat'
-    valid_PATH = 'data/piececonst_r241_N1024_smooth2.mat'
-
+    in_dim = 1
+    out_dim = 1
     ntrain = 1000
     nvalid = 200
 
-    modes = 12
-    planes = []
+    modes = (12, 12)
+    width = 32
+    depth = 4
+    steps = 1
+    padding = 8
 
     batch_size = 32
     batch_size2 = batch_size
 
     epochs = 500
     learning_rate = 0.001
-    scheduler_step = 50
-    scheduler_gamma = 0.5
+    scheduler_step = 400
+    scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
     r = 5
-    h = int(((241 - 1) / r) + 1)
+    h = int(((421 - 1) / r) + 1)
     s = h
 
     ################################################################
@@ -173,17 +177,21 @@ if __name__ == "__main__":
     valid_y = y_normalizer.norm(valid_y)
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
-                                               batch_size=batch_size, shuffle=True)
+                                               batch_size=batch_size, shuffle=True, drop_last=True)
     valid_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(valid_x, valid_y),
-                                               batch_size=batch_size, shuffle=False)
+                                               batch_size=batch_size, shuffle=False, drop_last=True)
 
+    ################################################################
+    #  Neural Networks
+    ################################################################
     # 建立网络
-    Net_model = Net(num_channels=1, modes=(12, 12), width=32, depth=4, steps=1, padding=9, activation='gelu').to(device)
+    Net_model = Net(in_dim=in_dim, out_dim=out_dim,
+                    modes=modes, width=width, depth=depth, steps=steps, padding=padding, activation='gelu').to(device)
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
-    Optimizer = torch.optim.Adam(Net_model.parameters(), lr=0.001, betas=(0.7, 0.9), weight_decay=1e-4)
+    Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
     # 下降策略
     Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     # 可视化
@@ -193,7 +201,7 @@ if __name__ == "__main__":
     log_loss = [[], []]
 
     ################################################################
-    # train data
+    # train process
     ################################################################
 
     for epoch in range(epochs):
@@ -206,30 +214,37 @@ if __name__ == "__main__":
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
               format(epoch, learning_rate, log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
-        plt.figure(1, figsize=(10, 5))
-        plt.clf()
-        Visual.plot_loss(np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
-        Visual.plot_loss(np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
-        # Visual.plot_loss(np.arange(len(log_loss[0])), np.array(log_loss)[0, :, 1], 'train_full')
-        # Visual.plot_loss(np.arange(len(log_loss[0])), np.array(log_loss)[1, :, 1], 'valid_full')
-        plt.title('training loss')
-        plt.savefig(os.path.join(work_path, 'log_loss.svg'))
+        star_time = time.time()
 
-        if epoch > 0 and epoch % 1 == 0:
+        if epoch > 0 and epoch % 20 == 0:
+            fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
+            fig.suptitle('training loss')
+            fig.savefig(os.path.join(work_path, 'log_loss.svg'))
+            plt.close(fig)
+
+        ################################################################
+        # Visualization
+        ################################################################
+
+        if epoch > 0 and epoch % 20 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-            train_coord, train_true, train_pred = inference(train_loader, Net_model)
-            valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model)
+            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model)
+            train_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model)
 
-            torch.save({'log_loss': log_loss, 'model': Net_model.state_dict(), },
+            torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            fig = plt.figure(100, figsize=(18, 5))
-            for fig_id in range(3):
-                Visual.plot_fields_ms(train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
-                plt.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
+            for fig_id in range(10):
+                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
+                Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
+                fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
 
-            fig = plt.figure(100, figsize=(18, 5))
-            for fig_id in range(3):
-                Visual.plot_fields_ms(valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
-                plt.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
+            for fig_id in range(10):
+                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
+                Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
+                fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
+                plt.close(fig)

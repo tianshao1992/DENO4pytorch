@@ -14,7 +14,7 @@ from spectral_layers import *
 
 
 class FNO1d(nn.Module):
-    def __init__(self, num_channels, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO1d, self).__init__()
 
         """
@@ -29,21 +29,22 @@ class FNO1d(nn.Module):
         output: the solution of a later timestep
         output shape: (batchsize, x=s, c=1)
         """
-
+        self.in_dim = in_dim
+        self.out_dim = out_dim
         self.modes = modes
         self.width = width
         self.depth = depth
         self.steps = steps
         self.activation = activation
         self.padding = padding  # pad the domain if input is non-periodic
-        self.fc0 = nn.Linear(steps * num_channels + 1, self.width)  # input channel is 2: (a(x), x)
+        self.fc0 = nn.Linear(steps * in_dim + 1, self.width)  # input channel is 2: (a(x), x)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv1d(self.width, self.width, self.modes, activation=self.activation))
+            self.convs.append(SpectralConv1d(self.width, self.width, self.modes, activation=self.activation, norm=None))
 
         self.fc1 = nn.Linear(self.width, 128)
-        self.fc2 = nn.Linear(128, num_channels)
+        self.fc2 = nn.Linear(128, out_dim)
 
     def forward(self, x, grid):
         # x dim = [b, x1, t*v]
@@ -64,7 +65,7 @@ class FNO1d(nn.Module):
         return x
 
 class FNO2d(nn.Module):
-    def __init__(self, num_channels, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO2d, self).__init__()
 
         """
@@ -79,22 +80,23 @@ class FNO2d(nn.Module):
         output: the solution of the next timestep
         output shape: (batchsize, x, y, c)
         """
-
+        self.in_dim = in_dim
+        self.out_dim = out_dim
         self.modes = modes
         self.width = width
         self.depth = depth
         self.steps = steps
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
-        self.fc0 = nn.Linear(steps * num_channels + 2, self.width)
+        self.fc0 = nn.Linear(steps * in_dim + 2, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv2d(self.width, self.width, self.modes, activation=self.activation))
+            self.convs.append(SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, norm=None))
 
         self.fc1 = nn.Linear(self.width, 128)
-        self.fc2 = nn.Linear(128, num_channels)
+        self.fc2 = nn.Linear(128, out_dim)
 
     def forward(self, x, grid):
         # x dim = [b, x1, x2, x3, t*v]
@@ -102,12 +104,12 @@ class FNO2d(nn.Module):
         x = self.fc0(x)
         x = x.permute(0, 3, 1, 2)
 
-        x = F.pad(x, [0, self.padding])  # pad the domain if input is non-periodic
+        x = F.pad(x, [0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
-        x = x[..., :-self.padding]
+        x = x[..., :-self.padding, :-self.padding]
         x = x.permute(0, 2, 3, 1)  # pad the domain if input is non-periodic
         x = self.fc1(x)
         x = F.gelu(x)
@@ -117,7 +119,7 @@ class FNO2d(nn.Module):
 
 
 class FNO3d(nn.Module):
-    def __init__(self, num_channels, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu'):
         super(FNO3d, self).__init__()
 
         """
@@ -132,22 +134,23 @@ class FNO3d(nn.Module):
         output: the solution of the next 40 timesteps
         output shape: (batchsize, x=64, y=64, t=40, c=1)
         """
-
+        self.in_dim = in_dim
+        self.out_dim = out_dim
         self.modes = modes
         self.width = width
         self.depth = depth
         self.steps = steps
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
-        self.fc0 = nn.Linear(steps * num_channels + 3, self.width)
+        self.fc0 = nn.Linear(steps * in_dim + 3, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv3d(self.width, self.width, self.modes, activation=self.activation))
+            self.convs.append(SpectralConv3d(self.width, self.width, self.modes, activation=self.activation, norm=None))
 
         self.fc1 = nn.Linear(self.width, 128)
-        self.fc2 = nn.Linear(128, num_channels)
+        self.fc2 = nn.Linear(128, out_dim)
 
     def forward(self, x, grid):
         # x dim = [b, x1, x2, x3, t*v]
@@ -155,12 +158,12 @@ class FNO3d(nn.Module):
         x = self.fc0(x)
         x = x.permute(0, 4, 1, 2, 3)
 
-        x = F.pad(x, [0, self.padding])  # pad the domain if input is non-periodic
+        x = F.pad(x, [0, self.padding, 0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
-        x = x[..., :-self.padding]
+        x = x[..., :-self.padding, :-self.padding, :-self.padding]
         x = x.permute(0, 2, 3, 4, 1)  # pad the domain if input is non-periodic
         x = self.fc1(x)
         x = F.gelu(x)
