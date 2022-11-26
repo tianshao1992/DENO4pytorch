@@ -14,7 +14,7 @@ from spectral_layers import *
 
 
 class FNO1d(nn.Module):
-    def __init__(self, num_channels, modes=16, width=64, depth=4, steps=1):
+    def __init__(self, num_channels, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO1d, self).__init__()
 
         """
@@ -34,12 +34,13 @@ class FNO1d(nn.Module):
         self.width = width
         self.depth = depth
         self.steps = steps
-        self.padding = 2  # pad the domain if input is non-periodic
+        self.activation = activation
+        self.padding = padding  # pad the domain if input is non-periodic
         self.fc0 = nn.Linear(steps * num_channels + 1, self.width)  # input channel is 2: (a(x), x)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv1d(self.width, self.width, self.modes))
+            self.convs.append(SpectralConv1d(self.width, self.width, self.modes, activation=self.activation))
 
         self.fc1 = nn.Linear(self.width, 128)
         self.fc2 = nn.Linear(128, num_channels)
@@ -63,7 +64,7 @@ class FNO1d(nn.Module):
         return x
 
 class FNO2d(nn.Module):
-    def __init__(self, num_channels, modes=(8, 8), width=32, depth=4, steps=1):
+    def __init__(self, num_channels, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO2d, self).__init__()
 
         """
@@ -83,13 +84,14 @@ class FNO2d(nn.Module):
         self.width = width
         self.depth = depth
         self.steps = steps
-        self.padding = 2  # pad the domain if input is non-periodic
+        self.padding = padding  # pad the domain if input is non-periodic
+        self.activation = activation
         self.fc0 = nn.Linear(steps * num_channels + 2, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv2d(self.width, self.width, self.modes))
+            self.convs.append(SpectralConv2d(self.width, self.width, self.modes, activation=self.activation))
 
         self.fc1 = nn.Linear(self.width, 128)
         self.fc2 = nn.Linear(128, num_channels)
@@ -115,7 +117,7 @@ class FNO2d(nn.Module):
 
 
 class FNO3d(nn.Module):
-    def __init__(self, num_channels, modes=(8, 8, 8), width=32, depth=4, steps=1):
+    def __init__(self, num_channels, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu'):
         super(FNO3d, self).__init__()
 
         """
@@ -135,13 +137,14 @@ class FNO3d(nn.Module):
         self.width = width
         self.depth = depth
         self.steps = steps
-        self.padding = 6  # pad the domain if input is non-periodic
+        self.padding = padding  # pad the domain if input is non-periodic
+        self.activation = activation
         self.fc0 = nn.Linear(steps * num_channels + 3, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv3d(self.width, self.width, self.modes))
+            self.convs.append(SpectralConv3d(self.width, self.width, self.modes, activation=self.activation))
 
         self.fc1 = nn.Linear(self.width, 128)
         self.fc2 = nn.Linear(128, num_channels)

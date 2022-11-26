@@ -130,7 +130,8 @@ venv*/
 venv/
 .idea
 .idea/
-
+*/data/
+*/work/
 # Spyder project settings
 .spyderproject
 .spyproject
