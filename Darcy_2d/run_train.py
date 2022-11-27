@@ -12,7 +12,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from process_data import DataNormer, MatLoader
+from Utilizes.process_data import DataNormer, MatLoader
 from Models.FNOs import FNO2d
 from Utilizes.loss_metrics import FieldsLpLoss
 from Utilizes.visual_data import MatplotlibVision

@@ -10,7 +10,7 @@
 
 import torch
 import torch.nn as nn
-from spectral_layers import *
+from Models.spectral_layers import *
 
 
 class FNO1d(nn.Module):

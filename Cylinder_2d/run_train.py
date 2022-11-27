@@ -4,7 +4,7 @@
 # @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
 # @Time    : 2022/11/27 12:42
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
-# @Site    : 
+# @Site    :
 # @File    : run_train.py
 """
 
@@ -23,6 +23,8 @@ import time
 import os
 from torchinfo import summary
 import sys
+import h5py
+from scipy import io as sio
 
 
 def feature_transform(x):
@@ -56,7 +58,14 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         yy = yy.to(device)
         if 'fno' in modelType:
             gd = feature_transform(xx)
-            pred = netmodel(xx, gd)
+            for t in range(0, T, step):
+                y = yy[..., t:t + step]
+                im = netmodel(xx, gd)
+                if t == 0:
+                    pred = im
+                else:
+                    pred = torch.cat((pred, im), -1)
+                xx = torch.cat((xx[..., step:], im), dim=-1)
         elif 'unet' in modelType:
             pred = netmodel(xx)
 
@@ -85,7 +94,14 @@ def valid(dataloader, netmodel, device, lossfunc):
             yy = yy.to(device)
             if 'fno' in modelType:
                 gd = feature_transform(xx)
-                pred = netmodel(xx, gd)
+                for t in range(0, T, step):
+                    y = yy[..., t:t + step]
+                    im = netmodel(xx, gd)
+                    if t == 0:
+                        pred = im
+                    else:
+                        pred = torch.cat((pred, im), -1)
+                    xx = torch.cat((xx[..., step:], im), dim=-1)
             elif 'unet' in modelType:
                 pred = netmodel(xx)
             loss = lossfunc(pred, yy)
@@ -108,7 +124,14 @@ def inference(dataloader, netmodel, device):
         xx = xx.to(device)
         if 'fno' in modelType:
             gd = feature_transform(xx)
-            pred = netmodel(xx, gd)
+            for t in range(0, T, step):
+                y = yy[..., t:t + step]
+                im = netmodel(xx, gd)
+                if t == 0:
+                    pred = im
+                else:
+                    pred = torch.cat((pred, im), -1)
+                xx = torch.cat((xx[..., step:], im), dim=-1)
         elif 'unet' in modelType:
             pred = netmodel(xx)
             gd = torch.zeros((1,)).to(device)
@@ -136,14 +159,12 @@ if __name__ == "__main__":
     else:
         device = torch.device('cpu')
 
-    INPUT_X = './data/naca/NACA_Cylinder_X.npy'
-    INPUT_Y = './data/naca/NACA_Cylinder_Y.npy'
-    OUTPUT_Sigma = './data/naca/NACA_Cylinder_Q.npy'
+    train_file = './data/cyl_Re250.mat'
 
-    in_dim = 2
+    in_dim = 10
     out_dim = 1
-    ntrain = 1000
-    nvalid = 200
+    ntrain = 150
+    nvalid = 50
 
     modelType = 'fno'
     modes = (12, 12)  # fno
@@ -153,7 +174,7 @@ if __name__ == "__main__":
     depth = 4  # all
     dropout = 0.0
 
-    batch_size = 32
+    batch_size = 16
     epochs = 500
     learning_rate = 0.001
     scheduler_step = 400
@@ -161,29 +182,23 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r1 = 1
-    r2 = 1
-    s1 = int(((221 - 1) / r1) + 1)
-    s2 = int(((51 - 1) / r2) + 1)
+    sub = 1
+    S = 64
+    T_in = 10
+    T = 40
+    step = 1
 
     ################################################################
     # load data
     ################################################################
 
-    inputX = np.load(INPUT_X)
-    inputX = torch.tensor(inputX, dtype=torch.float)
-    inputY = np.load(INPUT_Y)
-    inputY = torch.tensor(inputY, dtype=torch.float)
-    input = torch.stack([inputX, inputY], dim=-1)
+    reader = MatLoader(train_file)
+    train_x = reader.read_field('fields_').squeeze(0)[:ntrain, ::sub, ::sub, :T_in]
+    train_y = reader.read_field('u').squeeze(0)[:ntrain, ::sub, ::sub, T_in:T + T_in]
 
-    output = np.load(OUTPUT_Sigma)[:, (4,)].squeeze()
-    output = torch.tensor(output, dtype=torch.float).unsqueeze(-1)
-    print(input.shape, output.shape)
-
-    train_x = input[:ntrain, ::r1, ::r2][:, :s1, :s2]
-    train_y = output[:ntrain, ::r1, ::r2][:, :s1, :s2]
-    valid_x = input[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
-    valid_y = output[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
+    valid_x = reader.read_field('u')[ntrain:, ::sub, ::sub, :T_in]
+    valid_y = reader.read_field('u')[ntrain:, ::sub, ::sub, T_in:T + T_in]
+    del reader
 
     # x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0,))
     # train_x = x_normalizer.norm(train_x)
@@ -206,14 +221,14 @@ if __name__ == "__main__":
     if modelType == 'fno':
         Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
                           padding=padding, activation='gelu').to(device)
-        input1 = torch.randn(batch_size, input.shape[1], input.shape[2], input.shape[3]).to(device)
-        input2 = torch.randn(batch_size, input.shape[1], input.shape[2], 2).to(device)
+        input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(device)
+        input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(device)
         print(modelType)
         summary(Net_model, input_data=[input1, input2], device=device)
     elif modelType == 'unet':
-        Net_model = UNet2d(in_sizes=input.shape[1:], out_sizes=output.shape[1:], width=width, depth=depth,
+        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:], width=width, depth=depth,
                            activation='gelu', dropout=dropout).to(device)
-        input1 = torch.randn(batch_size, input.shape[1], input.shape[2], input.shape[3]).to(device)
+        input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(device)
         print(modelType)
         summary(Net_model, input_data=input1, device=device)
 
@@ -268,8 +283,6 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            nx = 40 // r1
-            ny = 20 // r2
             for fig_id in range(10):
                 fig, axs = plt.subplots(2, 3, figsize=(18, 10), layout='constrained', num=2)
                 Visual.plot_fields_ms(fig, axs[0], train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
