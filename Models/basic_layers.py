@@ -200,12 +200,12 @@ class Identity(nn.Module):
 
         elif len(x.shape) == 3:
             '''
-            (-1, in, S) -> (-1, out, S)
+            (-1, S, in) -> (-1, S, out)
             Used in SimpleResBlock
             '''
-            x = x.permute(0, 2, 1)
+            # x = x.permute(0, 2, 1)
             x = self.id(x)
-            x = x.permute(0, 2, 1)
+            # x = x.permute(0, 2, 1)
         elif len(x.shape) == 2:
             '''
             (-1, in) -> (-1, out)
