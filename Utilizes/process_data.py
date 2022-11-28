@@ -13,6 +13,7 @@ import scipy.io as sio
 import torch
 import h5py
 
+
 class DataNormer():
     """
         data normalization at last dimension
@@ -31,6 +32,9 @@ class DataNormer():
             self.std = np.std(data, axis=axis)
 
     def norm(self, x):
+        """
+            input tensors
+        """
         if torch.is_tensor(x):
             if self.method == "min-max":
                 x = 2 * (x - torch.tensor(self.min, device=x.device)) \
@@ -46,6 +50,9 @@ class DataNormer():
         return x
 
     def back(self, x):
+        """
+            input tensors
+        """
         if torch.is_tensor(x):
             if self.method == "min-max":
                 x = (x + 1) / 2 * (torch.tensor(self.max, device=x.device)
@@ -115,4 +122,3 @@ class MatLoader(object):
 
     def set_float(self, to_float):
         self.to_float = to_float
-

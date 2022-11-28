@@ -19,11 +19,14 @@ from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
 from functools import partial
 from Models.configs import activation_dict
 
+
 class SpectralConv1d(nn.Module):
     '''
+    1维谱卷积
     Modified Zongyi Li's Spectral1dConv code
     https://github.com/zongyi-li/fourier_neural_operator/blob/master/fourier_1d.py
     '''
+
     def __init__(self, in_dim,
                  out_dim,
                  modes: int,  # number of fourier modes
@@ -39,14 +42,14 @@ class SpectralConv1d(nn.Module):
 
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.modes = modes  #Number of Fourier modes to multiply, at most floor(N/2) + 1
+        self.modes = modes  # Number of Fourier modes to multiply, at most floor(N/2) + 1
         self.norm = norm
         self.dropout = dropout
         self.return_freq = return_freq
         self.activation = activation_dict[activation]
         self.linear = nn.Conv1d(self.in_dim, self.out_dim, 1)  # for residual
 
-        self.scale = (1 / (in_dim*out_dim))
+        self.scale = (1 / (in_dim * out_dim))
         self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes, dtype=torch.cfloat))
 
     # Complex multiplication
@@ -55,16 +58,19 @@ class SpectralConv1d(nn.Module):
         return torch.einsum("bix,iox->box", input, weights)
 
     def forward(self, x):
+        """
+        forward computation
+        """
         batchsize = x.shape[0]
-        #Compute Fourier coeffcients up to factor of e^(- something constant)
+        # Compute Fourier coeffcients up to factor of e^(- something constant)
         x_ft = torch.fft.rfft(x, norm=self.norm)
         res = self.linear(x)
 
         # Multiply relevant Fourier modes
-        out_ft = torch.zeros(batchsize, self.out_dim,  x.size(-1)//2 + 1,  device=x.device, dtype=torch.cfloat)
+        out_ft = torch.zeros(batchsize, self.out_dim, x.size(-1) // 2 + 1, device=x.device, dtype=torch.cfloat)
         out_ft[:, :, :self.modes] = self.compl_mul1d(x_ft[:, :, :self.modes], self.weights1)
 
-        #Return to physical space
+        # Return to physical space
         x = torch.fft.irfft(out_ft, n=x.size(-1))
         x = self.activation(x + res)
 
@@ -74,9 +80,9 @@ class SpectralConv1d(nn.Module):
             return x
 
 
-
 class SpectralConv2d(nn.Module):
     '''
+    2维谱卷积
     Modified Zongyi Li's SpectralConv2d PyTorch 1.6 code
     using only real weights
     https://github.com/zongyi-li/fourier_neural_operator/blob/master/fourier_2d.py
@@ -118,6 +124,9 @@ class SpectralConv2d(nn.Module):
         return torch.einsum("bixy,ioxy->boxy", input, weights)
 
     def forward(self, x):
+        """
+        forward computation
+        """
         batch_size = x.shape[0]
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         x_ft = torch.fft.rfft2(x, norm=self.norm)
@@ -142,10 +151,12 @@ class SpectralConv2d(nn.Module):
 
 class SpectralConv3d(nn.Module):
     '''
+    三维谱卷积
     Modified Zongyi Li's SpectralConv2d PyTorch 1.6 code
     using only real weights
     https://github.com/zongyi-li/fourier_neural_operator/blob/master/fourier_2d.py
     '''
+
     def __init__(self, in_dim,
                  out_dim,
                  modes: tuple,
@@ -154,7 +165,6 @@ class SpectralConv3d(nn.Module):
                  activation='silu',
                  return_freq=False):  # whether to return the frequency target
         super(SpectralConv3d, self).__init__()
-
 
         """
         3D Fourier layer. It does FFT, linear transform, and Inverse FFT.    
@@ -193,6 +203,9 @@ class SpectralConv3d(nn.Module):
         return torch.einsum("bixyz,ioxyz->boxyz", input, weights)
 
     def forward(self, x):
+        """
+        forward computation
+        """
         batch_size = x.size(0)
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         x_ft = torch.fft.rfftn(x, dim=[-3, -2, -1], norm=self.norm)
@@ -226,11 +239,11 @@ if __name__ == '__main__':
     print(y.shape)
 
     x = torch.ones([10, 3, 55, 64])
-    layer = SpectralConv2d(in_dim=3, out_dim=10, modes=[5, 3])
+    layer = SpectralConv2d(in_dim=3, out_dim=10, modes=(5, 3))
     y = layer(x)
     print(y.shape)
 
     x = torch.ones([10, 3, 16, 32, 48])
-    layer = SpectralConv3d(in_dim=3, out_dim=4, modes=[5, 5, 5])
+    layer = SpectralConv3d(in_dim=3, out_dim=4, modes=(5, 5, 5))
     y = layer(x)
     print(y.shape)

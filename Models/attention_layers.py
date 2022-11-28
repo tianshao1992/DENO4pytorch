@@ -36,10 +36,10 @@ def attention(query, key, value,
 
     if attention_type == 'cosine':
         p_attn = F.cosine_similarity(query, key.transpose(-2, -1)) \
-            / math.sqrt(d_k)
+                 / math.sqrt(d_k)
     else:
         scores = torch.matmul(query, key.transpose(-2, -1)) \
-            / math.sqrt(d_k)
+                 / math.sqrt(d_k)
         seq_len = scores.size(-1)
 
         if attention_type == 'softmax':
@@ -116,6 +116,7 @@ def causal_linear_attn(query, key, value, kv_mask=None, dropout=None, eps=1e-7):
     attn = torch.einsum('bhund,bhude,bhun->bhune', b_q, p_attn, D_inv)
     return attn.reshape(*query.shape), p_attn
 
+
 class PositionalEncoding(nn.Module):
     '''
     https://pytorch.org/tutorials/beginner/transformer_tutorial.html
@@ -124,15 +125,15 @@ class PositionalEncoding(nn.Module):
     '''
 
     def __init__(self, d_model,
-                       dropout=0.1,
-                       max_len=2**13):
+                 dropout=0.1,
+                 max_len=2 ** 13):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(dropout)
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(
-            0, d_model, 2).float() * (-math.log(2**13) / d_model))
+            0, d_model, 2).float() * (-math.log(2 ** 13) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
@@ -151,6 +152,7 @@ class FeedForward(nn.Module):
     """
     FeedForward layer in transformers
     """
+
     def __init__(self, in_dim=256,
                  dim_feedforward: int = 1024,
                  out_dim=None,
@@ -243,7 +245,7 @@ class SimpleAttention(nn.Module):
             self._get_norm(eps=eps)
 
         if pos_dim > 0:
-            self.fc = nn.Linear(d_model + n_head*pos_dim, d_model)
+            self.fc = nn.Linear(d_model + n_head * pos_dim, d_model)
 
         self.attn_weight = None
         self.dropout = nn.Dropout(dropout)
@@ -260,7 +262,7 @@ class SimpleAttention(nn.Module):
 
         bsz = query.size(0)
         if weight is not None:
-            query, key = weight*query, weight*key
+            query, key = weight * query, weight * key
 
         query, key, value = \
             [layer(x).view(bsz, -1, self.n_head, self.d_k).transpose(1, 2)
@@ -309,8 +311,8 @@ class SimpleAttention(nn.Module):
         elif self.attention_type == 'causal':
             assert mask is not None
             x, self.attn_weight = causal_linear_attn(query, key, value,
-                                                   mask=mask,
-                                                   dropout=self.dropout)
+                                                     mask=mask,
+                                                     dropout=self.dropout)
         else:
             x, self.attn_weight = attention(query, key, value,
                                             mask=mask,
@@ -318,7 +320,7 @@ class SimpleAttention(nn.Module):
                                             dropout=self.dropout)
 
         out_dim = self.n_head * self.d_k if pos is None else self.n_head * \
-            (self.d_k + self.pos_dim)
+                                                             (self.d_k + self.pos_dim)
         att_output = x.transpose(1, 2).contiguous().view(bsz, -1, out_dim)
 
         if pos is not None and self.pos_dim > 0:
@@ -335,8 +337,8 @@ class SimpleAttention(nn.Module):
                 xavier_uniform_(param, gain=self.xavier_init)
                 if self.diagonal_weight > 0.0:
                     param.data += self.diagonal_weight * \
-                        torch.diag(torch.ones(
-                            param.size(-1), dtype=torch.float))
+                                  torch.diag(torch.ones(
+                                      param.size(-1), dtype=torch.float))
                 if self.symmetric_init:
                     param.data += param.data.T
                     # param.data /= 2.0
@@ -392,12 +394,9 @@ class SimpleAttention(nn.Module):
 
 
 if __name__ == '__main__':
-
-
     Q = torch.ones([10, 100, 512])
     K = torch.ones([10, 100, 512])
     V = torch.ones([10, 100, 512])
     layer = SimpleAttention(n_head=8, d_model=512, norm_type='instance', norm_add=True)
     y = layer(Q, K, V)
     print(y)
-

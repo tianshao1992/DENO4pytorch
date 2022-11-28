@@ -15,6 +15,9 @@ from Models.configs import *
 
 
 class Conv1dResBlock(nn.Module):
+    """
+        1D残差卷积块
+    """
 
     def __init__(self, in_dim, out_dim,
                  kernel_size=3,
@@ -61,7 +64,7 @@ class Conv1dResBlock(nn.Module):
     def forward(self, x):
         """
         forward compute
-        :param in_var: (batch_size, input_dim, H, W)
+        :param in_var: (batch_size, input_dim, H)
         """
         if self.add_res:
             h = self.res(x)
@@ -78,10 +81,9 @@ class Conv1dResBlock(nn.Module):
 
 
 class DeConv1dBlock(nn.Module):
-    '''
-    Similar to a LeNet block
-    4x upsampling, dimension hard-coded
-    '''
+    """
+        1D反卷积块
+    """
 
     def __init__(self, in_dim: int,
                  hidden_dim: int,
@@ -121,7 +123,7 @@ class DeConv1dBlock(nn.Module):
     def forward(self, x):
         """
         forward compute
-        :param in_var: (batch_size, input_dim, H, W)
+        :param in_var: (batch_size, input_dim, H)
         """
         x = self.deconv0(x)
         x = self.dropout(x)
@@ -133,6 +135,9 @@ class DeConv1dBlock(nn.Module):
 
 
 class Interp1dUpsample(nn.Module):
+    """
+        1维上采样插值块
+    """
 
     def __init__(self, in_dim: int,
                  out_dim: int,
@@ -164,7 +169,7 @@ class Interp1dUpsample(nn.Module):
     def forward(self, x):
         """
         forward compute
-        :param in_var: (batch_size, input_dim, H, W)
+        :param in_var: (batch_size, input_dim, H)
         """
         if self.conv_block:
             x = self.conv(x)
@@ -348,6 +353,9 @@ class Interp2dUpsample(nn.Module):
 
 
 class Conv3dResBlock(nn.Module):
+    """
+        3维残差卷积块
+    """
 
     def __init__(self, in_dim, out_dim,
                  kernel_size=3,
@@ -394,7 +402,7 @@ class Conv3dResBlock(nn.Module):
     def forward(self, x):
         """
         forward compute
-        :param in_var: (batch_size, input_dim, H, W)
+        :param in_var: (batch_size, input_dim, H, W, L)
         """
         if self.add_res:
             h = self.res(x)
@@ -411,6 +419,9 @@ class Conv3dResBlock(nn.Module):
 
 
 class DeConv3dBlock(nn.Module):
+    """
+        3维反卷积块
+    """
 
     def __init__(self, in_dim: int,
                  hidden_dim: int,
@@ -442,6 +453,10 @@ class DeConv3dBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        """
+        forward compute
+        :param in_var: (batch_size, input_dim, H, W, L)
+        """
         x = self.deconv0(x)
         x = self.dropout(x)
         x = self.activation(x)
@@ -452,6 +467,11 @@ class DeConv3dBlock(nn.Module):
 
 
 class Interp3dUpsample(nn.Module):
+    '''
+    interpolate then Conv3dResBlock
+    old code uses lambda and cannot be pickled
+    temp hard-coded dimensions
+    '''
 
     def __init__(self, in_dim: int,
                  out_dim: int,
@@ -481,7 +501,10 @@ class Interp3dUpsample(nn.Module):
         self.interp_mode = interp_mode
 
     def forward(self, x):
-
+        """
+        forward compute
+        :param in_var: (batch_size, input_dim, H, W, L)
+        """
         if self.conv_block:
             x = self.conv(x)
 

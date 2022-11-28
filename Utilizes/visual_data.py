@@ -22,6 +22,33 @@ from matplotlib.ticker import MultipleLocator
 import matplotlib as mpl
 
 
+def adjacent_values(vals, q1, q3):
+    """
+    生成四分点，plot_violin
+    """
+    upper_adjacent_value = q3 + (q3 - q1) * 1.5
+    upper_adjacent_value = np.clip(upper_adjacent_value, q3, vals[-1])
+
+    lower_adjacent_value = q1 - (q3 - q1) * 1.5
+    lower_adjacent_value = np.clip(lower_adjacent_value, vals[0], q1)
+    return lower_adjacent_value, upper_adjacent_value
+
+
+def set_axis_style(ax, labels, position=None):
+    """
+    生成四分点，plot_violin
+    """
+    ax.get_xaxis().set_tick_params(direction='out')
+    ax.xaxis.set_ticks_position('bottom')
+    if position is None:
+        ax.set_xticks(np.arange(1, len(labels) + 1))
+        ax.set_xlim(0.25, len(labels) + 0.75)
+    else:
+        ax.set_xticks(position)
+        ax.set_xlim(1.5 * position[0] - 0.5 * position[1], 1.5 * position[-1] - 0.5 * position[-2])
+    ax.set_xticklabels(labels)
+
+
 class TextLogger(object):
     """
     log文件记录所有打印结果
@@ -161,127 +188,80 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_fields1d(self, fig, axs, curve, true, pred, title=None, xylabels=['x coordinate', 'field']):
-        axs.plot(curve, true)
-        axs.plot(curve, pred)
-        axs.legend(loc="best", prop=self.font)
-        axs.set_xlabel(xylabels[0], fontdict=self.font)
-        axs.set_ylabel(xylabels[1], fontdict=self.font)
-        axs.tick_params('both', labelsize=self.font["size"], )
-        axs.set_title(title, fontdict=self.font)
+    def plot_fields1d(self, fig, axs, real, pred, coord, title=None, xylabels=['x coordinate', 'field'],
+                      show_channel=None):
 
-    def plot_fields_tr(self, fig, axs, out_true, out_pred, coord, triObj, mask,
-                       cmin_max=None, fmin_max=None, field_name=None,
-                       cmap='RdBu_r', ):
+        if len(axs.shape) == 1:
+            axs = axs[None, :]
 
-        fig.clf()
-        Num_fields = out_true.shape[-1]
-        if fmin_max == None:
-            fmin, fmax = out_true.min(axis=(0,)), out_true.max(axis=(0,))
+        if show_channel is None:
+            show_channel = np.arange(len(self.field_name))
+
+        num_channel = len(show_channel)
+        name_channel = [self.field_name[i] for i in show_channel]
+
+        for i in range(num_channel):
+
+            fi = show_channel[i]
+            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
+            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
+
+            axs[i][0].cla()
+            axs[i][0].plot(coord, ff[0], color='g', linewidth=3, label='true')
+            axs[i][0].plot(coord, ff[1], '--', color='r', linewidth=2, label='pred')
+            axs[i][1].plot(coord, ff[2], color='r', linewidth=2, label='error')
+            for j in range(2):
+                axs[i][j].legend(loc="best", prop=self.font)
+                axs[i][j].set_xlabel(xylabels[0], fontdict=self.font)
+                axs[i][j].set_ylabel(xylabels[1], fontdict=self.font)
+                axs[i][j].tick_params('both', labelsize=self.font["size"], )
+                axs[i][j].set_title(title, fontdict=self.font)
+
+    def plot_fields_tr(self, fig, axs, real, pred, coord, edges, mask=None, cmin_max=None, fmin_max=None,
+                       show_channel=None):
+
+        if len(axs.shape) == 1:
+            axs = axs[None, :]
+
+        if show_channel is None:
+            show_channel = np.arange(len(self.field_name))
+
+        name_channel = [self.field_name[i] for i in show_channel]
+
+        if fmin_max is None:
+            fmin, fmax = real.min(axis=0), real.max(axis=0)
         else:
             fmin, fmax = fmin_max[0], fmin_max[1]
 
-        if cmin_max == None:
-            cmin, cmax = coord.min(axis=(0, 1)), coord.max(axis=(0, 1))
+        if cmin_max is None:
+            cmin, cmax = coord.min(axis=0), coord.max(axis=0)
         else:
             cmin, cmax = cmin_max[0], cmin_max[1]
 
-        if field_name == None:
-            field_name = self.field_name
-
-        x_pos = coord[:, 0]
-        y_pos = coord[:, 1]
-        ############################# Plotting ###############################
-        for fi in range(Num_fields):
-            plt.rcParams['font.size'] = 15
-            # triObj = tri.Triangulation(x_pos, y_pos, triangles=cell)  # 生成指定拓扑结构的三角形剖分.
-
-            Num_levels = 20
-            # plt.triplot(triObj, lw=0.5, color='white')
-
-            if cmin_max is not None:
-                plt.axis((cmin[0], cmax[0], cmin[1], cmax[1]))
-            ########      Exact f(t,x,y)     ###########
-            plt.subplot(Num_fields, 3, 3 * fi + 1)
-            levels = np.arange(out_true.min(), out_true.max(), 0.05)
-            plt.tricontourf(triObj, out_true[:, fi], Num_levels, cmap=cmap)
-            plt.fill(mask[:, 0], mask[:, 1], facecolor='white')
-            plt.clim(vmin=fmin[fi], vmax=fmax[fi])
-            cb = plt.colorbar()
-            cb.ax.tick_params(labelsize=15)  # 设置色标刻度字体大小
-            plt.rcParams['font.family'] = 'Times New Roman'
-            # cb.set_label('value', rotation=0, fontdict=self.font, y=1.08)
-            plt.rcParams['font.size'] = 15
-            plt.xlabel('$x$', fontdict=self.font)
-            plt.ylabel('$' + self.input_name[1] + '$', fontdict=self.font)
-            plt.title('True field $' + field_name[fi] + '$' + '', fontsize=15)
-
-            if cmin_max is not None:
-                plt.axis((cmin[0], cmax[0], cmin[1], cmax[1]))
-
-            ########     Learned f(t,x,y)     ###########
-            plt.subplot(Num_fields, 3, 3 * fi + 2)
-            # levels = np.arange(out_true.min(), out_true.max(), 0.05)
-            plt.tricontourf(triObj, out_pred[:, fi], Num_levels, cmap=cmap)
-            plt.fill(mask[:, 0], mask[:, 1], facecolor='w')
-            cb = plt.colorbar()
-            plt.clim(vmin=fmin[fi], vmax=fmax[fi])
-            cb.ax.tick_params(labelsize=15)  # 设置色标刻度字体大小
-            plt.rcParams['font.size'] = 15
-            plt.xlabel('$x$', fontdict=self.font)
-            plt.ylabel('$' + self.input_name[1] + '$', fontdict=self.font)
-            plt.title('Pred field $' + field_name[fi] + '$' + '', fontsize=15)
-
-            if cmin_max is not None:
-                plt.axis((cmin[0], cmax[0], cmin[1], cmax[1]))
-
-            ########     Error f(t,x,y)     ###########
-            plt.subplot(Num_fields, 3, 3 * fi + 3)
-            err = out_pred[:, fi] - out_true[:, fi]
-            plt.tricontourf(triObj, err, Num_levels, cmap='coolwarm')
-            plt.fill(mask[:, 0], mask[:, 1], facecolor='w')
-            cb = plt.colorbar()
-            plt.clim(vmin=-max(abs(fmin[fi]), abs(fmax[fi])), vmax=max(abs(fmin[fi]), abs(fmax[fi])))
-            cb.ax.tick_params(labelsize=15)  # 设置色标刻度字体大小
-            plt.rcParams['font.size'] = 15
-            plt.xlabel('$' + self.input_name[0] + '$', fontdict=self.font)
-            plt.ylabel('$' + self.input_name[1] + '$', fontdict=self.font)
-            plt.title('field error$' + field_name[fi] + '$' + '', fontsize=15)
-
-            if cmin_max is not None:
-                plt.axis((cmin[0], cmax[0], cmin[1], cmax[1]))
-
-    def plot_bld_tr(self, fig, axs, real, pred, coord, triObj, xmin_max=None, show_channel=(0, 1, 2),
-                    name_channel=('Ma', 'P', 'T')):
-        real[:, 1] /= 1000
-        pred[:, 1] /= 1000
-        x, y = coord[..., 0], coord[..., 1]
-        fmin, fmax = real.min(axis=(0,)), real.max(axis=(0,))
-        index = np.array([1, 300, 500, 20, 10, 10])
-
-        if xmin_max == None:
-            x_lower, x_upper = np.min(x), np.max(x)
-            y_lower, y_upper = np.min(y), np.max(y)
-        else:
-            x_lower, x_upper, y_lower, y_upper = xmin_max
-
-        # plt.rcParams['font.size'] = self.font_EN['size']
-        # plt.rcParams['font.family'] = self.font_EN['family']
-        num_channel = len(show_channel)
-        # num_channel = 1
-        titles = ['真实物理场', '预测物理场', '预测误差']
+        titles = ['truth', 'predicted', 'error']
         cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
+        num_channel = len(show_channel)
+
+        x = coord[:, 0]
+        y = coord[:, 1]
+
         for i in range(num_channel):
             fi = show_channel[i]
             ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
             limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
             for j in range(3):
-                f_true = axs[i][j].tripcolor(x, y, ff[j], triangles=triObj, cmap=cmaps[j], shading='gouraud',
+                f_true = axs[i][j].tripcolor(x, y, ff[j], triangles=edges, cmap=cmaps[j], shading='gouraud',
                                              antialiased=True, snap=True)
-                f_true.set_zorder(10)
 
-                axs[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
+                # f_true = axs[i][j].tricontourf(triObj, ff[j], 20, cmap=cmaps[j])
+                if mask is not None:
+                    axs[i][j].fill(mask[:, 0], mask[:, 1], facecolor='white')
+                # f_true.set_zorder(10)
+
+                # axs[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
                 axs[i][j].set_title(titles[j], fontdict=self.font_CHN)
+                axs[i][j].axis([cmin[0], cmax[0], cmin[1], cmax[1]])
+                # axs[i][j].tick_params(axis='x', labelsize=)
                 # if i == 0:
                 #     ax[i][j].set_title(titles[j], fontdict=self.font_CHN)
                 cb = fig.colorbar(f_true, ax=axs[i][j])
@@ -299,12 +279,12 @@ class MatplotlibVision(object):
                     cb.ax.set_title('$\mathrm{\Delta}$' + name_channel[i], fontdict=self.font_EN, loc='center')
                 # 设置刻度间隔
                 axs[i][j].set_aspect(1)
-                axs[i][j].xaxis.set_major_locator(MultipleLocator(0.1))
-                axs[i][j].yaxis.set_major_locator(MultipleLocator(0.1))
-                axs[i][j].xaxis.set_minor_locator(MultipleLocator(0.05))
-                axs[i][j].yaxis.set_minor_locator(MultipleLocator(0.05))
-                axs[i][j].set_xlabel(r'$x$/m', fontdict=self.font_EN)
-                axs[i][j].set_ylabel(r'$y$/m', fontdict=self.font_EN)
+                # axs[i][j].xaxis.set_major_locator(MultipleLocator(0.1))
+                # axs[i][j].yaxis.set_major_locator(MultipleLocator(0.1))
+                # axs[i][j].xaxis.set_minor_locator(MultipleLocator(0.2))
+                # axs[i][j].yaxis.set_minor_locator(MultipleLocator(0.1))
+                axs[i][j].set_xlabel(r'$x$', fontdict=self.font_EN)
+                axs[i][j].set_ylabel(r'$y$', fontdict=self.font_EN)
                 axs[i][j].spines['bottom'].set_linewidth(self.box_line_width)  # 设置底部坐标轴的粗细
                 axs[i][j].spines['left'].set_linewidth(self.box_line_width)  # 设置左边坐标轴的粗细
                 axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
@@ -388,3 +368,72 @@ class MatplotlibVision(object):
                              frames=np.arange(0, out_true.shape[0]).astype(np.int64), interval=200)
 
         anim.save(os.path.join(self.log_dir, str(p_id) + ".gif"), writer='pillow', dpi=300)
+
+    def plot_box(self, fig, ax, data, title=None, legends=None, xlabel=None, xticks=None, bag_width=1.0):
+        ax.set_title(title)
+        ax.semilogy()
+        ax.grid()
+        n_vin = data.shape[-1]
+        colors_map = ['#E4DACE', '#E5BB4B', '#498EAF', '#631F16']
+        if len(data.shape) == 2:
+            positions = np.arange(n_vin) + 1
+            x_pos = None
+            n_bag = 1
+        else:
+            n_bag = data.shape[-2]
+            p = (np.linspace(0, 1, n_vin + 2) - 0.5) * bag_width
+            positions = np.hstack([p[1:-1] + 0.5 + i for i in range(n_bag)]) * n_vin
+            x_pos = np.arange(n_bag) * n_vin + n_vin / 2
+
+        parts = ax.boxplot(data.reshape(data.shape[0], -1), widths=0.5 * bag_width, positions=positions, vert=True,
+                           patch_artist=True, )
+
+        for i in range(n_vin):
+            for j in range(n_bag):
+                parts['boxes'][i + j * n_vin].set_facecolor(colors_map[i])  # violin color
+                parts['boxes'][i + j * n_vin].set_edgecolor('grey')  # violin edge
+                parts['boxes'][i + j * n_vin].set_alpha(0.9)
+        ax.legend(legends)
+        if xticks is None:
+            xticks = np.arange(n_vin * n_bag)
+        ax.set_xlabel(xlabel)
+        ax.set_axis_style(ax, xticks, x_pos)
+
+    def plot_violin(self, fig, ax, data, title=None, legends=None, xticks=None, xlabel=None, bag_width=1.0):
+        ax.set_title(title)
+        ax.semilogy()
+        ax.grid()
+        n_vin = data.shape[-1]
+        colors_map = ['#E4DACE', '#E5BB4B', '#498EAF', '#631F16']
+        if len(data.shape) == 2:
+            positions = np.arange(n_vin) + 1
+            x_pos = None
+            n_bag = 1
+        else:
+            n_bag = data.shape[-2]
+            p = (np.linspace(0, 1, n_vin + 2) - 0.5) * bag_width
+            positions = np.hstack([p[1:-1] + 0.5 + i for i in range(n_bag)]) * n_vin
+            x_pos = np.arange(n_bag) * n_vin + n_vin / 2
+
+        parts = ax.violinplot(data.reshape(data.shape[0], -1), widths=0.5 * bag_width, positions=positions,
+                              showmeans=False, showmedians=False, showextrema=False)
+
+        for i in range(n_vin):
+            for j in range(n_bag):
+                parts['bodies'][i + j * n_vin].set_facecolor(colors_map[i])  # violin color
+                parts['bodies'][i + j * n_vin].set_edgecolor('grey')  # violin edge
+                parts['bodies'][i + j * n_vin].set_alpha(0.9)
+        ax.legend(legends)
+        quartile1, medians, quartile3 = np.percentile(data.reshape(data.shape[0], -1), [25, 50, 75], axis=0)
+        whiskers = np.array([
+            adjacent_values(sorted_array, q1, q3)
+            for sorted_array, q1, q3 in zip(data.reshape(data.shape[0], -1), quartile1, quartile3)])
+        whiskers_min, whiskers_max = whiskers[:, 0], whiskers[:, 1]
+
+        ax.scatter(positions, medians, marker='o', color='white', s=5, zorder=3)
+        ax.vlines(positions, quartile1, quartile3, color='black', linestyle='-', lw=5)
+        # ax.vlines(positions, whiskers_min, whiskers_max, color='black', linestyle='-', lw=1)
+        if xticks is None:
+            xticks = np.arange(n_vin * n_bag)
+        ax.set_xlabel(xlabel)
+        ax.set_axis_style(ax, xticks, x_pos)

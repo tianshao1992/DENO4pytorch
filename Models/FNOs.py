@@ -14,9 +14,12 @@ from Models.spectral_layers import *
 
 
 class FNO1d(nn.Module):
+    """
+        1维FNO网络
+    """
+
     def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO1d, self).__init__()
-
         """
         The overall network. It contains 4 layers of the Fourier layer.
         1. Lift the input to the desire channel dimension by self.fc0 .
@@ -47,6 +50,9 @@ class FNO1d(nn.Module):
         self.fc2 = nn.Linear(128, out_dim)
 
     def forward(self, x, grid):
+        """
+        forward computation
+        """
         # x dim = [b, x1, t*v]
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
@@ -64,7 +70,12 @@ class FNO1d(nn.Module):
         x = self.fc2(x)
         return x
 
+
 class FNO2d(nn.Module):
+    """
+        2维FNO网络
+    """
+
     def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO2d, self).__init__()
 
@@ -99,17 +110,22 @@ class FNO2d(nn.Module):
         self.fc2 = nn.Linear(128, out_dim)
 
     def forward(self, x, grid):
-        # x dim = [b, x1, x2, x3, t*v]
+        """
+        forward computation
+        """
+        # x dim = [b, x1, x2, t*v]
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 3, 1, 2)
 
-        x = F.pad(x, [0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
+        if self.padding != 0:
+            x = F.pad(x, [0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
-        x = x[..., :-self.padding, :-self.padding]
+        if self.padding != 0:
+            x = x[..., :-self.padding, :-self.padding]
         x = x.permute(0, 2, 3, 1)  # pad the domain if input is non-periodic
         x = self.fc1(x)
         x = F.gelu(x)
@@ -117,8 +133,11 @@ class FNO2d(nn.Module):
         return x
 
 
-
 class FNO3d(nn.Module):
+    """
+        3维FNO网络
+    """
+
     def __init__(self, in_dim, out_dim, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu'):
         super(FNO3d, self).__init__()
 
@@ -153,7 +172,10 @@ class FNO3d(nn.Module):
         self.fc2 = nn.Linear(128, out_dim)
 
     def forward(self, x, grid):
-        # x dim = [b, x1, x2, x3, t*v]
+        """
+        forward computation
+        x dim = [b, x1, x2, x3, t*v]
+        """
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 4, 1, 2, 3)
@@ -174,19 +196,19 @@ class FNO3d(nn.Module):
 if __name__ == '__main__':
     x = torch.ones([10, 32, 4])
     g = torch.ones([10, 32, 1])
-    layer = FNO1d(num_channels=4, modes=5, steps=1)
+    layer = FNO1d(in_dim=4, out_dim=1, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu')
     y = layer(x, g)
     print(y.shape)
 
     x = torch.ones([10, 32, 32, 4])
     g = torch.ones([10, 32, 32, 2])
-    layer = FNO2d(num_channels=4, modes=(5, 3), steps=1)
+    layer = FNO2d(in_dim=4, out_dim=1, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu')
     y = layer(x, g)
     print(y.shape)
 
 
     x = torch.ones([10, 32, 32, 32, 4])
     g = torch.ones([10, 32, 32, 32, 3])
-    layer = FNO3d(num_channels=4, modes=(5, 3, 5), steps=1)
+    layer = FNO3d(in_dim=4, out_dim=1, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu')
     y = layer(x, g)
     print(y.shape)

@@ -13,8 +13,10 @@ import torch.nn as nn
 from Models.conv_layers import *
 from Models.basic_layers import *
 
-
 class UpSampleNet1d(nn.Module):
+    """
+        1维上采样卷积网络
+    """
 
     def __init__(self, in_sizes: int, out_sizes: tuple, width=32, depth=4,
                  activation='gelu', dropout=0.0):
@@ -47,7 +49,9 @@ class UpSampleNet1d(nn.Module):
         self.conv = nn.Conv1d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        x = x
+        """
+        forward computation
+        """
         x = self.linear(x)
         x = x.view([-1, self.width] + self.hidden_size)
         for i in range(self.depth):
@@ -58,6 +62,9 @@ class UpSampleNet1d(nn.Module):
 
 
 class DownSampleNet1d(nn.Module):
+    """
+        1维下采样卷积网络
+    """
 
     def __init__(self, in_sizes: tuple, out_sizes: int, width=32, depth=4, activation='gelu', dropout=0.0):
 
@@ -90,6 +97,9 @@ class DownSampleNet1d(nn.Module):
                                     )
 
     def forward(self, x):
+        """
+        forward computation
+        """
         x = x.permute(0, 2, 1)
         x = self.interp_in(x)
         for i in range(self.depth):
@@ -100,6 +110,9 @@ class DownSampleNet1d(nn.Module):
 
 
 class UNet1d(nn.Module):
+    """
+        1维Unet
+    """
 
     def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, activation='gelu',
                  dropout=0.0):
@@ -158,6 +171,9 @@ class UNet1d(nn.Module):
         self.conv2 = nn.Conv1d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
+        """
+        forward computation
+        """
         x = x.permute(0, 2, 1)
         enc = []
         enc.append(self.interp_in(x))
@@ -176,8 +192,10 @@ class UNet1d(nn.Module):
         return x.permute(0, 2, 1)
 
 
-
 class UpSampleNet2d(nn.Module):
+    """
+        2维上采样卷积网络
+    """
 
     def __init__(self, in_sizes: int, out_sizes: tuple, width=32, depth=4,
                  activation='gelu', dropout=0.0):
@@ -217,7 +235,9 @@ class UpSampleNet2d(nn.Module):
         self.conv = nn.Conv2d(self.out_dim, self.out_dim, kernel_size=(3, 3), stride=(1, 1), padding=1)
 
     def forward(self, x):
-        x = x
+        """
+        forward computation
+        """
         x = self.linear(x)
         x = x.view([-1, self.width] + self.hidden_size)
         for i in range(self.depth):
@@ -226,7 +246,11 @@ class UpSampleNet2d(nn.Module):
         x = self.conv(x)
         return x.permute(0, 2, 3, 1)
 
+
 class DownSampleNet2d(nn.Module):
+    """
+        2维下采样卷积网络
+    """
 
     def __init__(self, in_sizes: tuple, out_sizes: int, width=32, depth=4, activation='gelu', dropout=0.0):
         """
@@ -265,6 +289,9 @@ class DownSampleNet2d(nn.Module):
                                     )
 
     def forward(self, x):
+        """
+        forward computation
+        """
         x = x.permute(0, 3, 1, 2)
         x = self.interp_in(x)
         for i in range(self.depth):
@@ -275,6 +302,9 @@ class DownSampleNet2d(nn.Module):
 
 
 class UNet2d(nn.Module):
+    """
+        2维UNet
+    """
 
     def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, activation='gelu',
                  dropout=0.0):
@@ -334,6 +364,9 @@ class UNet2d(nn.Module):
         self.conv2 = nn.Conv2d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
+        """
+        forward computation
+        """
         x = x.permute(0, 3, 1, 2)
         enc = []
         enc.append(self.interp_in(x))
@@ -353,6 +386,9 @@ class UNet2d(nn.Module):
 
 
 class UpSampleNet3d(nn.Module):
+    """
+        3维上采样卷积网络
+    """
 
     def __init__(self, in_sizes: int, out_sizes: tuple, width=32, depth=4,
                  activation='gelu', dropout=0.0):
@@ -394,7 +430,9 @@ class UpSampleNet3d(nn.Module):
         self.conv = nn.Conv3d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        x = x
+        """
+        forward computation
+        """
         x = self.linear(x)
         x = x.view([-1, self.width] + self.hidden_size)
         for i in range(self.depth):
@@ -405,6 +443,9 @@ class UpSampleNet3d(nn.Module):
 
 
 class DownSampleNet3d(nn.Module):
+    """
+        3维下采样卷积网络
+    """
 
     def __init__(self, in_sizes: tuple, out_sizes: int, width=32, depth=4, activation='gelu', dropout=0.0):
         """
@@ -443,6 +484,9 @@ class DownSampleNet3d(nn.Module):
                                     )
 
     def forward(self, x):
+        """
+        forward computation
+        """
         x = x.permute(0, 4, 1, 2, 3)
         x = self.interp_in(x)
         for i in range(self.depth):
@@ -451,7 +495,11 @@ class DownSampleNet3d(nn.Module):
         x = self.linear(x)
         return x
 
+
 class UNet3d(nn.Module):
+    """
+        3维UNet
+    """
 
     def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, activation='gelu',
                  dropout=0.0):
@@ -507,7 +555,10 @@ class UNet3d(nn.Module):
         self.conv2 = nn.Conv3d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
     def forward(self, x):
-        x=  x.permute(0, 4, 1, 2, 3)
+        """
+        forward computation
+        """
+        x = x.permute(0, 4, 1, 2, 3)
         enc = []
         enc.append(self.interp_in(x))
         for i in range(self.depth):

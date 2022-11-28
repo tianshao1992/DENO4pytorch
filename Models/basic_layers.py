@@ -140,14 +140,21 @@ class DeepONetMulti(nn.Module):
                 nn.init.xavier_uniform_(m.weight, gain=1)
                 m.bias.data.zero_()
 
-    def forward(self, u_vars, y_var):
+    def forward(self, u_vars, y_var, size_set=True):
         """
         forward compute
-        :param in_var: (batch_size, ..., input_dim)
+        :param u_vars: tensor list[(batch_size, ..., operator_dims[0]), (batch_size, ..., operator_dims[1]), ...]
+        :param y_var: (batch_size, ..., input_dim)
+        :param size_set: bool, true for standard inputs, false for reduce points number in operator inputs
         """
         B = 1.
         for u_var, branch in zip(u_vars, self.branches):
             B *= branch(u_var)
+        if not size_set:
+            B_size = list(y_var.shape[1:-1])
+            for i in range(len(B_size)):
+                B = B.unsqueeze(1)
+            B = torch.tile(B, [1, ] + B_size + [1, ])
         out_var = []
         for trunk in self.trunks:
             T = trunk(y_var)
@@ -218,8 +225,6 @@ class Identity(nn.Module):
         return x
 
 
-
-
 if __name__ == '__main__':
     x = torch.ones([10, 64, 64, 3])
     layer = FcnSingle([3, 64, 64, 10])
@@ -237,5 +242,3 @@ if __name__ == '__main__':
                           planes_branch=[64] * 3, planes_trunk=[64] * 2)
     y = layer(us, x)
     print(y.shape)
-
-

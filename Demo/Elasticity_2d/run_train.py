@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 # @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
-# @Time    : 2022/11/27 0:15
+# @Time    : 2022/11/27 20:34
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
-# @Site    : 
-# @File    : run_Darcy_train..py.py
+# @Site    :
+# @File    : run_train.py
 """
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,6 +15,7 @@ from Utilizes.process_data import DataNormer, MatLoader
 from Models.FNOs import FNO2d
 from Utilizes.loss_metrics import FieldsLpLoss
 from Utilizes.visual_data import MatplotlibVision
+
 
 import matplotlib.pyplot as plt
 import time
@@ -53,7 +53,6 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         optimizer: optimizer
         scheduler: scheduler
     """
-
     train_loss = 0
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
@@ -70,7 +69,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1)
+    return train_loss / (batch + 1) / batch_size
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -91,7 +90,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1)
+    return valid_loss / (batch + 1) / batch_size
 
 
 def inference(dataloader, netmodel, device):
@@ -102,6 +101,7 @@ def inference(dataloader, netmodel, device):
     Returns:
         out_pred: predicted fields
     """
+
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
@@ -109,7 +109,7 @@ def inference(dataloader, netmodel, device):
         pred = netmodel(xx, gd)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return gd.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'NS-2d-Darcy'
+    name = 'Hooke-2d-Elasticity'
     work_path = os.path.join('work')
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -128,10 +128,11 @@ if __name__ == "__main__":
     else:
         device = torch.device('cpu')
 
-    train_file = 'data/piececonst_r421_N1024_smooth1.mat'
-    valid_file = 'data/piececonst_r421_N1024_smooth2.mat'
+    INPUT_X = './data/Omesh/Random_UnitCell_Deform_X_10_interp.npy'
+    INPUT_Y = './data/Omesh/Random_UnitCell_Deform_Y_10_interp.npy'
+    OUTPUT_Sigma = './data/Omesh/Random_UnitCell_Deform_sigma_10_interp.npy'
 
-    in_dim = 1
+    in_dim = 2
     out_dim = 1
     ntrain = 1000
     nvalid = 200
@@ -143,8 +144,6 @@ if __name__ == "__main__":
     padding = 8
 
     batch_size = 32
-    batch_size2 = batch_size
-
     epochs = 500
     learning_rate = 0.001
     scheduler_step = 400
@@ -152,29 +151,38 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r = 5
-    h = int(((421 - 1) / r) + 1)
-    s = h
+    r1 = 2
+    r2 = 1
+    # h = int(((41 - 1) / r) + 1)
+    s1 = int(((65 - 1) / r1) + 1)
+    s2 = int(((41 - 1) / r2) + 1)
 
     ################################################################
     # load data
     ################################################################
 
-    reader = MatLoader(train_file)
-    train_x = reader.read_field('coeff')[:ntrain, ::r, ::r][:, :s, :s, None]
-    train_y = reader.read_field('sol')[:ntrain, ::r, ::r][:, :s, :s, None]
+    inputX = np.load(INPUT_X)
+    inputX = torch.tensor(inputX, dtype=torch.float).permute(2, 0, 1)
+    inputY = np.load(INPUT_Y)
+    inputY = torch.tensor(inputY, dtype=torch.float).permute(2, 0, 1)
+    input = torch.stack([inputX, inputY], dim=-1)
 
-    valid_x = reader.read_field('coeff')[:nvalid, ::r, ::r][:, :s, :s, None]
-    valid_y = reader.read_field('sol')[:nvalid, ::r, ::r][:, :s, :s, None]
-    del reader
+    output = np.load(OUTPUT_Sigma).squeeze()
+    output = torch.tensor(output, dtype=torch.float).permute(2, 0, 1).unsqueeze(-1)
+    print(input.shape, output.shape)
 
-    x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0,))
-    train_x = x_normalizer.norm(train_x)
-    valid_x = x_normalizer.norm(valid_x)
+    train_x = input[:ntrain, ::r1, ::r2][:, :s1, :s2]
+    train_y = output[:ntrain, ::r1, ::r2][:, :s1, :s2]
+    valid_x = input[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
+    valid_y = output[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
 
-    y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0,))
-    train_y = y_normalizer.norm(train_y)
-    valid_y = y_normalizer.norm(valid_y)
+    # x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0,))
+    # train_x = x_normalizer.norm(train_x)
+    # valid_x = x_normalizer.norm(valid_x)
+    #
+    # y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0,))
+    # train_y = y_normalizer.norm(train_y)
+    # valid_y = y_normalizer.norm(valid_y)
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
@@ -182,13 +190,15 @@ if __name__ == "__main__":
                                                batch_size=batch_size, shuffle=False, drop_last=True)
 
     ################################################################
-    #  Neural Networks
+    # Neural Networks
     ################################################################
+
     # 建立网络
     Net_model = Net(in_dim=in_dim, out_dim=out_dim,
                     modes=modes, width=width, depth=depth, steps=steps, padding=padding, activation='gelu').to(device)
     # 损失函数
-    Loss_func = nn.MSELoss()
+    # Loss_func = nn.MSELoss()
+    Loss_func = FieldsLpLoss(size_average=False)
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
@@ -207,16 +217,16 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, Loss_func, Optimizer, Scheduler))
+        log_loss[0].append(train(train_loader, Net_model, device, Loss_func, Optimizer, Scheduler))
 
         Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, Loss_func))
+        log_loss[1].append(valid(valid_loader, Net_model, device, Loss_func))
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
               format(epoch, learning_rate, log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 20 == 0:
+        if epoch > 0 and epoch % 5 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
@@ -228,23 +238,23 @@ if __name__ == "__main__":
         # Visualization
         ################################################################
 
-        if epoch > 0 and epoch % 20 == 0:
+        if epoch > 0 and epoch % 10 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model)
-            train_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model)
+            train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, device)
+            valid_coord, train_grid, valid_true, valid_pred = inference(valid_loader, Net_model, device)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
             for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
+                fig, axs = plt.subplots(1, 3, figsize=(18, 6), layout='constrained', num=2)
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
             for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
+                fig, axs = plt.subplots(1, 3, figsize=(18, 6), layout='constrained', num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
