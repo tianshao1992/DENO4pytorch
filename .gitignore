@@ -132,6 +132,11 @@ venv/
 .idea/
 */data/
 */work/
+*/*/work/
+*/*/data/
+*.npz
+*.npy
+*.mat
 # Spyder project settings
 .spyderproject
 .spyproject
