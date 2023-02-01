@@ -130,7 +130,7 @@ venv*/
 venv/
 .idea
 .idea/
-*/data/
+data/
 */work/
 */*/work/
 */*/data/

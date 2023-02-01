@@ -251,7 +251,7 @@ if __name__ == "__main__":
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
             train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, device)
-            valid_coord, train_grid, valid_true, valid_pred = inference(valid_loader, Net_model, device)
+            valid_coord, valid_grid, valid_true, valid_pred = inference(valid_loader, Net_model, device)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
