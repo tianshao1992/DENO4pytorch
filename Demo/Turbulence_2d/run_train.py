@@ -274,7 +274,7 @@ if __name__ == "__main__":
         # Visualization
         ################################################################
 
-        if epoch >= 0 and epoch % 20 == 0:
+        if epoch >= 0 and epoch % 50 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
             train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
@@ -283,13 +283,22 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
-            Visual.plot_fields_ms(fig, axs, train_true[0, ..., :1], train_pred[0, ..., :1], train_grid[0])
-            Visual.plot_fields_am(fig, axs, train_true.transpose((0, 3, 1, 2))[0, ..., None],
-                                  train_pred.transpose((0, 3, 1, 2))[0, ..., None],
-                                  train_grid[0], 'train')
+            for tim_id in range(0, 40, 4):
+                fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
+                Visual.plot_fields_ms(fig, axs, train_true[0, ..., tim_id, None],
+                                      train_pred[0, ..., tim_id, None], train_grid[0])
 
-            fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=2)
-            Visual.plot_fields_am(fig, axs, valid_true.transpose((0, 3, 1, 2))[0, ..., None],
-                                  valid_pred.transpose((0, 3, 1, 2))[0, ..., None],
-                                  valid_grid[0], 'valid')
+                fig.savefig(os.path.join(work_path, 'train_solution_' + str(tim_id) + '.jpg'))
+                plt.close(fig)
+                # Visual.plot_fields_am(fig, axs, train_true.transpose((0, 3, 1, 2))[0, ..., None],
+                #                       train_pred.transpose((0, 3, 1, 2))[0, ..., None],
+                #                       train_grid[0], 'train')
+
+                fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=2)
+                Visual.plot_fields_ms(fig, axs, valid_true[0, ..., tim_id, None],
+                                      valid_pred[0, ..., tim_id, None], valid_grid[0])
+                fig.savefig(os.path.join(work_path, 'valid_solution_' + str(tim_id) + '.jpg'))
+                plt.close(fig)
+            # Visual.plot_fields_am(fig, axs, valid_true.transpose((0, 3, 1, 2))[0, ..., None],
+            #                       valid_pred.transpose((0, 3, 1, 2))[0, ..., None],
+            #                       valid_grid[0], 'valid')
