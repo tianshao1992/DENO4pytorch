@@ -14,6 +14,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer, MatLoader
 from Models.basic_layers import DeepONetMulti
+from Models.differ_layers import gradients
 from Utilizes.loss_metrics import FieldsLpLoss
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
@@ -45,7 +46,8 @@ class Net(DeepONetMulti):
 
         return res
 
-def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
+
+def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler, sizes):
     """
     Args:
         data_loader: output fields at last time step
@@ -56,43 +58,33 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     """
 
     train_loss = 0
+    train_loss_eqs = 0
+    train_loss_bcs = 0
     for batch, (f, x, u) in enumerate(dataloader):
         f = f.to(device)
         x = x.to(device)
         u = u.to(device)
+        x.requires_grad_(True)
         pred = netmodel([f, ], x, size_set=False)
+        resi = netmodel.equation(f, x, pred)
 
-        loss = lossfunc(pred, u)
+        # 守恒残差
+        eqs_loss = torch.mean((resi[:, sizes[0]:] - 1.0) ** 2)
+        # 边界条件
+        bcs_loss = torch.mean(pred[:, :sizes[0]] ** 2)
+
+        loss = eqs_loss + bcs_loss * 10.
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         train_loss += loss.item()
+        train_loss_eqs += eqs_loss.item()
+        train_loss_bcs += bcs_loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1)
-
-
-def valid(dataloader, netmodel, device, lossfunc):
-    """
-    Args:
-        data_loader: input coordinates
-        model: Network
-        lossfunc: Loss function
-    """
-    valid_loss = 0
-    with torch.no_grad():
-        for batch, (f, x, u) in enumerate(dataloader):
-            f = f.to(device)
-            x = x.to(device)
-            u = u.to(device)
-            pred = netmodel([f, ], x, size_set=False)
-
-            loss = lossfunc(pred, u)
-            valid_loss += loss.item()
-
-    return valid_loss / (batch + 1)
+    return train_loss / (batch + 1), train_loss_eqs / (batch + 1), train_loss_bcs / (batch + 1)
 
 
 def inference(dataloader, netmodel, device):
@@ -115,12 +107,52 @@ def inference(dataloader, netmodel, device):
     return x.cpu().numpy(), x.cpu().numpy(), u.numpy(), pred.cpu().numpy()
 
 
+def gen_data(all_data, mode, star, size):
+    dom_coords = np.array([[-3, -3],
+                           [3, 3]], dtype=np.float32)
+
+    Num_bcs = all_data.shape[1]
+    Num_eqs = 500
+    Num_grid = 101
+    xx = np.linspace(dom_coords[0, 0], dom_coords[1, 0], Num_grid, dtype=np.float32)
+    yy = np.linspace(dom_coords[0, 1], dom_coords[1, 1], Num_grid, dtype=np.float32)
+    xx, yy = np.meshgrid(xx, yy)
+
+    u_r_list = []
+    y_r_list = []
+    s_r_list = []
+    for k in range(size):
+        # Create training data for bcs loss
+        u = all_data[star + k]
+
+        if mode == "train":
+            y_eqs = dom_coords.min(axis=0) + (dom_coords.max(axis=0) - dom_coords.min(axis=0)) \
+                    * np.random.uniform(size=(Num_eqs, 2)).astype(np.float32)  # shape = (Num_eqs, 2)
+
+            u_r_list.append(u.reshape(-1))
+            y_r_list.append(np.concatenate((u, y_eqs), axis=0))
+            s_r_list.append(np.zeros((Num_bcs + Num_eqs, 1), dtype=np.float32))
+
+        else:
+            y_eqs = np.stack((xx, yy), axis=-1)  # shape = (Num_grid, Num_grid, 2)
+
+            u_r_list.append(u.reshape(-1))
+            y_r_list.append(y_eqs)
+            s_r_list.append(np.ones((Num_grid, Num_grid, 1), dtype=np.float32))
+
+    u = np.stack(u_r_list, axis=0)
+    y = np.stack(y_r_list, axis=0)
+    s = np.stack(s_r_list, axis=0)
+
+    return torch.tensor(u), torch.tensor(y), torch.tensor(s)
+
+
 if __name__ == "__main__":
     ################################################################
     # configs
     ################################################################
 
-    name = 'deepONet'
+    name = 'deepONet-PINN'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -152,31 +184,25 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r = 2295
-    s = 101
-
     ################################################################
     # load data
     ################################################################
 
-    data = np.load(train_file, allow_pickle=True)
-    data = np.array(data, dtype=np.float32)
+    raw_data = np.load(train_file, allow_pickle=True)
+    raw_data = np.array(raw_data, dtype=np.float32)
 
-    D = data.reshape(-1, 2)
-    mu = D.mean(0)
-    sigma = D.std(0)
+    train_f, train_grid, train_u = gen_data(raw_data, 'train', 0, 1000)
+    valid_f, valid_grid, valid_u = gen_data(raw_data, 'valid', 1000, 200)
 
-    f_normalizer = DataNormer(train_f.numpy(), method='mean-std', axis=(0,))
+    f_normalizer = DataNormer(raw_data.reshape(raw_data.shape[0], -1), method='mean-std', axis=(0,))
     train_f = f_normalizer.norm(train_f)
     valid_f = f_normalizer.norm(valid_f)
 
-    u_normalizer = DataNormer(train_u.numpy(), method='mean-std', axis=(0,))
-    train_u = u_normalizer.norm(train_u)
-    valid_u = u_normalizer.norm(valid_u)
+    operator_dim = train_f.shape[1]
 
-    grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std', axis=(0, 1))
-    train_grid = grid_normalizer.norm(train_grid)
-    valid_grid = grid_normalizer.norm(valid_grid)
+    # grid_normalizer = DataNormer(train_grid, method='mean-std', axis=(0, 1))
+    # train_grid = grid_normalizer.norm(train_grid)
+    # valid_grid = grid_normalizer.norm(valid_grid)
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_f, train_grid, train_u),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
@@ -187,8 +213,8 @@ if __name__ == "__main__":
     #  Neural Networks
     ################################################################
     # 建立网络
-    Net_model = Net(input_dim=2, operator_dims=[101, ], output_dim=1,
-                    planes_branch=[64] * 3, planes_trunk=[64] * 3).to(Device)
+    Net_model = Net(input_dim=2, operator_dims=[operator_dim, ], output_dim=1,
+                    planes_branch=[64] * 4, planes_trunk=[64] * 4).to(Device)
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
@@ -200,31 +226,33 @@ if __name__ == "__main__":
     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('f',))
 
     star_time = time.time()
-    log_loss = [[], []]
+    log_loss = [[], [], []]
 
     ################################################################
     # train process
     ################################################################
 
     # 生成网格文件
-    triang = tri.Triangulation(train_grid_x[:, 0], train_grid_y[:, 0])
 
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler))
+        loss_tol, loss_eqs, loss_bcs = train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler, [253, ])
+        log_loss[0].append(loss_tol)
+        log_loss[1].append(loss_eqs)
+        log_loss[2].append(loss_bcs)
 
-        Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
-        print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
-              format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
+        print('epoch: {:6d}, lr: {:.3e}, tol_loss: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
+              format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1], log_loss[2][-1],
+                     time.time() - star_time))
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 20 == 0:
+        if epoch > 0 and epoch % 50 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'tol_loss')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'eqs_loss')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[2, :], 'bcs_loss')
             fig.suptitle('training loss')
             fig.savefig(os.path.join(work_path, 'log_loss.svg'))
             plt.close(fig)
@@ -242,16 +270,17 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
-                Visual.plot_fields_tr(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id],
-                                      edges=triang.triangles)
-                fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
-                plt.close(fig)
+            # for fig_id in range(10):
+            #     triang = tri.Triangulation(train_coord[fig_id, :, 0], train_coord[fig_id, :, 1])
+            #
+            #     fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
+            #     Visual.plot_fields_tr(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id],
+            #                           edges=triang.triangles)
+            #     fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
+            #     plt.close(fig)
 
             for fig_id in range(10):
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
-                Visual.plot_fields_tr(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id],
-                                      edges=triang.triangles)
+                Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
