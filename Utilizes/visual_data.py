@@ -100,7 +100,7 @@ class MatplotlibVision(object):
                        "font.serif": ['SimSun'], }
         rcParams.update(self.config)
 
-    def plot_loss(self, fig, axs, x, y, label, title=None, xylabels=['epoch', 'loss value']):
+    def plot_loss(self, fig, axs, x, y, label, title=None, xylabels=('epoch', 'loss value')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
@@ -113,7 +113,7 @@ class MatplotlibVision(object):
         axs.set_title(title, fontdict=self.font)
         # plt.pause(0.001)
 
-    def plot_value(self, fig, axs, x, y, label, title=None, xylabels=['x', 'y']):
+    def plot_value(self, fig, axs, x, y, label, title=None, xylabels=('x', 'y')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
@@ -125,7 +125,7 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_scatter(self, fig, axs, true, pred, axis=0, title=None, xylabels=['x', 'y']):
+    def plot_scatter(self, fig, axs, true, pred, axis=0, title=None, xylabels=('x', 'y')):
         # sbn.set(color_codes=True)
 
         axs.scatter(np.arange(true.shape[0]), true, marker='*')
@@ -138,7 +138,7 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_regression(self, fig, axs, true, pred, title=None, xylabels=['true value', 'pred value']):
+    def plot_regression(self, fig, axs, true, pred, title=None, xylabels=('true value', 'pred value')):
         # 所有功率预测误差与真实结果的回归直线
         # sbn.set(color_codes=True)
 
@@ -173,7 +173,7 @@ class MatplotlibVision(object):
         # plt.pause(0.001)
 
     def plot_error(self, fig, axs, error, title=None,
-                   xylabels=['predicted relative error / %', 'distribution density']):
+                   xylabels=('predicted relative error / %', 'distribution density')):
         # sbn.set_color_codes()
         # ax.bar(np.arange(len(error)), error*100, )
 
@@ -187,187 +187,6 @@ class MatplotlibVision(object):
         axs.set_ylabel(xylabels[1], fontdict=self.font)
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
-
-    def plot_fields1d(self, fig, axs, real, pred, coord, title=None, xylabels=['x coordinate', 'field'],
-                      show_channel=None):
-
-        if len(axs.shape) == 1:
-            axs = axs[None, :]
-
-        if show_channel is None:
-            show_channel = np.arange(len(self.field_name))
-
-        num_channel = len(show_channel)
-        name_channel = [self.field_name[i] for i in show_channel]
-
-        for i in range(num_channel):
-
-            fi = show_channel[i]
-            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
-            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
-
-            axs[i][0].cla()
-            axs[i][0].plot(coord, ff[0], color='g', linewidth=3, label='true')
-            axs[i][0].plot(coord, ff[1], '--', color='r', linewidth=2, label='pred')
-            axs[i][1].plot(coord, ff[2], color='r', linewidth=2, label='error')
-            for j in range(2):
-                axs[i][j].legend(loc="best", prop=self.font)
-                axs[i][j].set_xlabel(xylabels[0], fontdict=self.font)
-                axs[i][j].set_ylabel(xylabels[1], fontdict=self.font)
-                axs[i][j].tick_params('both', labelsize=self.font["size"], )
-                axs[i][j].set_title(title, fontdict=self.font)
-
-    def plot_fields_tr(self, fig, axs, real, pred, coord, edges, mask=None, cmin_max=None, fmin_max=None,
-                       show_channel=None):
-
-        if len(axs.shape) == 1:
-            axs = axs[None, :]
-
-        if show_channel is None:
-            show_channel = np.arange(len(self.field_name))
-
-        name_channel = [self.field_name[i] for i in show_channel]
-
-        if fmin_max is None:
-            fmin, fmax = real.min(axis=0), real.max(axis=0)
-        else:
-            fmin, fmax = fmin_max[0], fmin_max[1]
-
-        if cmin_max is None:
-            cmin, cmax = coord.min(axis=0), coord.max(axis=0)
-        else:
-            cmin, cmax = cmin_max[0], cmin_max[1]
-
-        titles = ['truth', 'predicted', 'error']
-        cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
-        num_channel = len(show_channel)
-
-        x = coord[:, 0]
-        y = coord[:, 1]
-
-        for i in range(num_channel):
-            fi = show_channel[i]
-            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
-            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
-            for j in range(3):
-                f_true = axs[i][j].tripcolor(x, y, ff[j], triangles=edges, cmap=cmaps[j], shading='gouraud',
-                                             antialiased=True, snap=True)
-
-                # f_true = axs[i][j].tricontourf(triObj, ff[j], 20, cmap=cmaps[j])
-                if mask is not None:
-                    axs[i][j].fill(mask[:, 0], mask[:, 1], facecolor='white')
-                # f_true.set_zorder(10)
-
-                # axs[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
-                axs[i][j].set_title(titles[j], fontdict=self.font_CHN)
-                axs[i][j].axis([cmin[0], cmax[0], cmin[1], cmax[1]])
-                # axs[i][j].tick_params(axis='x', labelsize=)
-                # if i == 0:
-                #     ax[i][j].set_title(titles[j], fontdict=self.font_CHN)
-                cb = fig.colorbar(f_true, ax=axs[i][j])
-                cb.ax.tick_params(labelsize=15)
-                for l in cb.ax.yaxis.get_ticklabels():
-                    l.set_family('Times New Roman')
-                tick_locator = ticker.MaxNLocator(nbins=6)  # colorbar上的刻度值个数
-                cb.locator = tick_locator
-                cb.update_ticks()
-                if j < 2:
-                    f_true.set_clim(fmin[i], fmax[i])
-                    cb.ax.set_title(name_channel[i], fontdict=self.font_EN, loc='center')
-                else:
-                    f_true.set_clim(-limit, limit)
-                    cb.ax.set_title('$\mathrm{\Delta}$' + name_channel[i], fontdict=self.font_EN, loc='center')
-                # 设置刻度间隔
-                axs[i][j].set_aspect(1)
-                # axs[i][j].xaxis.set_major_locator(MultipleLocator(0.1))
-                # axs[i][j].yaxis.set_major_locator(MultipleLocator(0.1))
-                # axs[i][j].xaxis.set_minor_locator(MultipleLocator(0.2))
-                # axs[i][j].yaxis.set_minor_locator(MultipleLocator(0.1))
-                axs[i][j].set_xlabel(r'$x$', fontdict=self.font_EN)
-                axs[i][j].set_ylabel(r'$y$', fontdict=self.font_EN)
-                axs[i][j].spines['bottom'].set_linewidth(self.box_line_width)  # 设置底部坐标轴的粗细
-                axs[i][j].spines['left'].set_linewidth(self.box_line_width)  # 设置左边坐标轴的粗细
-                axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
-                axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
-
-    def plot_fields_ms(self, fig, axs, real, pred, coord, cmin_max=None, fmin_max=None, show_channel=None):
-        if len(axs.shape) == 1:
-            axs = axs[None, :]
-
-        if show_channel is None:
-            show_channel = np.arange(len(self.field_name))
-
-        name_channel = [self.field_name[i] for i in show_channel]
-
-        if fmin_max == None:
-            fmin, fmax = real.min(axis=(0, 1)), real.max(axis=(0, 1))
-        else:
-            fmin, fmax = fmin_max[0], fmin_max[1]
-
-        if cmin_max == None:
-            cmin, cmax = coord.min(axis=(0, 1)), coord.max(axis=(0, 1))
-        else:
-            cmin, cmax = cmin_max[0], cmin_max[1]
-
-        x_pos = coord[:, :, 0]
-        y_pos = coord[:, :, 1]
-        num_channel = len(show_channel)
-
-        # plt.clf()
-        titles = ['truth', 'predicted', 'error']
-        cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
-        for i in range(num_channel):
-
-            fi = show_channel[i]
-            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
-            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
-            for j in range(3):
-
-                axs[i][j].cla()
-                f_true = axs[i][j].pcolormesh(x_pos, y_pos, ff[j], cmap=cmaps[j], shading='gouraud',
-                                              antialiased=True, snap=True)
-                f_true.set_zorder(10)
-                axs[i][j].axis([cmin[0], cmax[0], cmin[1], cmax[1]])
-                # ax[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
-                axs[i][j].set_title(titles[j], fontdict=self.font_EN)
-                # if i == 0:
-                #     ax[i][j].set_title(titles[j], fontdict=self.font_CHN)
-                cb = fig.colorbar(f_true, ax=axs[i][j])
-                cb.ax.tick_params(labelsize=self.font['size'])
-                for l in cb.ax.yaxis.get_ticklabels():
-                    l.set_family('Times New Roman')
-                tick_locator = ticker.MaxNLocator(nbins=6)  # colorbar上的刻度值个数
-                cb.locator = tick_locator
-                cb.update_ticks()
-                if j < 2:
-                    f_true.set_clim(fmin[i], fmax[i])
-                    cb.ax.set_title(name_channel[i], fontdict=self.font_EN, loc='center')
-                else:
-                    f_true.set_clim(-limit, limit)
-                    cb.ax.set_title('$\mathrm{\Delta}$' + name_channel[i], fontdict=self.font_EN, loc='center')
-                # 设置刻度间隔
-                axs[i][j].set_aspect(1)
-                axs[i][j].set_xlabel(r'$x$/m', fontdict=self.font_EN)
-                axs[i][j].set_ylabel(r'$y$/m', fontdict=self.font_EN)
-                axs[i][j].spines['bottom'].set_linewidth(self.box_line_width)  # 设置底部坐标轴的粗细
-                axs[i][j].spines['left'].set_linewidth(self.box_line_width)  # 设置左边坐标轴的粗细
-                axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
-                axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
-
-    def plot_fields_am(self, fig, axs, out_true, out_pred, coord, p_id, ):
-
-        fmax = out_true.max(axis=(0, 1, 2))  # 云图标尺
-        fmin = out_true.min(axis=(0, 1, 2))  # 云图标尺
-
-        def anim_update(t_id):
-            # print('para:   ' + str(p_id) + ',   time:   ' + str(t_id))
-            axes = self.plot_fields_ms(fig, axs, out_true[t_id], out_pred[t_id], coord, fmin_max=(fmin, fmax))
-            return axes
-
-        anim = FuncAnimation(fig, anim_update,
-                             frames=np.arange(0, out_true.shape[0]).astype(np.int64), interval=200)
-
-        anim.save(os.path.join(self.log_dir, str(p_id) + ".gif"), writer='pillow', dpi=300)
 
     def plot_box(self, fig, ax, data, title=None, legends=None, xlabel=None, xticks=None, bag_width=1.0):
         ax.set_title(title)
@@ -437,3 +256,188 @@ class MatplotlibVision(object):
             xticks = np.arange(n_vin * n_bag)
         ax.set_xlabel(xlabel)
         ax.set_axis_style(ax, xticks, x_pos)
+
+    def plot_fields1d(self, fig, axs, real, pred, coord, title=None, xylabels=['x coordinate', 'field'],
+                      show_channel=None):
+
+        if len(axs.shape) == 1:
+            axs = axs[None, :]
+
+        if show_channel is None:
+            show_channel = np.arange(len(self.field_name))
+
+        num_channel = len(show_channel)
+        name_channel = [self.field_name[i] for i in show_channel]
+
+        for i in range(num_channel):
+
+            fi = show_channel[i]
+            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
+            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
+
+            axs[i][0].cla()
+            axs[i][0].plot(coord, ff[0], color='g', linewidth=3, label='true')
+            axs[i][0].plot(coord, ff[1], '--', color='r', linewidth=2, label='pred')
+            axs[i][1].plot(coord, ff[2], color='r', linewidth=2, label='error')
+            for j in range(2):
+                axs[i][j].legend(loc="best", prop=self.font)
+                axs[i][j].set_xlabel(xylabels[0], fontdict=self.font)
+                axs[i][j].set_ylabel(xylabels[1], fontdict=self.font)
+                axs[i][j].tick_params('both', labelsize=self.font["size"], )
+                axs[i][j].set_title(title, fontdict=self.font)
+
+    def plot_fields_tr(self, fig, axs, real, pred, coord, edges, mask=None, cmin_max=None, fmin_max=None,
+                       show_channel=None, cmaps=None, titles=None):
+
+        if len(axs.shape) == 1:
+            axs = axs[None, :]
+
+        if show_channel is None:
+            show_channel = np.arange(len(self.field_name))
+
+        if fmin_max is None:
+            fmin, fmax = real.min(axis=0), real.max(axis=0)
+        else:
+            fmin, fmax = fmin_max[0], fmin_max[1]
+
+        if cmin_max is None:
+            cmin, cmax = coord.min(axis=0), coord.max(axis=0)
+        else:
+            cmin, cmax = cmin_max[0], cmin_max[1]
+
+        if titles is None:
+            titles = ['truth', 'predicted', 'error']
+
+        if cmaps is None:
+            cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
+
+        size_channel = len(show_channel)
+        name_channel = [self.field_name[i] for i in show_channel]
+
+        for i in range(size_channel):
+            fi = show_channel[i]
+            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
+            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
+            for j in range(3):
+                f_true = axs[i][j].tripcolor(x, y, ff[j], triangles=edges, cmap=cmaps[j], shading='gouraud',
+                                             antialiased=True, snap=True)
+
+                # f_true = axs[i][j].tricontourf(triObj, ff[j], 20, cmap=cmaps[j])
+                if mask is not None:
+                    axs[i][j].fill(mask[:, 0], mask[:, 1], facecolor='white')
+                # f_true.set_zorder(10)
+
+                # axs[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
+                axs[i][j].set_title(titles[j], fontdict=self.font_CHN)
+                axs[i][j].axis([cmin[0], cmax[0], cmin[1], cmax[1]])
+                # axs[i][j].tick_params(axis='x', labelsize=)
+                # if i == 0:
+                #     ax[i][j].set_title(titles[j], fontdict=self.font_CHN)
+                cb = fig.colorbar(f_true, ax=axs[i][j])
+                cb.ax.tick_params(labelsize=15)
+                for l in cb.ax.yaxis.get_ticklabels():
+                    l.set_family('Times New Roman')
+                tick_locator = ticker.MaxNLocator(nbins=6)  # colorbar上的刻度值个数
+                cb.locator = tick_locator
+                cb.update_ticks()
+                if j < 2:
+                    f_true.set_clim(fmin[i], fmax[i])
+                    cb.ax.set_title(name_channel[i], fontdict=self.font_EN, loc='center')
+                else:
+                    f_true.set_clim(-limit, limit)
+                    cb.ax.set_title('$\mathrm{\Delta}$' + name_channel[i], fontdict=self.font_EN, loc='center')
+                # 设置刻度间隔
+                axs[i][j].set_aspect(1)
+                # axs[i][j].xaxis.set_major_locator(MultipleLocator(0.1))
+                # axs[i][j].yaxis.set_major_locator(MultipleLocator(0.1))
+                # axs[i][j].xaxis.set_minor_locator(MultipleLocator(0.2))
+                # axs[i][j].yaxis.set_minor_locator(MultipleLocator(0.1))
+                axs[i][j].set_xlabel(r'$x$', fontdict=self.font_EN)
+                axs[i][j].set_ylabel(r'$y$', fontdict=self.font_EN)
+                axs[i][j].spines['bottom'].set_linewidth(self.box_line_width)  # 设置底部坐标轴的粗细
+                axs[i][j].spines['left'].set_linewidth(self.box_line_width)  # 设置左边坐标轴的粗细
+                axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
+                axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
+
+    def plot_fields_ms(self, fig, axs, real, pred, coord, cmin_max=None, fmin_max=None, show_channel=None,
+                       cmaps=None, titles=None):
+        if len(axs.shape) == 1:
+            axs = axs[None, :]
+
+        if show_channel is None:
+            show_channel = np.arange(len(self.field_name))
+
+        if fmin_max == None:
+            fmin, fmax = real.min(axis=(0, 1)), real.max(axis=(0, 1))
+        else:
+            fmin, fmax = fmin_max[0], fmin_max[1]
+
+        if cmin_max == None:
+            cmin, cmax = coord.min(axis=(0, 1)), coord.max(axis=(0, 1))
+        else:
+            cmin, cmax = cmin_max[0], cmin_max[1]
+
+        if titles is None:
+            titles = ['truth', 'predicted', 'error']
+
+        if cmaps is None:
+            cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
+
+        x_pos = coord[:, :, 0]
+        y_pos = coord[:, :, 1]
+        size_channel = len(show_channel)
+        name_channel = [self.field_name[i] for i in show_channel]
+
+        for i in range(size_channel):
+
+            fi = show_channel[i]
+            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
+            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
+            for j in range(3):
+
+                axs[i][j].cla()
+                f_true = axs[i][j].pcolormesh(x_pos, y_pos, ff[j], cmap=cmaps[j], shading='gouraud',
+                                              antialiased=True, snap=True)
+                f_true.set_zorder(10)
+                axs[i][j].axis([cmin[0], cmax[0], cmin[1], cmax[1]])
+                # axs[i][j].axis('equal')
+                # ax[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
+                axs[i][j].set_title(titles[j], fontdict=self.font_EN)
+                # if i == 0:
+                #     ax[i][j].set_title(titles[j], fontdict=self.font_CHN)
+                cb = fig.colorbar(f_true, ax=axs[i][j])
+                cb.ax.tick_params(labelsize=self.font['size'])
+                for l in cb.ax.yaxis.get_ticklabels():
+                    l.set_family('Times New Roman')
+                tick_locator = ticker.MaxNLocator(nbins=6)  # colorbar上的刻度值个数
+                cb.locator = tick_locator
+                cb.update_ticks()
+                if j < 2:
+                    f_true.set_clim(fmin[i], fmax[i])
+                    cb.ax.set_title(name_channel[i], fontdict=self.font_EN, loc='center')
+                else:
+                    f_true.set_clim(-limit, limit)
+                    cb.ax.set_title('$\mathrm{\Delta}$' + name_channel[i], fontdict=self.font_EN, loc='center')
+                # 设置刻度间隔
+                axs[i][j].set_aspect(1)
+                axs[i][j].set_xlabel(r'$x$/m', fontdict=self.font_EN)
+                axs[i][j].set_ylabel(r'$y$/m', fontdict=self.font_EN)
+                axs[i][j].spines['bottom'].set_linewidth(self.box_line_width)  # 设置底部坐标轴的粗细
+                axs[i][j].spines['left'].set_linewidth(self.box_line_width)  # 设置左边坐标轴的粗细
+                axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
+                axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
+
+    def plot_fields_am(self, fig, axs, out_true, out_pred, coord, p_id, ):
+
+        fmax = out_true.max(axis=(0, 1, 2))  # 云图标尺
+        fmin = out_true.min(axis=(0, 1, 2))  # 云图标尺
+
+        def anim_update(t_id):
+            # print('para:   ' + str(p_id) + ',   time:   ' + str(t_id))
+            axes = self.plot_fields_ms(fig, axs, out_true[t_id], out_pred[t_id], coord, fmin_max=(fmin, fmax))
+            return axes
+
+        anim = FuncAnimation(fig, anim_update,
+                             frames=np.arange(0, out_true.shape[0]).astype(np.int64), interval=200)
+
+        anim.save(os.path.join(self.log_dir, str(p_id) + ".gif"), writer='pillow', dpi=300)

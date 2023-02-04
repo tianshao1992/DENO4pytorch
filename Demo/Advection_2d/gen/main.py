@@ -25,7 +25,7 @@ def main_IC1():
         u.append(pde.solve(x).reshape(nt, nx))
     u = np.array(u)
     x, t = x[:, 0].reshape(nt, nx), x[:, 1].reshape(nt, nx)
-    np.savez_compressed("train.npz", x=x, t=t, u=u)
+    np.savez_compressed("../data/train.npz", x=x, t=t, u=u)
 
     # for i in range(3):
     #     plt.figure()
@@ -57,7 +57,7 @@ def main_IC2():
         u.append(pde.solve(x).reshape(nt, nx))
     u = np.array(u)
     x, t = x[:, 0].reshape(nt, nx), x[:, 1].reshape(nt, nx)
-    np.savez_compressed("train_IC2.npz", x=x, t=t, u=u)
+    np.savez_compressed("../data/train_IC2.npz", x=x, t=t, u=u)
 
     for i in range(3):
         plt.figure()

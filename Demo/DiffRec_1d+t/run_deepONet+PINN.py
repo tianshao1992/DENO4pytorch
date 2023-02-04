@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-# @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
-# @Time    : 2022/11/27 0:15
+# @Copyright (c) 2023 Baidu.com, Inc. All Rights Reserved
+# @Time    : 2023/2/4 0:15
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
 # @Site    :
-# @File    : run_Darcy_train..py.py
+# @File    : run_deepONet+PINN.py.py
 """
 
 import numpy as np
@@ -19,7 +19,7 @@ from Utilizes.loss_metrics import FieldsLpLoss
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
-import matplotlib.tri as tri
+from scipy.interpolate import griddata
 import time
 import os
 import sys
@@ -31,7 +31,7 @@ class Net(DeepONetMulti):
     def __init__(self, input_dim, operator_dims, output_dim, planes_branch, planes_trunk):
         super(Net, self).__init__(input_dim, operator_dims, output_dim, planes_branch, planes_trunk)
 
-    def equation(self, u_var, y_var, out_var):
+    def equation(self, u_var, y_var, out_var, ux):
         """
         Args:
             u_var: branch input
@@ -41,13 +41,14 @@ class Net(DeepONetMulti):
             res: equation residual
         """
         dfda = gradients(out_var, y_var)
-        dfdx, dfdy = dfda[..., (0,)], dfda[..., (1,)]
-        res = dfdx ** 2 + dfdy ** 2
+        dfdx, dfdt = dfda[..., (0,)], dfda[..., (1,)]
+        d2fdx2 = gradients(dfdx, y_var)[..., (0,)]
+        res = dfdt - 0.01 * d2fdx2 - 0.01 * out_var ** 2 - ux
 
         return res
 
 
-def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler, sizes):
+def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler, bcs_index):
     """
     Args:
         data_loader: output fields at last time step
@@ -65,17 +66,17 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler, sizes):
         x = x.to(device)
         u = u.to(device)
         x.requires_grad_(True)
+        optimizer.zero_grad()
         pred = netmodel([f, ], x, size_set=False)
-        resi = netmodel.equation(f, x, pred)
+        resi = netmodel.equation(f, x, pred, u)
 
         # 守恒残差
-        eqs_loss = torch.mean((resi[:, sizes[0]:] - 1.0) ** 2)
+        eqs_loss = torch.mean(resi[:, bcs_index[0]:] ** 2)
         # 边界条件
-        bcs_loss = torch.mean(pred[:, :sizes[0]] ** 2)
+        bcs_loss = torch.mean((pred[:, :bcs_index[0]] - u[:, :bcs_index[0]]) ** 2)
 
-        loss = eqs_loss + bcs_loss * 10.
+        loss = eqs_loss + bcs_loss
 
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -104,47 +105,7 @@ def inference(dataloader, netmodel, device):
         pred = netmodel([f, ], x, size_set=False)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return x.cpu().numpy(), x.cpu().numpy(), u.numpy(), pred.cpu().numpy()
-
-
-def gen_data(all_data, mode, star, size):
-    dom_coords = np.array([[-3, -3],
-                           [3, 3]], dtype=np.float32)
-
-    Num_bcs = all_data.shape[1]
-    Num_eqs = 500
-    Num_grid = 101
-    xx = np.linspace(dom_coords[0, 0], dom_coords[1, 0], Num_grid, dtype=np.float32)
-    yy = np.linspace(dom_coords[0, 1], dom_coords[1, 1], Num_grid, dtype=np.float32)
-    xx, yy = np.meshgrid(xx, yy)
-
-    u_r_list = []
-    y_r_list = []
-    s_r_list = []
-    for k in range(size):
-        # Create training data for bcs loss
-        u = all_data[star + k]
-
-        if mode == "train":
-            y_eqs = dom_coords.min(axis=0) + (dom_coords.max(axis=0) - dom_coords.min(axis=0)) \
-                    * np.random.uniform(size=(Num_eqs, 2)).astype(np.float32)  # shape = (Num_eqs, 2)
-
-            u_r_list.append(u.reshape(-1))
-            y_r_list.append(np.concatenate((u, y_eqs), axis=0))
-            s_r_list.append(np.zeros((Num_bcs + Num_eqs, 1), dtype=np.float32))
-
-        else:
-            y_eqs = np.stack((xx, yy), axis=-1)  # shape = (Num_grid, Num_grid, 2)
-
-            u_r_list.append(u.reshape(-1))
-            y_r_list.append(y_eqs)
-            s_r_list.append(np.ones((Num_grid, Num_grid, 1), dtype=np.float32))
-
-    u = np.stack(u_r_list, axis=0)
-    y = np.stack(y_r_list, axis=0)
-    s = np.stack(s_r_list, axis=0)
-
-    return torch.tensor(u), torch.tensor(y), torch.tensor(s)
+    return f.cpu().numpy(), x.cpu().numpy(), u.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -166,20 +127,18 @@ if __name__ == "__main__":
     else:
         Device = torch.device('cpu')
 
-    train_file = os.path.join('data', 'airfoil.npy')
-    # valid_file = os.path.join('data', 'airfoil.npy')
+    train_file = os.path.join('data', 'pinn_train.mat')
+    valid_file = os.path.join('data', 'pinn_valid.mat')
 
     in_dim = 1
     out_dim = 1
-    ntrain = 1900
-    nvalid = 100
-
+    ntrain = 2000
+    nvalid = 200
     batch_size = 32
-    batch_size2 = batch_size
 
-    epochs = 10000
+    epochs = 1000
     learning_rate = 0.001
-    scheduler_step = 2000
+    scheduler_step = 800
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -188,17 +147,24 @@ if __name__ == "__main__":
     # load data
     ################################################################
 
-    raw_data = np.load(train_file, allow_pickle=True)
-    raw_data = np.array(raw_data, dtype=np.float32)
+    reader = MatLoader(train_file)
+    train_f = reader.read_field('u_bcs_train')[:ntrain, 0]
+    # 注意: 本算例中训练集的s_res_train 不是真实解，而是每个节点对应的branch_net输入函数值，用于计算equation_loss
+    train_u = torch.cat((reader.read_field('s_bcs_train'), reader.read_field('s_res_train')), dim=1)[:ntrain]
+    train_grid = torch.cat((reader.read_field('y_bcs_train'),  reader.read_field('y_res_train')), dim=1)[:ntrain]
 
-    train_f, train_grid, train_u = gen_data(raw_data, 'train', 0, 1000)
-    valid_f, valid_grid, valid_u = gen_data(raw_data, 'valid', 1000, 200)
+    reader = MatLoader(valid_file)
+    valid_f = reader.read_field('u_res_valid')[:, 0]
+    valid_u = reader.read_field('s_res_valid')[..., None]
+    valid_grid = reader.read_field('y_res_valid')
 
-    f_normalizer = DataNormer(raw_data.reshape(raw_data.shape[0], -1), method='mean-std', axis=(0,))
-    train_f = f_normalizer.norm(train_f)
-    valid_f = f_normalizer.norm(valid_f)
+    del reader
 
-    operator_dim = train_f.shape[1]
+    # f_normalizer = DataNormer(raw_data.reshape(raw_data.shape[0], -1), method='mean-std', axis=(0,))
+    # train_f = f_normalizer.norm(train_f)
+    # valid_f = f_normalizer.norm(valid_f)
+
+    operator_dim = train_f.shape[-1]
 
     # grid_normalizer = DataNormer(train_grid, method='mean-std', axis=(0, 1))
     # train_grid = grid_normalizer.norm(train_grid)
@@ -214,10 +180,12 @@ if __name__ == "__main__":
     ################################################################
     # 建立网络
     Net_model = Net(input_dim=2, operator_dims=[operator_dim, ], output_dim=1,
-                    planes_branch=[64] * 4, planes_trunk=[64] * 4).to(Device)
+                    planes_branch=[64] * 5, planes_trunk=[64] * 5).to(Device)
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
+    # 评价指标
+    Field_metric = FieldsLpLoss(d=2, p=2, reduction=True, size_average=False)
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
     # 下降策略
@@ -237,7 +205,7 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        loss_tol, loss_eqs, loss_bcs = train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler, [253, ])
+        loss_tol, loss_eqs, loss_bcs = train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler, [300, ])
         log_loss[0].append(loss_tol)
         log_loss[1].append(loss_eqs)
         log_loss[2].append(loss_bcs)
@@ -270,17 +238,14 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            # for fig_id in range(10):
-            #     triang = tri.Triangulation(train_coord[fig_id, :, 0], train_coord[fig_id, :, 1])
-            #
-            #     fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
-            #     Visual.plot_fields_tr(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id],
-            #                           edges=triang.triangles)
-            #     fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
-            #     plt.close(fig)
+            err_rel = Field_metric.rel(valid_pred, valid_true)
 
-            for fig_id in range(10):
+            for fig_id in range(5):
+                # 100 为验证集算例中的网格节点个数
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
-                Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
+                Visual.plot_fields_ms(fig, axs, valid_true[fig_id].reshape((100, 100, -1)),
+                                      valid_pred[fig_id].reshape((100, 100, -1)),
+                                      valid_coord[fig_id].reshape((100, 100, -1)))
+                plt.title('Absolute error:  {:.3e}'.format(float(err_rel[fig_id])), fontdict=Visual.font_EN)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)

@@ -75,7 +75,7 @@ class CarDataset(Dataset):
 
 # loss function with rel/abs Lp loss
 class FieldsLpLoss(object):
-    def __init__(self, d=2, p=2, size_average=True, reduction=True):
+    def __init__(self, d=2, p=2, reduction=True, size_average=False):
         super(FieldsLpLoss, self).__init__()
 
         # Dimension and Lp-norm type are postive
@@ -87,34 +87,44 @@ class FieldsLpLoss(object):
         self.size_average = size_average
 
     def abs(self, x, y):
-        num_examples = x.size()[0]
+
+        if not torch.is_tensor(x):
+            x = torch.tensor(x)
+            y = torch.tensor(y)
+
 
         # Assume uniform mesh
         # h = 1.0 / (x.size()[1] - 1.0) (h ** (self.d / self.p)) *
+        errs = x - y
 
-        all_norms = torch.norm(x.reshape(num_examples, -1) - y.reshape(num_examples, -1), self.p, 1)
+        avg_dims = tuple(np.arrange(len(x.shape))[1:-1])
+        avg_nums = np.prod(x.shape[1:-1])
 
         if self.reduction:
             if self.size_average:
-                return torch.mean(all_norms)
+                return torch.norm(errs, self.p, dim=avg_dims) / avg_nums
             else:
-                return torch.sum(all_norms)
+                return torch.norm(errs, self.p, dim=avg_dims)
 
-        return all_norms
+        return errs
 
     def rel(self, x, y):
-        num_examples = x.size()[0]
 
-        diff_norms = torch.norm(x.reshape(num_examples, -1) - y.reshape(num_examples, -1), self.p, 1)
-        y_norms = torch.norm(y.reshape(num_examples, -1), self.p, 1)
+        if not torch.is_tensor(x):
+            x = torch.tensor(x)
+            y = torch.tensor(y)
+
+        errs = x - y
+        avg_dims = tuple(np.arange(len(x.shape))[1:-1])
+        avg_nums = np.prod(x.shape[1:-1])
 
         if self.reduction:
             if self.size_average:
-                return torch.mean(diff_norms / y_norms)
+                return torch.norm(errs, self.p, dim=avg_dims) / torch.norm(y, self.p, dim=avg_dims) / avg_nums
             else:
-                return torch.sum(diff_norms / y_norms)
+                return torch.norm(errs, self.p, dim=avg_dims) / torch.norm(y, self.p, dim=avg_dims)
 
-        return diff_norms / y_norms
+        return errs / torch.norm(y, self.p, dim=avg_dims)
 
     def __call__(self, x, y):
         return self.rel(x, y)
