@@ -8,9 +8,7 @@
 # @File    : FNOs.py
 """
 
-import torch
-import torch.nn as nn
-from Models.spectral_layers import *
+from fno.spectral_layers import *
 
 
 class FNO1d(nn.Module):
@@ -21,9 +19,9 @@ class FNO1d(nn.Module):
     def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu'):
         super(FNO1d, self).__init__()
         """
-        The overall network. It contains 4 layers of the Fourier layer.
+        The overall network. It contains /depth/ layers of the Fourier layer.
         1. Lift the input to the desire channel dimension by self.fc0 .
-        2. 4 layers of the integral operators u' = (W + K)(u).
+        2. /depth/ layers of the integral operators u' = (W + K)(u).
             W defined by self.w; K defined by self.conv .
         3. Project from the channel space to the output space by self.fc1 and self.fc2 .
 

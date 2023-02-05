@@ -13,10 +13,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
-from Utilizes.process_data import DataNormer, MatLoader
-from Models.FNOs import FNO2d
-from Models.ConvNets import UNet2d, UpSampleNet2d, DownSampleNet2d
-from Utilizes.loss_metrics import FieldsLpLoss
+from fno.FNOs import FNO2d
+from cnn.ConvNets import UNet2d
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -112,7 +110,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'FNO'
+    name = 'UNet'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:

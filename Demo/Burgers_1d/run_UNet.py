@@ -13,8 +13,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer, MatLoader
-from Models.ConvNets import UNet1d
-from Utilizes.loss_metrics import FieldsLpLoss
+from cnn.ConvNets import UNet1d
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt

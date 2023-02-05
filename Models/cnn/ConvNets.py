@@ -7,11 +7,8 @@
 # @Site    : 
 # @File    : ConvNets.py
 """
-import math
-import torch
-import torch.nn as nn
-from Models.conv_layers import *
-from Models.basic_layers import *
+from cnn.conv_layers import *
+from basic_layers import *
 
 class UpSampleNet1d(nn.Module):
     """

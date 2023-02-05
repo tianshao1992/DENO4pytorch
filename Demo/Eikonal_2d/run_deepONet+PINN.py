@@ -12,14 +12,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from Utilizes.process_data import DataNormer, MatLoader
-from Models.basic_layers import DeepONetMulti
-from Models.differ_layers import gradients
-from Utilizes.loss_metrics import FieldsLpLoss
+from basic_layers import DeepONetMulti
+from pinn.differ_layers import gradients
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
-from scipy.interpolate import griddata
 import time
 import os
 import sys

@@ -12,10 +12,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from Utilizes.process_data import DataNormer, MatLoader
-from Models.FNOs import FNO2d
-from Models.ConvNets import UNet2d, UpSampleNet2d, DownSampleNet2d
-from Utilizes.loss_metrics import FieldsLpLoss
+from Utilizes.process_data import MatLoader
+from fno.FNOs import FNO2d
+from cnn.ConvNets import UNet2d
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -23,8 +22,6 @@ import time
 import os
 from torchinfo import summary
 import sys
-import h5py
-from scipy import io as sio
 
 
 def feature_transform(x):

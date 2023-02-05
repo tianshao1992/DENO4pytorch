@@ -9,7 +9,7 @@
 """
 
 
-from Models.Transformers import *
+from transformer.Transformers import *
 
 ########################################## make full model　###########################################
 config = defaultdict(lambda: None,

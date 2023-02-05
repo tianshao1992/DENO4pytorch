@@ -10,10 +10,8 @@
 
 import numpy as np
 import torch
-import torch.nn as nn
 from torch_geometric.data import Data, DataLoader
-from Utilizes.process_data import DataNormer, MatLoader
-from Models.GraphNets import GMMNet, KernelNN3
+from gnn.GraphNets import KernelNN3
 from Utilizes.loss_metrics import FieldsLpLoss
 from Utilizes.visual_data import MatplotlibVision
 

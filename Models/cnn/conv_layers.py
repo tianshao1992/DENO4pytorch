@@ -7,9 +7,7 @@
 # @Site    : 
 # @File    : conv_layers.py
 """
-import torch
-import torch.nn as nn
-from Models.basic_layers import Identity
+from basic_layers import Identity
 import torch.nn.functional as F
 from Models.configs import *
 
