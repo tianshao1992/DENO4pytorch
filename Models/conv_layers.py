@@ -46,12 +46,14 @@ class Conv1dResBlock(nn.Module):
         self.basic_block = basic_block
         if self.basic_block:
             self.conv1 = nn.Sequential(
+                nn.BatchNorm1d(num_features=out_dim),
                 self.activation,
                 nn.Conv1d(out_dim, out_dim,
                           kernel_size=kernel_size,
                           padding=padding,
                           bias=bias),
                 nn.Dropout(dropout),
+                nn.BatchNorm1d(num_features=out_dim),
             )
         self.apply_shortcut = (in_dim != out_dim)
 
@@ -127,8 +129,8 @@ class DeConv1dBlock(nn.Module):
         """
         x = self.deconv0(x)
         x = self.dropout(x)
-        x = self.activation(x)
-        x = self.conv0(x)
+        # x = self.activation(x)
+        # x = self.conv0(x)
         # x = self.deconv1(x)
         # x = self.activation(x)
         return x

@@ -15,43 +15,39 @@
 # @Time    : 2022/11/27 12:42
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
 # @Site    : 
-# @File    : run_train.py
+# @File    : run_FNO&UNet.py
 """
 
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torchinfo import summary
 from Utilizes.process_data import DataNormer, MatLoader
 from Models.FNOs import FNO2d
+from Models.ConvNets import UNet2d, UpSampleNet2d, DownSampleNet2d
 from Utilizes.loss_metrics import FieldsLpLoss
-from Utilizes.visual_data import MatplotlibVision
+from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
 import time
 import os
+import sys
 
-
-class Net(FNO2d):
-    """use basic model to build the network"""
-
-    def __init__(self, in_dim, out_dim, modes, width, depth, steps, padding, activation='gelu'):
-        super(Net, self).__init__(in_dim, out_dim, modes, width, depth, steps, padding, activation)
-
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
-        gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-        return torch.cat((gridx, gridy), dim=-1).to(x.device)
+def feature_transform(x):
+    """
+    Args:
+        x: input coordinates
+    Returns:
+        res: input transform
+    """
+    shape = x.shape
+    batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+    gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+    gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
+    gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
+    gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
+    return torch.cat((gridx, gridy), dim=-1).to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -67,7 +63,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        gd = netmodel.feature_transform(xx)
+        gd = feature_transform(xx)
 
         pred = netmodel(xx, gd)
         loss = lossfunc(pred, yy)
@@ -94,7 +90,7 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            gd = netmodel.feature_transform(xx)
+            gd = feature_transform(xx)
 
             pred = netmodel(xx, gd)
             loss = lossfunc(pred, yy)
@@ -115,7 +111,7 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = netmodel.feature_transform(xx)
+        gd = feature_transform(xx)
         pred = netmodel(xx, gd)
 
     # equation = model.equation(u_var, y_var, out_pred)
@@ -127,16 +123,16 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'NS-2d-Pipe'
-    work_path = os.path.join('work')
+    name = 'UNet'
+    work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
 
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        Device = torch.device('cuda')
     else:
-        device = torch.device('cpu')
+        Device = torch.device('cpu')
 
     INPUT_X = './data/Pipe_X.npy'
     INPUT_Y = './data/Pipe_Y.npy'
@@ -152,6 +148,7 @@ if __name__ == "__main__":
     depth = 4
     steps = 1
     padding = 8
+    dropout = 0.0
 
     batch_size = 32
     epochs = 500
@@ -203,11 +200,21 @@ if __name__ == "__main__":
     ################################################################
 
     # 建立网络
-    Net_model = Net(in_dim=in_dim, out_dim=out_dim,
-                    modes=modes, width=width, depth=depth, steps=steps, padding=padding, activation='gelu').to(device)
+    if name == 'FNO':
+        Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
+                          padding=padding, activation='gelu').to(Device)
+    elif name == 'UNet':
+        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:], width=width,
+                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
+
+    input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
+    input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
+    print(name)
+    summary(Net_model, input_data=[input1, input2], device=Device)
+
     # 损失函数
-    # Loss_func = nn.MSELoss()
-    Loss_func = FieldsLpLoss(size_average=False)
+    Loss_func = nn.MSELoss()
+    # Loss_func = FieldsLpLoss(size_average=False)
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
@@ -226,10 +233,10 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, device, Loss_func, Optimizer, Scheduler))
+        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler))
 
         Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, device, Loss_func))
+        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
               format(epoch, learning_rate, log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
@@ -250,20 +257,20 @@ if __name__ == "__main__":
         if epoch > 0 and epoch % 20 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-            train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, device)
-            valid_coord, valid_grid, valid_true, valid_pred = inference(valid_loader, Net_model, device)
+            train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
+            valid_coord, valid_grid, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
             for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 6), layout='constrained', num=2)
+                fig, axs = plt.subplots(1, 3, figsize=(18, 4), layout='constrained', num=2)
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
             for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 6), layout='constrained', num=3)
+                fig, axs = plt.subplots(1, 3, figsize=(18, 4), layout='constrained', num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)

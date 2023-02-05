@@ -56,18 +56,16 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        if 'fno' in modelType:
-            gd = feature_transform(xx)
-            for t in range(0, T, step):
-                y = yy[..., t:t + step]
-                im = netmodel(xx, gd)
-                if t == 0:
-                    pred = im
-                else:
-                    pred = torch.cat((pred, im), -1)
-                xx = torch.cat((xx[..., step:], im), dim=-1)
-        elif 'unet' in modelType:
-            pred = netmodel(xx)
+
+        gd = feature_transform(xx)
+        for t in range(0, T, step):
+            y = yy[..., t:t + step]
+            im = netmodel(xx, gd)
+            if t == 0:
+                pred = im
+            else:
+                pred = torch.cat((pred, im), -1)
+            xx = torch.cat((xx[..., step:], im), dim=-1)
 
         loss = lossfunc(pred, yy)
         optimizer.zero_grad()
@@ -92,18 +90,17 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            if 'fno' in modelType:
-                gd = feature_transform(xx)
-                for t in range(0, T, step):
-                    y = yy[..., t:t + step]
-                    im = netmodel(xx, gd)
-                    if t == 0:
-                        pred = im
-                    else:
-                        pred = torch.cat((pred, im), -1)
-                    xx = torch.cat((xx[..., step:], im), dim=-1)
-            elif 'unet' in modelType:
-                pred = netmodel(xx)
+
+            gd = feature_transform(xx)
+            for t in range(0, T, step):
+                y = yy[..., t:t + step]
+                im = netmodel(xx, gd)
+                if t == 0:
+                    pred = im
+                else:
+                    pred = torch.cat((pred, im), -1)
+                xx = torch.cat((xx[..., step:], im), dim=-1)
+
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
@@ -122,19 +119,15 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        if 'fno' in modelType:
-            gd = feature_transform(xx)
-            for t in range(0, T, step):
-                y = yy[..., t:t + step]
-                im = netmodel(xx, gd)
-                if t == 0:
-                    pred = im
-                else:
-                    pred = torch.cat((pred, im), -1)
-                xx = torch.cat((xx[..., step:], im), dim=-1)
-        elif 'unet' in modelType:
-            pred = netmodel(xx)
-            gd = torch.zeros((1,)).to(device)
+        gd = feature_transform(xx)
+        for t in range(0, T, step):
+            y = yy[..., t:t + step]
+            im = netmodel(xx, gd)
+            if t == 0:
+                pred = im
+            else:
+                pred = torch.cat((pred, im), -1)
+            xx = torch.cat((xx[..., step:], im), dim=-1)
 
     # equation = model.equation(u_var, y_var, out_pred)
     return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
@@ -145,8 +138,8 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'Euler-2d-NACA'
-    work_path = os.path.join('work')
+    name = 'UNet'
+    work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
@@ -166,7 +159,7 @@ if __name__ == "__main__":
     ntrain = 4000
     nvalid = 1000
 
-    modelType = 'fno'
+
     modes = (12, 12)  # fno
     steps = 1  # fno
     padding = 8  # fno
@@ -200,13 +193,6 @@ if __name__ == "__main__":
     valid_y = reader.read_field('u')[ntrain:, ::sub, ::sub, T_in:T + T_in]
     del reader
 
-    # x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0,))
-    # train_x = x_normalizer.norm(train_x)
-    # valid_x = x_normalizer.norm(valid_x)
-    #
-    # y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0,))
-    # train_y = y_normalizer.norm(train_y)
-    # valid_y = y_normalizer.norm(valid_y)
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
@@ -218,23 +204,20 @@ if __name__ == "__main__":
     ################################################################
 
     # 建立网络
-    if modelType == 'fno':
+    if name == 'FNO':
         Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
                           padding=padding, activation='gelu').to(Device)
-        input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
-        input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
-        print(modelType)
-        summary(Net_model, input_data=[input1, input2], device=Device)
-    elif modelType == 'unet':
-        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:], width=width, depth=depth,
-                           activation='gelu', dropout=dropout).to(Device)
-        input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
-        print(modelType)
-        summary(Net_model, input_data=input1, device=Device)
+    elif name == 'UNet':
+        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:-1] + (out_dim,), width=width,
+                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
+
+    input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
+    input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
+    print(name)
+    summary(Net_model, input_data=[input1, input2], device=Device)
 
     # 损失函数
-    # Loss_func = nn.MSELoss()
-    Loss_func = FieldsLpLoss()
+    Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)

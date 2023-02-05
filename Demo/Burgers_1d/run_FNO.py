@@ -116,7 +116,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'Burgers-1d'
+    name = 'FNO'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     steps = 1
     padding = 2
 
-    batch_size = 32
+    batch_size = 128
     batch_size2 = batch_size
 
     epochs = 500
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    sub = 2 ** 3  # subsampling rate
+    sub = 2 ** 5  # subsampling rate
     h = 2 ** 13 // sub  # total grid size divided by the subsampling rate
     s = h
 

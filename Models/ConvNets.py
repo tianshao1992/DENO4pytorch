@@ -104,17 +104,17 @@ class DownSampleNet1d(nn.Module):
         x = self.interp_in(x)
         for i in range(self.depth):
             x = self.downconvs[i](x)
-        x = x.view([-1, math.prod(self._out_size) * self.width])
+        x = x.reshape([-1, math.prod(self._out_size) * self.width])
         x = self.linear(x)
         return x
 
 
 class UNet1d(nn.Module):
     """
-        1维Unet
+        1维Unet  UNET model: https://github.com/milesial/Pytorch-UNet
     """
 
-    def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, activation='gelu',
+    def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, steps=1, activation='gelu',
                  dropout=0.0):
         """
         :param in_sizes: (C_in, H_in)
@@ -130,14 +130,15 @@ class UNet1d(nn.Module):
         self.out_dim = out_sizes[-1]
         self.width = width
         self.depth = depth
+        self.steps = steps
 
         self._input_sizes = [0]
         self._input_sizes[0] = max(2 ** math.floor(math.log2(in_sizes[0])), 2 ** depth)
         # self._input_sizes[1] = max(2 ** math.floor(math.log2(in_sizes[1])), 2 ** depth)
 
-        self.interp_in = Interp1dUpsample(in_dim=self.in_dim, out_dim=self.in_dim, activation=activation,
+        self.interp_in = Interp1dUpsample(in_dim=steps*self.in_dim + 1, out_dim=self.in_dim, activation=activation,
                                           dropout=dropout,
-                                          interp_size=self._input_sizes, conv_block=False)
+                                          interp_size=self._input_sizes, conv_block=True)
         self.encoders = nn.ModuleList()
         for i in range(self.depth):
             if i == 0:
@@ -157,7 +158,8 @@ class UNet1d(nn.Module):
 
         for i in range(self.depth, 0, -1):
             self.decoders.append(
-                Conv1dResBlock(2 ** i * width, 2 ** (i - 1) * width, activation=activation, dropout=dropout))
+                Conv1dResBlock(2 ** i * width, 2 ** (i - 1) * width, basic_block=True, activation=activation,
+                               dropout=dropout))
             self.upconvs.append(
                 DeConv1dBlock(2 ** i * width, 2 ** (i - 1) * width, 2 ** (i - 1) * width, activation=activation,
                               dropout=dropout))
@@ -170,11 +172,14 @@ class UNet1d(nn.Module):
 
         self.conv2 = nn.Conv1d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
-    def forward(self, x):
+    def forward(self, x, grid):
         """
         forward computation
         """
+        # x dim = [b, x1, t*v]
+        x = torch.cat((x, grid), dim=-1)
         x = x.permute(0, 2, 1)
+
         enc = []
         enc.append(self.interp_in(x))
         for i in range(self.depth):
@@ -296,7 +301,7 @@ class DownSampleNet2d(nn.Module):
         x = self.interp_in(x)
         for i in range(self.depth):
             x = self.downconvs[i](x)
-        x = x.view([-1, math.prod(self._out_size) * self.width])
+        x = x.reshape([-1, math.prod(self._out_size) * self.width])
         x = self.linear(x)
         return x
 
@@ -306,7 +311,7 @@ class UNet2d(nn.Module):
         2维UNet
     """
 
-    def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, activation='gelu',
+    def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, steps=1, activation='gelu',
                  dropout=0.0):
         """
         :param in_sizes: (H_in, W_in, C_in)
@@ -322,14 +327,15 @@ class UNet2d(nn.Module):
         self.out_dim = out_sizes[-1]
         self.width = width
         self.depth = depth
+        self.steps = steps
 
         self._input_sizes = [0, 0]
         self._input_sizes[0] = max(2 ** math.floor(math.log2(self.in_sizes[0])), 2 ** depth)
         self._input_sizes[1] = max(2 ** math.floor(math.log2(self.in_sizes[1])), 2 ** depth)
 
 
-        self.interp_in = Interp2dUpsample(in_dim=self.in_dim, out_dim=self.in_dim, activation=activation,
-                                          dropout=dropout, interp_size=self._input_sizes, conv_block=False)
+        self.interp_in = Interp2dUpsample(in_dim=steps*self.in_dim + 2, out_dim=self.in_dim, activation=activation,
+                                          dropout=dropout, interp_size=self._input_sizes, conv_block=True)
         self.encoders = nn.ModuleList()
         for i in range(self.depth):
             if i == 0:
@@ -350,7 +356,8 @@ class UNet2d(nn.Module):
 
         for i in range(self.depth, 0, -1):
             self.decoders.append(
-                Conv2dResBlock(2 ** i * width, 2 ** (i - 1) * width, activation=activation, dropout=dropout))
+                Conv2dResBlock(2 ** i * width, 2 ** (i - 1) * width, activation=activation,
+                               basic_block=True, dropout=dropout))
             self.upconvs.append(
                 DeConv2dBlock(2 ** i * width, 2 ** (i - 1) * width, 2 ** (i - 1) * width, activation=activation,
                               dropout=dropout))
@@ -363,10 +370,11 @@ class UNet2d(nn.Module):
 
         self.conv2 = nn.Conv2d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
-    def forward(self, x):
+    def forward(self, x, grid):
         """
         forward computation
         """
+        x = torch.cat((x, grid), dim=-1)
         x = x.permute(0, 3, 1, 2)
         enc = []
         enc.append(self.interp_in(x))
@@ -407,7 +415,8 @@ class UpSampleNet3d(nn.Module):
         self.depth = depth
         self.in_dim = in_sizes
         self.dropout = dropout
-        self.depth = min(math.floor(math.log2(self.out_sizes[0])) - 1, math.floor(math.log2(self.out_sizes[1])) - 1, math.floor(math.log2(self.out_sizes[2])) - 1,
+        self.depth = min(math.floor(math.log2(self.out_sizes[0])) - 1,
+                         math.floor(math.log2(self.out_sizes[1])) - 1, math.floor(math.log2(self.out_sizes[2])) - 1,
                          depth)
 
         self.hidden_size = [0, 0, 0]
@@ -491,7 +500,7 @@ class DownSampleNet3d(nn.Module):
         x = self.interp_in(x)
         for i in range(self.depth):
             x = self.downconvs[i](x)
-        x = x.view([-1, math.prod(self._out_size) * self.width])
+        x = x.reshape([-1, math.prod(self._out_size) * self.width])
         x = self.linear(x)
         return x
 
@@ -501,7 +510,7 @@ class UNet3d(nn.Module):
         3维UNet
     """
 
-    def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, activation='gelu',
+    def __init__(self, in_sizes: tuple, out_sizes: tuple, width=32, depth=4, steps=1, activation='gelu',
                  dropout=0.0):
 
         super(UNet3d, self).__init__()
@@ -512,15 +521,16 @@ class UNet3d(nn.Module):
         self.out_dim = out_sizes[-1]
         self.width = width
         self.depth = depth
+        self.steps = steps
 
         self._input_sizes = [0, 0, 0]
         self._input_sizes[0] = max(2 ** math.floor(math.log2(in_sizes[0])), 2 ** depth)
         self._input_sizes[1] = max(2 ** math.floor(math.log2(in_sizes[1])), 2 ** depth)
         self._input_sizes[2] = max(2 ** math.floor(math.log2(in_sizes[2])), 2 ** depth)
 
-        self.interp_in = Interp3dUpsample(in_dim=self.in_dim, out_dim=self.in_dim, activation=activation,
+        self.interp_in = Interp3dUpsample(in_dim=steps*self.in_dim + 3, out_dim=self.in_dim, activation=activation,
                                           dropout=dropout,
-                                          interp_size=self._input_sizes, conv_block=False)
+                                          interp_size=self._input_sizes, conv_block=True)
         self.encoders = nn.ModuleList()
         for i in range(self.depth):
             if i == 0:
@@ -541,7 +551,8 @@ class UNet3d(nn.Module):
 
         for i in range(self.depth, 0, -1):
             self.decoders.append(
-                Conv3dResBlock(2 ** i * width, 2 ** (i - 1) * width, activation=activation, dropout=dropout))
+                Conv3dResBlock(2 ** i * width, 2 ** (i - 1) * width, activation=activation,
+                               basic_block=True, dropout=dropout))
             self.upconvs.append(
                 DeConv3dBlock(2 ** i * width, 2 ** (i - 1) * width, 2 ** (i - 1) * width, activation=activation,
                               dropout=dropout))
@@ -554,10 +565,11 @@ class UNet3d(nn.Module):
 
         self.conv2 = nn.Conv3d(self.out_dim, self.out_dim, kernel_size=3, stride=1, padding=1)
 
-    def forward(self, x):
+    def forward(self, x, grid):
         """
         forward computation
         """
+        x = torch.cat((x, grid), dim=-1)
         x = x.permute(0, 4, 1, 2, 3)
         enc = []
         enc.append(self.interp_in(x))
@@ -578,9 +590,10 @@ class UNet3d(nn.Module):
 if __name__ == '__main__':
 
     x = torch.ones([10, 92, 8])
+    g = torch.ones([10, 92, 1])
     input_size = x.shape[1:]
-    layer = UNet1d(in_sizes=input_size, out_sizes=(128, 16), width=32, depth=6)
-    y = layer(x)
+    layer = UNet1d(in_sizes=input_size, out_sizes=(128, 16), width=32, depth=6, steps=1)
+    y = layer(x, g)
     print(y.shape)
 
     x = torch.ones([10, 10])
@@ -596,27 +609,29 @@ if __name__ == '__main__':
     print(y.shape)
 
     x = torch.ones([10, 4, 92, 8])
+    g = torch.ones([10, 4, 92, 2])
     input_size = x.shape[1:]
-    layer = UNet2d(in_sizes=input_size, out_sizes=(5, 32, 32), width=32, depth=6)
-    y = layer(x)
+    layer = UNet2d(in_sizes=input_size, out_sizes=(32, 32, 5), width=32, depth=6, steps=1)
+    y = layer(x, g)
     print(y.shape)
 
     x = torch.ones([10, 10])
-    in_sizes, out_sizes = 10, (5, 58, 32)
+    in_sizes, out_sizes = 10, (58, 32, 5)
     layer = UpSampleNet2d(in_sizes, out_sizes, width=32, depth=4)
     y = layer(x)
     print(y.shape)
 
-    x = torch.ones([10, 4, 92, 52])
+    x = torch.ones([10, 22, 92, 4])
     in_sizes, out_sizes = x.shape[1:], 10
     layer = DownSampleNet2d(in_sizes, out_sizes, width=32, depth=4)
     y = layer(x)
     print(y.shape)
 
     x = torch.ones([10, 32, 92, 92, 8])
+    g = torch.ones([10, 32, 92, 92, 3])
     input_size = x.shape[1:]
-    layer = UNet3d(in_sizes=input_size, out_sizes=(5, 32, 32, 16), width=32, depth=6)
-    y = layer(x)
+    layer = UNet3d(in_sizes=input_size, out_sizes=(32, 32, 16, 5), width=32, depth=6)
+    y = layer(x, g)
     print(y.shape)
 
     x = torch.ones([10, 10])

@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer, MatLoader
-from Models.FNOs import FNO1d
+from Models.ConvNets import UNet1d
 from Utilizes.loss_metrics import FieldsLpLoss
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
@@ -23,11 +23,11 @@ import os
 import sys
 
 
-class Net(FNO1d):
+class Net(UNet1d):
     """use basic model to build the network"""
 
-    def __init__(self, in_dim, out_dim, modes, width, depth, steps, padding, activation='gelu'):
-        super(Net, self).__init__(in_dim, out_dim, modes, width, depth, steps, padding, activation)
+    def __init__(self, in_sizes: tuple, out_sizes: tuple, width, depth, steps=1, activation='gelu'):
+        super(Net, self).__init__(in_sizes, out_sizes, width, depth, steps, activation)
 
     def feature_transform(self, x):
         """
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'Burgers-1d'
+    name = 'UNet-16-1024'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -138,18 +138,15 @@ if __name__ == "__main__":
     ntrain = 1000
     nvalid = 100
 
-    modes = 16
-    width = 64
+
+    width = 16
     depth = 4
     steps = 1
-    padding = 2
 
-    batch_size = 32
-    batch_size2 = batch_size
-
-    epochs = 500
+    batch_size = 128
+    epochs = 800
     learning_rate = 0.001
-    scheduler_step = 400
+    scheduler_step = 700
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -187,8 +184,8 @@ if __name__ == "__main__":
     #  Neural Networks
     ################################################################
     # 建立网络
-    Net_model = Net(in_dim=in_dim, out_dim=out_dim,
-                    modes=modes, width=width, depth=depth, steps=steps, padding=padding, activation='gelu').to(device)
+    Net_model = Net(in_sizes=(h, 1), out_sizes=(h, 1),
+                    width=width, depth=depth, steps=steps, activation='gelu').to(device)
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
