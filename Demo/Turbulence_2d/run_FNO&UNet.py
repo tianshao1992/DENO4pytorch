@@ -241,7 +241,7 @@ if __name__ == "__main__":
         Net_model.eval()
         log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
-              format(epoch, learning_rate, log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
+              format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
         star_time = time.time()
 
