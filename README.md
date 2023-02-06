@@ -14,8 +14,7 @@
 - Liu, T. et al. Supervised learning method for the physical field reconstruction in a nanofluid heat transfer problem. International Journal of Heat and Mass Transfer 165, 120684 (2021).
 - Du, Q. et al. Airfoil design and surrogate modeling for performance prediction based on deep learning method. Physics of Fluids 20 (2022).
 - Li, Y. et al. Deep learning based real-time energy extraction system modeling for flapping foil. Energy 246, 123390 (2022).
-
-[![10.1016/j.ijheatmasstransfer.2020.120684](https://img.shields.io/badge/DOI-doi%10.1016/j.ijheatmasstransfer.2020.120684-red)](https://linkinghub.elsevier.com/retrieve/pii/S0017931020336206)
+[![10.1016/j.ijheatmasstransfer.2020.120684](https://img.shields.io/badge/DOI-doi%3A10.1016/j.ijheatmasstransfer.2020.120684-red)](https://linkinghub.elsevier.com/retrieve/pii/S0017931020336206)
 
 ### FNO 
 - **Fourier Neural Operator as backbone**
@@ -67,6 +66,7 @@
 - Raissi, M., Perdikaris, P. & Karniadakis, G. E. Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. Journal of Computational Physics 378, 686–707 (2019).
 - Raissi, M., Yazdani, A. & Karniadakis, G. E. Hidden fluid mechanics: Learning velocity and pressure fields from flow visualizations. Science 367, 1026–1030 (2020).
 - Wang, S. et al. When and why PINNs fail to train: A neural tangent kernel perspective. arXiv:2007.14527 [cs, math, stat] (2020).
+  [![10.1016/j.ijheatmasstransfer.2020.120684](https://img.shields.io/badge/DOI-doi%3A10.1016/j.ijheatmasstransfer.2020.120684-red)](https://linkinghub.elsevier.com/retrieve/pii/S0017931020336206)
 
 ### Physics-data fusion (Semi-Supervised learning)
 
