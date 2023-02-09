@@ -25,11 +25,11 @@ from torchinfo import summary
 from collections import defaultdict
 from functools import partial
 
-from GraphTransformer.utilize import *
-from GraphTransformer.basic_layers import *
-from GraphTransformer.graph_layers import *
-from GraphTransformer.attention_layers import *
-from GraphTransformer.spectral_layers import *
+# from utilize import *
+from basic_layers import *
+from graph_layers import *
+from attention_layers import *
+from spectral_layers import *
 
 
 class SimpleTransformerEncoderLayer(nn.Module):
@@ -236,10 +236,12 @@ class SpectralRegressor(nn.Module):
                  dropout=0.1,
                  debug=False):
         super(SpectralRegressor, self).__init__()
-        if spacial_dim == 2:  # 2d, function + (x,y)
-            spectral_conv = SpectralConv2d
-        elif spacial_dim == 1:  # 1d, function + x
+        if spacial_dim == 1:
             spectral_conv = SpectralConv1d
+        elif spacial_dim == 2:  # 2d, function + (x,y)
+            spectral_conv = SpectralConv2d
+        elif spacial_dim == 3:  # 1d, function + x
+            spectral_conv = SpectralConv3d
         else:
             raise NotImplementedError("3D not implemented.")
         # activation = default(activation, 'silu')
@@ -248,23 +250,18 @@ class SpectralRegressor(nn.Module):
         self.spacial_fc = spacial_fc  # False in Transformer
         if self.spacial_fc:
             self.fc = nn.Linear(in_dim + spacial_dim, n_hidden)
+
         self.spectral_conv = nn.ModuleList([spectral_conv(in_dim=n_hidden,
                                                           out_dim=freq_dim,
-                                                          n_grid=n_grid,
                                                           modes=modes,
                                                           dropout=dropout,
-                                                          activation=activation,
-                                                          return_freq=return_freq,
-                                                          debug=debug)])
+                                                          activation=activation)])
         for _ in range(num_spectral_layers - 1):
             self.spectral_conv.append(spectral_conv(in_dim=freq_dim,
                                                     out_dim=freq_dim,
-                                                    n_grid=n_grid,
                                                     modes=modes,
                                                     dropout=dropout,
-                                                    activation=activation,
-                                                    return_freq=return_freq,
-                                                    debug=debug))
+                                                    activation=activation))
         if not last_activation:
             self.spectral_conv[-1].activation = Identity()
 
@@ -296,6 +293,8 @@ class SpectralRegressor(nn.Module):
             x = torch.cat([x, grid], dim=-1)
             x = self.fc(x)
 
+        x = x.permute(0, 2, 1)
+
         for layer in self.spectral_conv:
             if self.return_freq:
                 x, x_ft = layer(x)
@@ -306,6 +305,7 @@ class SpectralRegressor(nn.Module):
             if self.return_latent:
                 x_latent.append(x.contiguous())
 
+        x = x.permute(0, 2, 1)
         x = self.regressor(x)
 
         if self.normalizer:
@@ -626,7 +626,7 @@ if __name__ == '__main__':
                              return_attn_weight=True,
                              seq_len=None,
                              bulk_regression=False,
-                             decoder_type='ifft',
+                             decoder_type='pointwise',
                              freq_dim=64,
                              num_regressor_layers=2,
                              fourier_modes=16,

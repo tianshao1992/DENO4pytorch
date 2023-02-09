@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 # @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
-# @Time    : 2023/1/29 19:47
+# @Time    : 2023/2/9 23:18
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
 # @Site    : 
-# @File    : run_train.py
+# @File    : run_Trans.py
 """
 
 import numpy as np
@@ -13,33 +13,30 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer, MatLoader
-from fno.FNOs import FNO1d
+from transformer.Transformers import SimpleTransformer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
 import time
 import os
 import sys
+import yaml
 
 
-class Net(FNO1d):
-    """use basic model to build the network"""
+def feature_transform(x):
+    """
+    Args:
+        x: input coordinates
+    Returns:
+        res: input transform
+    """
+    shape = x.shape
+    batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+    gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+    gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
 
-    def __init__(self, in_dim, out_dim, modes, width, depth, steps, padding, activation='gelu'):
-        super(Net, self).__init__(in_dim, out_dim, modes, width, depth, steps, padding, activation)
-
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
-        return gridx.to(x.device)
+    edge = torch.ones((x.shape[0], 1))
+    return gridx.to(x.device), edge.to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -56,9 +53,9 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        gd = netmodel.feature_transform(xx)
+        grid, edge = feature_transform(xx)
 
-        pred = netmodel(xx, gd)
+        pred = netmodel(xx, grid, edge, grid)['preds']
         loss = lossfunc(pred, yy)
 
         optimizer.zero_grad()
@@ -83,9 +80,9 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            gd = netmodel.feature_transform(xx)
+            grid, edge = feature_transform(xx)
 
-            pred = netmodel(xx, gd)
+            pred = netmodel(xx, grid, edge, grid)['preds']
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
@@ -103,11 +100,11 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = netmodel.feature_transform(xx)
-        pred = netmodel(xx, gd)
+        grid, edge = feature_transform(xx)
+        pred = netmodel(xx, grid, edge, grid)['preds']
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return gd.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -115,7 +112,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'FNO'
+    name = 'Transformer'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -185,9 +182,12 @@ if __name__ == "__main__":
     ################################################################
     #  Neural Networks
     ################################################################
+    with open(os.path.join('transformer_config.yml')) as f:
+        config = yaml.full_load(f)
+    config = config['Burgers_1d']
+
     # 建立网络
-    Net_model = Net(in_dim=in_dim, out_dim=out_dim,
-                    modes=modes, width=width, depth=depth, steps=steps, padding=padding, activation='gelu').to(device)
+    Net_model = SimpleTransformer(**config).to(device)
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()

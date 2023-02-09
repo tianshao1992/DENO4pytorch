@@ -116,6 +116,10 @@ def generate_one_training_data(key, P, Q):
     L = np.linalg.cholesky(K + jitter * np.eye(N))
     gp_sample = np.dot(L, np.random.normal(size=(N,)))
 
+    import matplotlib.pyplot as plt
+    plt.plot(gp_sample)
+    plt.show()
+
     v_fn = lambda x: np.interp(x, X.flatten(), gp_sample)
     u_fn = lambda x: v_fn(x) - v_fn(x).min() + 1.0
 

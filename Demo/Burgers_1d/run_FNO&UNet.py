@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer, MatLoader
+from fno.FNOs import FNO1d
 from cnn.ConvNets import UNet1d
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
@@ -22,24 +23,18 @@ import os
 import sys
 
 
-class Net(UNet1d):
-    """use basic model to build the network"""
-
-    def __init__(self, in_sizes: tuple, out_sizes: tuple, width, depth, steps=1, activation='gelu'):
-        super(Net, self).__init__(in_sizes, out_sizes, width, depth, steps, activation)
-
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
-        return gridx.to(x.device)
+def feature_transform(x):
+    """
+    Args:
+        x: input coordinates
+    Returns:
+        res: input transform
+    """
+    shape = x.shape
+    batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+    gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+    gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
+    return gridx.to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -56,7 +51,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        gd = netmodel.feature_transform(xx)
+        gd = feature_transform(xx)
 
         pred = netmodel(xx, gd)
         loss = lossfunc(pred, yy)
@@ -83,7 +78,7 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            gd = netmodel.feature_transform(xx)
+            gd = feature_transform(xx)
 
             pred = netmodel(xx, gd)
             loss = lossfunc(pred, yy)
@@ -103,11 +98,11 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = netmodel.feature_transform(xx)
+        gd = feature_transform(xx)
         pred = netmodel(xx, gd)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return gd.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -115,7 +110,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'UNet-16-1024'
+    name = 'FNO'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -125,9 +120,9 @@ if __name__ == "__main__":
     sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
 
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        Device = torch.device('cuda')
     else:
-        device = torch.device('cpu')
+        Device = torch.device('cpu')
 
     train_file = 'data/burgers_data_R10.mat'
     # valid_file = 'data/burgers_data_R10.mat'
@@ -137,20 +132,23 @@ if __name__ == "__main__":
     ntrain = 1000
     nvalid = 100
 
-
-    width = 16
+    modes = 16
+    width = 64
     depth = 4
     steps = 1
-
+    padding = 2
+    dropout = 0.0
     batch_size = 128
-    epochs = 800
+
+
+    epochs = 500
     learning_rate = 0.001
-    scheduler_step = 700
+    scheduler_step = 400
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    sub = 2 ** 3  # subsampling rate
+    sub = 2 ** 5  # subsampling rate
     h = 2 ** 13 // sub  # total grid size divided by the subsampling rate
     s = h
 
@@ -182,9 +180,15 @@ if __name__ == "__main__":
     ################################################################
     #  Neural Networks
     ################################################################
+
     # 建立网络
-    Net_model = Net(in_sizes=(h, 1), out_sizes=(h, 1),
-                    width=width, depth=depth, steps=steps, activation='gelu').to(device)
+    if name == 'FNO':
+        Net_model = FNO1d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
+                          padding=padding, activation='gelu').to(Device)
+    elif name == 'UNet':
+        Net_model = UNet1d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:], width=width,
+                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
+
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
@@ -205,10 +209,10 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, device, Loss_func, Optimizer, Scheduler))
+        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler))
 
         Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, device, Loss_func))
+        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
               format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
@@ -229,8 +233,8 @@ if __name__ == "__main__":
         if epoch > 0 and epoch % 20 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, device)
-            valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, device)
+            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
+            valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
