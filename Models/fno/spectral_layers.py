@@ -44,13 +44,14 @@ class SpectralConv1d(nn.Module):
         self.out_dim = out_dim
         self.modes = modes  # Number of Fourier modes to multiply, at most floor(N/2) + 1
         self.norm = norm
-        self.dropout = dropout
+        self.dropout = nn.Dropout(dropout)
         self.return_freq = return_freq
         self.activation = activation_dict[activation]
         self.linear = nn.Conv1d(self.in_dim, self.out_dim, 1)  # for residual
-
+        # self.linear = nn.Linear(self.in_dim, self.out_dim)
         self.scale = (1 / (in_dim * out_dim))
         self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes, dtype=torch.cfloat))
+        # xavier_normal_(self.weights1, gain=1 / (in_dim * out_dim))
 
     # Complex multiplication
     def compl_mul1d(self, input, weights):
@@ -63,15 +64,16 @@ class SpectralConv1d(nn.Module):
         """
         batchsize = x.shape[0]
         # Compute Fourier coeffcients up to factor of e^(- something constant)
-        x_ft = torch.fft.rfft(x, norm=self.norm)
         res = self.linear(x)
+        # x = self.dropout(x)
+        x_ft = torch.fft.rfft(x, norm=self.norm)
 
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batchsize, self.out_dim, x.size(-1) // 2 + 1, device=x.device, dtype=torch.cfloat)
         out_ft[:, :, :self.modes] = self.compl_mul1d(x_ft[:, :, :self.modes], self.weights1)
 
         # Return to physical space
-        x = torch.fft.irfft(out_ft, n=x.size(-1))
+        x = torch.fft.irfft(out_ft, norm=self.norm)
         x = self.activation(x + res)
 
         if self.return_freq:
@@ -129,8 +131,10 @@ class SpectralConv2d(nn.Module):
         """
         batch_size = x.shape[0]
         # Compute Fourier coeffcients up to factor of e^(- something constant)
-        x_ft = torch.fft.rfft2(x, norm=self.norm)
         res = self.linear(x)
+        # x = self.dropout(x)
+        x_ft = torch.fft.rfft2(x, norm=self.norm)
+
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batch_size, self.out_dim, x.size(-2), x.size(-1) // 2 + 1, dtype=torch.cfloat,
                              device=x.device)
@@ -140,7 +144,7 @@ class SpectralConv2d(nn.Module):
             self.compl_mul2d(x_ft[:, :, -self.modes1:, :self.modes2], self.weights2)
 
         # Return to physical space
-        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)))
+        x = torch.fft.irfft2(out_ft, s=(x.size(-2), x.size(-1)), norm=self.norm)
         x = self.activation(x + res)
 
         if self.return_freq:
@@ -208,8 +212,9 @@ class SpectralConv3d(nn.Module):
         """
         batch_size = x.size(0)
         # Compute Fourier coeffcients up to factor of e^(- something constant)
-        x_ft = torch.fft.rfftn(x, dim=[-3, -2, -1], norm=self.norm)
         res = self.linear(x)
+        # x = self.dropout(x)
+        x_ft = torch.fft.rfftn(x, dim=[-3, -2, -1], norm=self.norm)
         # Multiply relevant Fourier modes
         out_ft = torch.zeros(batch_size, self.out_dim, x.size(-3), x.size(-2), x.size(-1) // 2 + 1,
                              dtype=torch.cfloat, device=x.device)
@@ -223,7 +228,7 @@ class SpectralConv3d(nn.Module):
             self.compl_mul3d(x_ft[:, :, -self.modes1:, -self.modes2:, :self.modes3], self.weights4)
 
         # Return to physical space
-        x = torch.fft.irfftn(out_ft, s=(x.size(-3), x.size(-2), x.size(-1)))
+        x = torch.fft.irfftn(out_ft, s=(x.size(-3), x.size(-2), x.size(-1)), norm=self.norm)
         x = self.activation(x + res)
 
         if self.return_freq:

@@ -122,9 +122,9 @@ if __name__ == "__main__":
     sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
 
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        Device = torch.device('cuda')
     else:
-        device = torch.device('cpu')
+        Device = torch.device('cpu')
 
     train_file = 'data/burgers_data_R10.mat'
     # valid_file = 'data/burgers_data_R10.mat'
@@ -150,27 +150,31 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    sub = 2 ** 5  # subsampling rate
-    h = 2 ** 13 // sub  # total grid size divided by the subsampling rate
-    s = h
+    sub_train = 2 ** 5  # subsampling rate
+    h_train = 2 ** 13 // sub_train  # total grid size divided by the subsampling rate
+    s_train = h_train
+
+    sub_valid = 2 ** 3
+    h_valid = 2 ** 13 // sub_valid  # total grid size divided by the subsampling rate
+    s_valid = h_valid
 
     ################################################################
     # load data
     ################################################################
 
     reader = MatLoader(train_file)
-    train_x = reader.read_field('a')[:ntrain, ::sub][:, :s, None]
-    train_y = reader.read_field('u')[:ntrain, ::sub][:, :s, None]
+    train_x = reader.read_field('a')[:ntrain, ::sub_train][:, :s_train, None]
+    train_y = reader.read_field('u')[:ntrain, ::sub_train][:, :s_train, None]
 
-    valid_x = reader.read_field('a')[nvalid:, ::sub][:, :s, None]
-    valid_y = reader.read_field('u')[nvalid:, ::sub][:, :s, None]
+    valid_x = reader.read_field('a')[nvalid:, ::sub_valid][:, :s_valid, None]
+    valid_y = reader.read_field('u')[nvalid:, ::sub_valid][:, :s_valid, None]
     del reader
 
-    x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0,))
+    x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0, 1))
     train_x = x_normalizer.norm(train_x)
     valid_x = x_normalizer.norm(valid_x)
 
-    y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0,))
+    y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0, 1))
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
@@ -187,7 +191,7 @@ if __name__ == "__main__":
     config = config['Burgers_1d']
 
     # 建立网络
-    Net_model = SimpleTransformer(**config).to(device)
+    Net_model = SimpleTransformer(**config).to(Device)
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
@@ -208,10 +212,10 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, device, Loss_func, Optimizer, Scheduler))
+        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler))
 
         Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, device, Loss_func))
+        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
               format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
@@ -232,8 +236,8 @@ if __name__ == "__main__":
         if epoch > 0 and epoch % 20 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, device)
-            valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, device)
+            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
+            valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))

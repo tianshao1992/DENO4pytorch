@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 
 activation_dict = \
     {'gelu': nn.GELU(), 'silu': nn.SiLU(), 'relu': nn.ReLU(), 'tanh': nn.Tanh(), 'leakyrelu': nn.LeakyReLU(),
-     None: nn.ReLU()}
+     None: nn.SiLU()}
 
 additional_attr = ['normalizer', 'raw_laplacian', 'return_latent',
                    'residual_type', 'norm_type', 'norm_eps', 'boundary_condition',

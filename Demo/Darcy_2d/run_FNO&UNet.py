@@ -12,8 +12,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torchinfo import summary
 from Utilizes.process_data import DataNormer, MatLoader
 from fno.FNOs import FNO2d
+from cnn.ConvNets import UNet2d
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -22,26 +24,20 @@ import os
 import sys
 
 
-class Net(FNO2d):
-    """use basic model to build the network"""
-
-    def __init__(self, in_dim, out_dim, modes, width, depth, steps, padding, activation='gelu'):
-        super(Net, self).__init__(in_dim, out_dim, modes, width, depth, steps, padding, activation)
-
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
-        gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-        return torch.cat((gridx, gridy), dim=-1).to(x.device)
+def feature_transform(x):
+    """
+    Args:
+        x: input coordinates
+    Returns:
+        res: input transform
+    """
+    shape = x.shape
+    batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+    gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+    gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
+    gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
+    gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
+    return torch.cat((gridx, gridy), dim=-1).to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -58,7 +54,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        gd = netmodel.feature_transform(xx)
+        gd = feature_transform(xx)
 
         pred = netmodel(xx, gd)
         loss = lossfunc(pred, yy)
@@ -85,7 +81,7 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            gd = netmodel.feature_transform(xx)
+            gd = feature_transform(xx)
 
             pred = netmodel(xx, gd)
             loss = lossfunc(pred, yy)
@@ -105,11 +101,11 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = netmodel.feature_transform(xx)
+        gd = feature_transform(xx)
         pred = netmodel(xx, gd)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return gd.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -117,7 +113,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'darcy_triangular_notch'
+    name = 'FNO'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -131,19 +127,20 @@ if __name__ == "__main__":
     else:
         Device = torch.device('cpu')
 
-    train_file = os.path.join('data', name, 'Darcy_Triangular_FNO.mat')
-    valid_file = os.path.join('data', name, 'Darcy_Triangular_FNO.mat')
+    train_file = os.path.join('data', 'standard', 'piececonst_r421_N1024_smooth1.mat')
+    valid_file = os.path.join('data', 'standard', 'piececonst_r421_N1024_smooth1.mat')
 
     in_dim = 1
     out_dim = 1
-    ntrain = 1900
+    ntrain = 1000
     nvalid = 100
 
-    modes = (8, 8)
+    modes = (12, 12)
     width = 32
     depth = 4
     steps = 1
-    padding = 0
+    padding = 9
+    dropout = 0.0
 
     batch_size = 32
     batch_size2 = batch_size
@@ -155,33 +152,34 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r = 2
-    h = int(((100 - 1) / r) + 1)
-    s = h
+    r_train = 5
+    h_train = int(((421 - 1) / r_train) + 1)
+    s_train = h_train
+
+    r_valid = 5
+    h_valid = int(((421 - 1) / r_valid) + 1)
+    s_valid = h_valid
 
     ################################################################
     # load data
     ################################################################
 
     reader = MatLoader(train_file)
-    train_x = reader.read_field('boundCoeff')[:ntrain, ::r, ::r][:, :s, :s, None]
-    train_y = reader.read_field('sol')[:ntrain, ::r, ::r][:, :s, :s, None]
-    # train_grid_x = reader.read_field('coord_x')[:ntrain, ::r, ::r][:, :s, :s, None]
-    # train_grid_y = reader.read_field('coord_y')[:ntrain, ::r, ::r][:, :s, :s, None]
+    train_x = reader.read_field('coeff')[:ntrain, ::r_train, ::r_train][:, :s_train, :s_train, None]
+    train_y = reader.read_field('sol')[:ntrain, ::r_train, ::r_train][:, :s_train, :s_train, None]
 
-    valid_x = reader.read_field('boundCoeff')[-nvalid:, ::r, ::r][:, :s, :s, None]
-    valid_y = reader.read_field('sol')[-nvalid:, ::r, ::r][:, :s, :s, None]
-    # valid_grid_x = reader.read_field('coord_x')[-nvalid:, ::r, ::r][:, :s, :s, None]
-    # valid_grid_y = reader.read_field('coord_y')[-nvalid:, ::r, ::r][:, :s, :s, None]
+    valid_x = reader.read_field('coeff')[-nvalid:, ::r_valid, ::r_valid][:, :s_valid, :s_valid, None]
+    valid_y = reader.read_field('sol')[-nvalid:, ::r_valid, ::r_valid][:, :s_valid, :s_valid, None]
+
     del reader
 
-    x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0,))
-    # train_x = x_normalizer.norm(train_x)
-    # valid_x = x_normalizer.norm(valid_x)
+    x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
+    train_x = x_normalizer.norm(train_x)
+    valid_x = x_normalizer.norm(valid_x)
 
-    y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0,))
-    # train_y = y_normalizer.norm(train_y)
-    # valid_y = y_normalizer.norm(valid_y)
+    y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
+    train_y = y_normalizer.norm(train_y)
+    valid_y = y_normalizer.norm(valid_y)
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
@@ -192,8 +190,18 @@ if __name__ == "__main__":
     #  Neural Networks
     ################################################################
     # 建立网络
-    Net_model = Net(in_dim=in_dim, out_dim=out_dim,
-                    modes=modes, width=width, depth=depth, steps=steps, padding=padding, activation='gelu').to(Device)
+    if name == 'FNO':
+        Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
+                          padding=padding, activation='gelu').to(Device)
+    elif name == 'UNet':
+        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:], width=width,
+                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
+
+    input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
+    input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
+    print(name)
+    summary(Net_model, input_data=[input1, input2], device=Device)
+
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
