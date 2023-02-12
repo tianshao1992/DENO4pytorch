@@ -292,8 +292,10 @@ class SpectralRegressor(nn.Module):
         if self.spacial_fc:
             x = torch.cat([x, grid], dim=-1)
             x = self.fc(x)
-
-        x = x.permute(0, 2, 1)
+        if len(x.shape) == 3:
+            x = x.permute(0, 2, 1)
+        else:
+            x = x.permute(0, 3, 1, 2)
 
         for layer in self.spectral_conv:
             if self.return_freq:
@@ -305,7 +307,11 @@ class SpectralRegressor(nn.Module):
             if self.return_latent:
                 x_latent.append(x.contiguous())
 
-        x = x.permute(0, 2, 1)
+        if len(x.shape) == 3:
+            x = x.permute(0, 2, 1)
+        elif len(x.shape) == 4:
+            x = x.permute(0, 2, 3, 1)
+
         x = self.regressor(x)
 
         if self.normalizer:
@@ -595,6 +601,248 @@ class SimpleTransformer(nn.Module):
         get_encoder
         """
         return self.encoder_layers
+
+
+class FourierTransformer2D(nn.Module):
+    def __init__(self, **kwargs):
+        super(FourierTransformer2D, self).__init__()
+        self.config = defaultdict(lambda: None, **kwargs)
+        self._get_setting()
+        self._initialize()
+        self.__name__ = self.attention_type.capitalize() + 'Transformer2D'
+
+    def forward(self, node, pos, edge, grid, weight=None, boundary_value=None):
+        '''
+        - node: (batch_size, n, n, node_feats)
+        - pos: (batch_size, n_s*n_s, pos_dim)
+        - edge: (batch_size, n_s*n_s, n_s*n_s, edge_feats)
+        - weight: (batch_size, n_s*n_s, n_s*n_s): mass matrix prefered
+            or (batch_size, n_s*n_s) when mass matrices are not provided (lumped mass)
+        - grid: (batch_size, n-2, n-2, 2) excluding boundary
+        '''
+        bsz = node.size(0)
+        n_s = int(pos.size(1))
+        x_latent = []
+        attn_weights = []
+
+        # if not self.downscaler_size:
+        node = torch.cat([node, pos], dim=-1)
+        x = self.downscaler(node)
+        x = x.view(bsz, -1, self.n_hidden)
+        pos = pos.view(bsz, -1, pos.shape[-1])
+
+        x = self.feat_extract(x, edge)
+        x = self.dpo(x)
+
+        for encoder in self.encoder_layers:
+            if self.return_attn_weight and self.attention_type != 'official':
+                x, attn_weight = encoder(x, pos, weight)
+                attn_weights.append(attn_weight)
+            elif self.attention_type != 'official':
+                x = encoder(x, pos, weight)
+            else:
+                out_dim = self.n_head * self.pos_dim + self.n_hidden
+                x = x.view(bsz, -1, self.n_head, self.n_hidden // self.n_head).transpose(1, 2)
+                x = torch.cat([pos.repeat([1, self.n_head, 1, 1]), x], dim=-1)
+                x = x.transpose(1, 2).contiguous().view(bsz, -1, out_dim)
+                x = encoder(x)
+            if self.return_latent:
+                x_latent.append(x.contiguous())
+
+        x = x.view(bsz, n_s, n_s, self.n_hidden)
+        x = self.upscaler(x)
+
+        if self.return_latent:
+            x_latent.append(x.contiguous())
+
+        x = self.dpo(x)
+
+        if self.return_latent:
+            x, xr_latent = self.regressor(x, grid=grid)
+            x_latent.append(xr_latent)
+        else:
+            x = self.regressor(x, grid=grid)
+
+        if self.normalizer:
+            x = self.normalizer.inverse_transform(x)
+
+        # if self.boundary_condition == 'dirichlet':
+        #     x = x[:, 1:-1, 1:-1].contiguous()
+        #     x = F.pad(x, (0, 0, 1, 1, 1, 1), "constant", 0)
+        #     if boundary_value is not None:
+        #         assert x.size() == boundary_value.size()
+        #         x += boundary_value
+
+        return dict(preds=x,
+                    preds_latent=x_latent,
+                    attn_weights=attn_weights)
+
+    def _initialize(self):
+        self._get_feature()
+        self._get_scaler()
+        self._get_encoder()
+        self._get_regressor()
+        self.config = dict(self.config)
+
+    def cuda(self, device=None):
+        self = super().cuda(device)
+        if self.normalizer:
+            self.normalizer = self.normalizer.cuda(device)
+        return self
+
+    def cpu(self):
+        self = super().cpu()
+        if self.normalizer:
+            self.normalizer = self.normalizer.cpu()
+        return self
+
+    def to(self, *args, **kwargs):
+        self = super().to(*args, **kwargs)
+        if self.normalizer:
+            self.normalizer = self.normalizer.to(*args, **kwargs)
+        return self
+
+    def print_config(self):
+        for a in self.config.keys():
+            if not a.startswith('__'):
+                print(f"{a}: \t", getattr(self, a))
+
+    @staticmethod
+    def _initialize_layer(layer, gain=1e-2):
+        for param in layer.parameters():
+            if param.ndim > 1:
+                xavier_uniform_(param, gain=gain)
+            else:
+                constant_(param, 0)
+
+    @staticmethod
+    def _get_pos(pos, downsample):
+        '''
+        get the downscaled position in 2d
+        '''
+        bsz = pos.size(0)
+        n_grid = pos.size(1)
+        x, y = pos[..., 0], pos[..., 1]
+        x = x.view(bsz, n_grid, n_grid)
+        y = y.view(bsz, n_grid, n_grid)
+        x = x[:, ::downsample, ::downsample].contiguous()
+        y = y[:, ::downsample, ::downsample].contiguous()
+        return torch.stack([x, y], dim=-1)
+
+    def _get_setting(self):
+        all_attr = list(self.config.keys()) + additional_attr
+        for key in all_attr:
+            setattr(self, key, self.config[key])
+
+        self.dim_feedforward = default(self.dim_feedforward, 2 * self.n_hidden)
+        self.dropout = default(self.dropout, 0.05)
+        self.dpo = nn.Dropout(self.dropout)
+        if self.decoder_type == 'attention':
+            self.num_encoder_layers += 1
+        self.attention_types = ['fourier', 'integral', 'local', 'global',
+                                'cosine', 'galerkin', 'linear', 'softmax']
+
+    def _get_feature(self):
+        if self.feat_extract_type == 'gcn' and self.num_feat_layers > 0:
+            self.feat_extract = GCN(node_feats=self.n_hidden,
+                                    edge_feats=self.edge_feats,
+                                    num_gcn_layers=self.num_feat_layers,
+                                    out_features=self.n_hidden,
+                                    activation=self.graph_activation,
+                                    raw_laplacian=self.raw_laplacian,
+                                    debug=self.debug,
+                                    )
+        elif self.feat_extract_type == 'gat' and self.num_feat_layers > 0:
+            self.feat_extract = GAT(node_feats=self.n_hidden,
+                                    out_features=self.n_hidden,
+                                    num_gcn_layers=self.num_feat_layers,
+                                    activation=self.graph_activation,
+                                    debug=self.debug,
+                                    )
+        else:
+            self.feat_extract = Identity()
+
+    def _get_scaler(self):
+        # if self.downscaler_size:
+        #     self.downscaler = DownScaler(in_dim=self.node_feats,
+        #                                  out_dim=self.n_hidden,
+        #                                  downsample_mode=self.downsample_mode,
+        #                                  interp_size=self.downscaler_size,
+        #                                  dropout=self.downscaler_dropout,
+        #                                  activation_type=self.downscaler_activation)
+        # else:
+        self.downscaler = nn.Linear(self.node_feats + self.spacial_dim, out_features=self.n_hidden)
+        # Identity(in_features=self.node_feats+self.spacial_dim, out_features=self.n_hidden)
+        # if self.upscaler_size:
+        #     self.upscaler = UpScaler(in_dim=self.n_hidden,
+        #                              out_dim=self.n_hidden,
+        #                              upsample_mode=self.upsample_mode,
+        #                              interp_size=self.upscaler_size,
+        #                              dropout=self.upscaler_dropout,
+        #                              activation_type=self.upscaler_activation)
+        # else:
+        self.upscaler = Identity()
+
+    def _get_encoder(self):
+        if self.attention_type in self.attention_types:
+            encoder_layer = SimpleTransformerEncoderLayer(d_model=self.n_hidden,
+                                                          n_head=self.n_head,
+                                                          attention_type=self.attention_type,
+                                                          dim_feedforward=self.dim_feedforward,
+                                                          layer_norm=self.layer_norm,
+                                                          attn_norm=self.attn_norm,
+                                                          batch_norm=self.batch_norm,
+                                                          pos_dim=self.pos_dim,
+                                                          xavier_init=self.xavier_init,
+                                                          diagonal_weight=self.diagonal_weight,
+                                                          symmetric_init=self.symmetric_init,
+                                                          attn_weight=self.return_attn_weight,
+                                                          dropout=self.encoder_dropout,
+                                                          ffn_dropout=self.ffn_dropout,
+                                                          norm_eps=self.norm_eps,
+                                                          debug=self.debug)
+        # elif self.attention_type == 'official':
+        #     encoder_layer = TransformerEncoderLayer(d_model=self.n_hidden+self.pos_dim*self.n_head,
+        #                                             nhead=self.n_head,
+        #                                             dim_feedforward=self.dim_feedforward,
+        #                                             dropout=self.encoder_dropout,
+        #                                             batch_first=True,
+        #                                             layer_norm_eps=self.norm_eps,
+        #                                             )
+        else:
+            raise NotImplementedError("encoder type not implemented.")
+        self.encoder_layers = nn.ModuleList(
+            [copy.deepcopy(encoder_layer) for _ in range(self.num_encoder_layers)])
+
+    def _get_regressor(self):
+        if self.decoder_type == 'pointwise':
+            self.regressor = PointwiseRegressor(in_dim=self.n_hidden,
+                                                n_hidden=self.n_hidden,
+                                                out_dim=self.n_targets,
+                                                num_layers=self.num_regressor_layers,
+                                                spacial_fc=self.spacial_fc,
+                                                spacial_dim=self.spacial_dim,
+                                                activation=self.regressor_activation,
+                                                dropout=self.decoder_dropout,
+                                                return_latent=self.return_latent,
+                                                debug=self.debug)
+        elif self.decoder_type == 'ifft2':
+            self.regressor = SpectralRegressor(in_dim=self.n_hidden,
+                                               n_hidden=self.freq_dim,
+                                               freq_dim=self.freq_dim,
+                                               out_dim=self.n_targets,
+                                               num_spectral_layers=self.num_regressor_layers,
+                                               modes=self.fourier_modes,
+                                               spacial_dim=self.spacial_dim,
+                                               spacial_fc=self.spacial_fc,
+                                               activation=self.regressor_activation,
+                                               last_activation=self.last_activation,
+                                               dropout=self.decoder_dropout,
+                                               return_latent=self.return_latent,
+                                               debug=self.debug
+                                               )
+        else:
+            raise NotImplementedError("Decoder type not implemented")
 
 
 if __name__ == '__main__':

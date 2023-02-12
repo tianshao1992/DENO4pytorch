@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'Transformer'
+    name = 'Transformer_galerkin'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:

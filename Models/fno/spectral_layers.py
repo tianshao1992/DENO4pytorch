@@ -105,8 +105,12 @@ class SpectralConv2d(nn.Module):
 
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.modes1 = modes[0]  # Number of Fourier modes to multiply, at most floor(N/2) + 1
-        self.modes2 = modes[1]
+        if isinstance(modes, int):
+            self.modes1 = modes  # Number of Fourier modes to multiply, at most floor(N/2) + 1
+            self.modes2 = modes
+        else:
+            self.modes1 = modes[0]  # Number of Fourier modes to multiply, at most floor(N/2) + 1
+            self.modes2 = modes[1]
 
         self.norm = norm
         self.dropout = dropout
@@ -176,9 +180,14 @@ class SpectralConv3d(nn.Module):
 
         self.in_dim = in_dim
         self.out_dim = out_dim
-        self.modes1 = modes[0]  # Number of Fourier modes to multiply, at most floor(N/2) + 1
-        self.modes2 = modes[1]
-        self.modes3 = modes[2]
+        if isinstance(modes, int):
+            self.modes1 = modes  # Number of Fourier modes to multiply, at most floor(N/2) + 1
+            self.modes2 = modes
+            self.modes3 = modes
+        else:
+            self.modes1 = modes[0]  # Number of Fourier modes to multiply, at most floor(N/2) + 1
+            self.modes2 = modes[1]
+            self.modes3 = modes[2]
 
         self.norm = norm
         self.dropout = dropout

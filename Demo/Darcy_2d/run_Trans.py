@@ -14,7 +14,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
 from Utilizes.process_data import DataNormer, MatLoader
-from transformer.Transformers import SimpleTransformer
+from transformer.Transformers import SimpleTransformer, FourierTransformer2D
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -37,7 +37,9 @@ def feature_transform(x):
     gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
     gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
     gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-    return torch.cat((gridx, gridy), dim=-1).to(x.device)
+
+    edge = torch.ones((x.shape[0], 1))
+    return torch.cat((gridx, gridy), dim=-1).to(x.device), edge.to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -113,7 +115,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'FNO'
+    name = 'Transformer_galerkin'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -142,12 +144,10 @@ if __name__ == "__main__":
     padding = 9
     dropout = 0.0
 
-    batch_size = 32
-    batch_size2 = batch_size
-
-    epochs = 500
+    batch_size = 8
+    epochs = 400
     learning_rate = 0.001
-    scheduler_step = 400
+    scheduler_step = 300
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -191,10 +191,10 @@ if __name__ == "__main__":
     ################################################################
     with open(os.path.join('transformer_config.yml')) as f:
         config = yaml.full_load(f)
-    config = config['Burgers_1d']
+    config = config['Darcy_2d']
 
     # 建立网络
-    Net_model = SimpleTransformer(**config).to(Device)
+    Net_model = FourierTransformer2D(**config).to(Device)
 
     # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
     # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
@@ -251,13 +251,13 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            for fig_id in range(10):
+            for fig_id in range(batch_size):
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+            for fig_id in range(batch_size):
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))

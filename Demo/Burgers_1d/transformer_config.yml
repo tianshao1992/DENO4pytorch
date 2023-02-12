@@ -11,7 +11,7 @@ Burgers_1d:
   n_freq_targets: 0
   dim_feedforward: 192
   feat_extract_type: null
-  attention_type: fourier
+  attention_type: linear
   xavier_init: 0.001
   diagonal_weight: 0.01
   symmetric_init: False
