@@ -1,5 +1,5 @@
 Turbulence_2d+t:
-  node_feats: 10+2
+  node_feats: 10
   pos_dim: 2
   n_targets: 1
   n_hidden: 48
@@ -11,18 +11,25 @@ Turbulence_2d+t:
   feat_extract_type: None
   xavier_init: 0.01
   diagonal_weight: 0.01
+  symmetric_init: False
   layer_norm: True
   attn_norm: False
+  norm_eps: 0.0000001
+  batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: ifft
-  freq_dim: 20
+  decoder_type: ifft2
+  last_activation: True
+  freq_dim: 16
   num_regressor_layers: 2
   fourier_modes: 12
   spacial_dim: 2
-  spacial_fc: False
+  spacial_fc: True
   dropout: 0.0
   encoder_dropout: 0.0
   decoder_dropout: 0.0
   ffn_dropout: 0.05
   debug: False
+  upsample_mode: interp
+  downsample_mode: interp
+  boundary_condition: dirichlet

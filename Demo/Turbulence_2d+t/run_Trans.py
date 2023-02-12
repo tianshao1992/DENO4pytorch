@@ -39,7 +39,9 @@ def feature_transform(x):
     gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
     gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
     gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-    return torch.cat((gridx, gridy), dim=-1).to(x.device)
+
+    edge = torch.ones((x.shape[0], 1))
+    return torch.cat((gridx, gridy), dim=-1).to(x.device), edge.to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -56,10 +58,10 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         xx = xx.to(device)
         yy = yy.to(device)
 
-        gd = feature_transform(xx)
+        grid, edge = feature_transform(xx)
         for t in range(0, T, step):
-            y = yy[..., t:t + step]
-            im = netmodel(xx, gd)
+            # y = yy[..., t:t + step]
+            im = netmodel(xx, grid, edge, grid)['preds']
             if t == 0:
                 pred = im
             else:
@@ -90,10 +92,10 @@ def valid(dataloader, netmodel, device, lossfunc):
             xx = xx.to(device)
             yy = yy.to(device)
 
-            gd = feature_transform(xx)
+            grid, edge = feature_transform(xx)
             for t in range(0, T, step):
                 y = yy[..., t:t + step]
-                im = netmodel(xx, gd)
+                im = netmodel(xx, grid, edge, grid)['preds']
                 if t == 0:
                     pred = im
                 else:
@@ -118,10 +120,10 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = feature_transform(xx)
+        grid, edge = feature_transform(xx)
         for t in range(0, T, step):
             y = yy[..., t:t + step]
-            im = netmodel(xx, gd)
+            im = netmodel(xx, grid, edge, grid)['preds']
             if t == 0:
                 pred = im
             else:
@@ -129,7 +131,7 @@ def inference(dataloader, netmodel, device):
             xx = torch.cat((xx[..., step:], im), dim=-1)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -165,7 +167,7 @@ if __name__ == "__main__":
     depth = 4  # all
     dropout = 0.0
 
-    batch_size = 8
+    batch_size = 4
     epochs = 500
     learning_rate = 0.001
     scheduler_step = 400
@@ -203,10 +205,7 @@ if __name__ == "__main__":
     with open(os.path.join('transformer_config.yml')) as f:
         config = yaml.full_load(f)
 
-    if 'inverse' not in name:
-        config = config['Darcy_2d']
-    else:
-        config = config['Darcy_2d_inverse']
+    config = config['Turbulence_2d+t']
 
     # 建立网络
     Net_model = FourierTransformer2D(**config).to(Device)
