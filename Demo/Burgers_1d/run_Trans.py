@@ -170,11 +170,11 @@ if __name__ == "__main__":
     valid_y = reader.read_field('u')[nvalid:, ::sub_valid][:, :s_valid, None]
     del reader
 
-    x_normalizer = DataNormer(train_x.numpy(), method='mean-std', axis=(0, 1))
+    x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
     train_x = x_normalizer.norm(train_x)
     valid_x = x_normalizer.norm(valid_x)
 
-    y_normalizer = DataNormer(train_y.numpy(), method='mean-std', axis=(0, 1))
+    y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 

@@ -2,19 +2,20 @@
 # -*- coding: utf-8 -*-
 """
 # @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
-# @Time    : 2022/11/27 12:42
+# @Time    : 2023/2/13 0:17
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
 # @Site    : 
-# @File    : run_train.py
+# @File    : run_Trans.py
 """
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import MatLoader
-from fno.FNOs import FNO2d
-from cnn.ConvNets import UNet2d
+from transformer.Transformers import FourierTransformer2D
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -22,6 +23,7 @@ import time
 import os
 from torchinfo import summary
 import sys
+import yaml
 
 
 def feature_transform(x):
@@ -156,7 +158,6 @@ if __name__ == "__main__":
     ntrain = 4000
     nvalid = 1000
 
-
     modes = (12, 12)  # fno
     steps = 1  # fno
     padding = 8  # fno
@@ -190,7 +191,6 @@ if __name__ == "__main__":
     valid_y = reader.read_field('u')[ntrain:, ::sub, ::sub, T_in:T + T_in]
     del reader
 
-
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
     valid_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(valid_x, valid_y),
@@ -200,18 +200,20 @@ if __name__ == "__main__":
     # Neural Networks
     ################################################################
 
-    # 建立网络
-    if name == 'FNO':
-        Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
-                          padding=padding, activation='gelu').to(Device)
-    elif name == 'UNet':
-        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:-1] + (out_dim,), width=width,
-                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
+    with open(os.path.join('transformer_config.yml')) as f:
+        config = yaml.full_load(f)
 
-    input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
-    input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
-    print(name)
-    summary(Net_model, input_data=[input1, input2], device=Device)
+    if 'inverse' not in name:
+        config = config['Darcy_2d']
+    else:
+        config = config['Darcy_2d_inverse']
+
+    # 建立网络
+    Net_model = FourierTransformer2D(**config).to(Device)
+    # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
+    # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
+    # print(name)
+    # summary(Net_model, input_data=[input1, input2], device=Device)
 
     # 损失函数
     Loss_func = nn.MSELoss()
