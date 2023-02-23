@@ -39,7 +39,7 @@ class FcnSingle(nn.Module):
             self.layers.append(self.active)
         self.layers.append(nn.Linear(self.planes[-2], self.planes[-1]))
         self.layers = nn.Sequential(*self.layers)
-        self.reset_parameters()
+        # self.reset_parameters()
 
     def reset_parameters(self):
         """

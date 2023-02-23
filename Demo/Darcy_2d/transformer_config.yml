@@ -64,18 +64,21 @@ Darcy_2d_inverse:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: pointwise
+  decoder_type: ifft2
   regressor_activation: silu
   spacial_dim: 2
   spacial_fc: True
+  freq_dim: 32
+  num_regressor_layers: 2
+  fourier_modes: 12
+  last_activation: True
   upsample_mode: interp
   downsample_mode: interp
   boundary_condition: free
-  num_regressor_layers: 1
   dropout: 0.05
   downscaler_dropout: 0.05
-  upscaler_dropout: 0.05
+  upscaler_dropout: 0.0
   ffn_dropout: 0.05
   encoder_dropout: 0.05
-  decoder_dropout: 0.05
+  decoder_dropout: 0.0
   debug: False

@@ -180,14 +180,15 @@ if __name__ == "__main__":
         valid_x = reader.read_field('coeff')[-nvalid:, ::r_valid, ::r_valid][:, :s_valid, :s_valid, None]
         valid_y = reader.read_field('sol')[-nvalid:, ::r_valid, ::r_valid][:, :s_valid, :s_valid, None]
 
-        x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
-        train_x = x_normalizer.norm(train_x)
-        valid_x = x_normalizer.norm(valid_x)
-
-        y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
-        train_y = y_normalizer.norm(train_y)
-        valid_y = y_normalizer.norm(valid_y)
     del reader
+
+    x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
+    train_x = x_normalizer.norm(train_x)
+    valid_x = x_normalizer.norm(valid_x)
+
+    y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
+    train_y = y_normalizer.norm(train_y)
+    valid_y = y_normalizer.norm(valid_y)
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
@@ -200,7 +201,7 @@ if __name__ == "__main__":
     with open(os.path.join('transformer_config.yml')) as f:
         config = yaml.full_load(f)
 
-    if 'inverse' not in name:
+    if 'inverse' in name:
         config = config['Darcy_2d_inverse']
     else:
         config = config['Darcy_2d']
