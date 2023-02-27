@@ -151,8 +151,8 @@ if __name__ == "__main__":
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r1 = 2
-    r2 = 2
+    r1 = 1
+    r2 = 1
     s1 = int(((125 - 1) / r1) + 1)
     s2 = int(((323 - 1) / r2) + 1)
 
