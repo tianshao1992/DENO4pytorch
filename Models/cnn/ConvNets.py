@@ -8,7 +8,7 @@
 # @File    : ConvNets.py
 """
 from cnn.conv_layers import *
-from basic_layers import *
+from basic.basic_layers import *
 
 class UpSampleNet1d(nn.Module):
     """

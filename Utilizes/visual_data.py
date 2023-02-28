@@ -427,6 +427,68 @@ class MatplotlibVision(object):
                 axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
                 axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
 
+    def plot_fields_grid(self, fig, axs, real, pred, fmin_max=None, show_channel=None,
+                       cmaps=None, titles=None):
+        if len(axs.shape) == 1:
+            axs = axs[None, :]
+
+        if show_channel is None:
+            show_channel = np.arange(len(self.field_name))
+
+        if fmin_max == None:
+            fmin, fmax = real.min(axis=(0, 1)), real.max(axis=(0, 1))
+        else:
+            fmin, fmax = fmin_max[0], fmin_max[1]
+
+        if titles is None:
+            titles = ['truth', 'predicted', 'error']
+
+        if cmaps is None:
+            cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
+
+        x = np.arange(np.shape(real)[0])
+        y = np.arange(np.shape(real)[1])
+        x_pos, y_pos = np.meshgrid(y, x)
+        size_channel = len(show_channel)
+        name_channel = [self.field_name[i] for i in show_channel]
+
+        for i in range(size_channel):
+
+            fi = show_channel[i]
+            ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
+            limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
+            for j in range(3):
+
+                axs[i][j].cla()
+                f_true = axs[i][j].pcolormesh(x_pos, y_pos, ff[j], cmap=cmaps[j], shading='gouraud',
+                                              antialiased=True, snap=True)
+                f_true.set_zorder(10)
+                # axs[i][j].axis('equal')
+                # ax[i][j].grid(zorder=0, which='both', color='grey', linewidth=1)
+                axs[i][j].set_title(titles[j], fontdict=self.font_EN)
+                # if i == 0:
+                #     ax[i][j].set_title(titles[j], fontdict=self.font_CHN)
+                cb = fig.colorbar(f_true, ax=axs[i][j])
+                cb.ax.tick_params(labelsize=self.font['size'])
+                for l in cb.ax.yaxis.get_ticklabels():
+                    l.set_family('Times New Roman')
+                tick_locator = ticker.MaxNLocator(nbins=6)  # colorbar上的刻度值个数
+                cb.locator = tick_locator
+                cb.update_ticks()
+                if j < 2:
+                    f_true.set_clim(fmin[i], fmax[i])
+                    cb.ax.set_title(name_channel[i], fontdict=self.font_EN, loc='center')
+                else:
+                    f_true.set_clim(-limit, limit)
+                    cb.ax.set_title('$\mathrm{\Delta}$' + name_channel[i], fontdict=self.font_EN, loc='center')
+                # 设置刻度间隔
+                # axs[i][j].set_aspect(1)
+                axs[i][j].set_xlabel(r'$x$/m', fontdict=self.font_EN)
+                axs[i][j].set_ylabel(r'$y$/m', fontdict=self.font_EN)
+                axs[i][j].spines['bottom'].set_linewidth(self.box_line_width)  # 设置底部坐标轴的粗细
+                axs[i][j].spines['left'].set_linewidth(self.box_line_width)  # 设置左边坐标轴的粗细
+                axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
+                axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
     def plot_fields_am(self, fig, axs, out_true, out_pred, coord, p_id, ):
 
         fmax = out_true.max(axis=(0, 1, 2))  # 云图标尺
@@ -441,3 +503,7 @@ class MatplotlibVision(object):
                              frames=np.arange(0, out_true.shape[0]).astype(np.int64), interval=200)
 
         anim.save(os.path.join(self.log_dir, str(p_id) + ".gif"), writer='pillow', dpi=300)
+
+
+    # def output_tecplot_2d(self, out_true, out_pred, elemnets, filed_name, ):
+

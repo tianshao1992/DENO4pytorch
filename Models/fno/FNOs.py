@@ -74,7 +74,7 @@ class FNO2d(nn.Module):
         2维FNO网络
     """
 
-    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu', dropout=0.0):
         super(FNO2d, self).__init__()
 
         """
@@ -97,12 +97,13 @@ class FNO2d(nn.Module):
         self.steps = steps
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
+        self.dropout = dropout
         self.fc0 = nn.Linear(steps * in_dim + 2, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, norm=None))
+            self.convs.append(SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, dropout=self.dropout, norm=None))
 
         self.fc1 = nn.Linear(self.width, 128)
         self.fc2 = nn.Linear(128, out_dim)
