@@ -113,7 +113,7 @@ class SpectralConv2d(nn.Module):
             self.modes2 = modes[1]
 
         self.norm = norm
-        self.dropout = dropout
+        self.dropout = nn.Dropout(dropout)
         self.activation = activation_dict[activation]
         self.return_freq = return_freq
         self.linear = nn.Conv2d(self.in_dim, self.out_dim, 1)  # for residual
@@ -136,7 +136,7 @@ class SpectralConv2d(nn.Module):
         batch_size = x.shape[0]
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         res = self.linear(x)
-        # x = self.dropout(x)
+        x = self.dropout(x)
         x_ft = torch.fft.rfft2(x, norm=self.norm)
 
         # Multiply relevant Fourier modes
@@ -190,7 +190,7 @@ class SpectralConv3d(nn.Module):
             self.modes3 = modes[2]
 
         self.norm = norm
-        self.dropout = dropout
+        self.dropout = nn.Dropout(dropout)
         self.return_freq = return_freq
         self.activation = activation_dict[activation]
 
