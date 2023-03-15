@@ -114,7 +114,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'UNet'
+    name = 'FNO'
     work_path = os.path.join('work', name + 'ForPTEDrop_0.1')
     isCreated = os.path.exists(work_path)
     if not isCreated:

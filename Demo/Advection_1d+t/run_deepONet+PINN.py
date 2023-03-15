@@ -5,7 +5,7 @@
 # @Time    : 2023/2/4 0:15
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
 # @Site    :
-# @File    : run_deepFcn.py.py
+# @File    : run_deepONet+PINN.py.py
 """
 
 import numpy as np
