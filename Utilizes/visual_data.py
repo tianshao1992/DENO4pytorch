@@ -505,5 +505,43 @@ class MatplotlibVision(object):
         anim.save(os.path.join(self.log_dir, str(p_id) + ".gif"), writer='pillow', dpi=300)
 
 
-    # def output_tecplot_2d(self, out_true, out_pred, elemnets, filed_name, ):
+    def output_tecplot_struct(self, out_true, out_pred, coord, field_name, output_file):
+        name_true = ['True_' + name for name in field_name]
+        name_pred = ['Pred_' + name for name in field_name]
+        name_err = ['Err_' + name for name in field_name]
+
+        output = np.concatenate((coord, out_true, out_pred, out_true - out_pred), axis=-1)
+
+        d1 = pd.DataFrame(output.reshape(-1, output.shape[-1]))
+        f = open(output_file, "w")
+        f.write("%s\n" % ('TITLE = "Element Data"'))
+        if coord.shape[-1] == 1:
+            f.write("%s" % ('VARIABLES = "X",'))
+        elif coord.shape[-1] == 2:
+            f.write("%s" % ('VARIABLES = "X","Y",'))
+        else:
+            f.write("%s" % ('VARIABLES = "X","Y","Z",'))
+
+        for i in range(len(name_true)):
+            f.write("%s" % ('"' + name_true[i] + '",'))
+
+        for i in range(len(name_pred)):
+            f.write("%s" % ('"' + name_pred[i] + '",'))
+
+        for i in range(len(name_err) ):
+            f.write("%s" % ('"' + name_err[i] + '",'))
+
+        f.write("\n%s" % ('ZONE T="Turbo blade1", '))
+        if len(coord.shape) == 2:
+            f.write("%s" % ('I=' + str(coord.shape[0])))
+        elif len(coord.shape) == 3:
+            f.write("%s" % ('I=' + str(coord.shape[1]) + ', J=' + str(coord.shape[0])))
+        else:
+            f.write("%s" % ('I=' + str(coord.shape[0]) + ', J=' + str(coord.shape[1]) + ', K=' + str(coord.shape[2])))
+        f.write("%s\n" % (', F=POINT'))
+        f.close()
+
+        d1.to_csv(output_file, index=False, mode='a', float_format="%15.5e", sep=",", header=False)
+
+
 

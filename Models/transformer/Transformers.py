@@ -26,10 +26,10 @@ from collections import defaultdict
 from functools import partial
 
 # from utilize import *
-from basic_layers import *
-from graph_layers import *
-from attention_layers import *
-from spectral_layers import *
+from basic.basic_layers import *
+from gnn.graph_layers import *
+from transformer.attention_layers import *
+from fno.spectral_layers import *
 
 
 class SimpleTransformerEncoderLayer(nn.Module):
