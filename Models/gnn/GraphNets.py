@@ -68,7 +68,7 @@ class GMMResBlock(nn.Module):
 
 
 class KernelNN3(torch.nn.Module):
-    def __init__(self, width_node, width_kernel, depth, ker_in, in_width=1, out_width=1):
+    def __init__(self, width_node, width_kernel, depth, ker_in, in_width, out_width):
         super(KernelNN3, self).__init__()
         self.depth = depth
 
@@ -85,10 +85,10 @@ class KernelNN3(torch.nn.Module):
 
         self.fc2 = torch.nn.Linear(width_node, 128)
         self.fc3 = torch.nn.Linear(128, out_width)
-        self.fc3 = torch.nn.Linear(128, 1)
+        # self.fc3 = torch.nn.Linear(128, 1)
 
-    def forward(self, data):
-        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+    def forward(self, x, edge_index, edge_attr):
+        # x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
         x = self.fc1(x)
 
         x = self.conv1(x, edge_index, edge_attr)

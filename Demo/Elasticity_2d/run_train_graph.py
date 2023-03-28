@@ -261,7 +261,7 @@ if __name__ == "__main__":
                 triang = tri.Triangulation(train_coord[t][:, 0], train_coord[t][:, 1])
 
                 fig, axs = plt.subplots(1, 3, figsize=(30, 10), num=1, layout='constrained')
-                Visual.plot_field_tri(fig, axs, train_true[t], train_pred[t], train_coord[t],
+                Visual.plot_fields_tr(fig, axs, train_true[t], train_pred[t], train_coord[t],
                                       triang, mask=train_profile[t].reshape((-1, 2)))
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(t) + '_graph.jpg'))
                 plt.close(fig)
@@ -269,7 +269,7 @@ if __name__ == "__main__":
                 triang = tri.Triangulation(train_coord[t][:, 0], train_coord[t][:, 1])
 
                 fig, axs = plt.subplots(1, 3, figsize=(30, 10), num=1, layout='constrained')
-                Visual.plot_field_tri(fig, axs, valid_true[t], valid_pred[t], valid_coord[t],
+                Visual.plot_fields_tr(fig, axs, valid_true[t], valid_pred[t], valid_coord[t],
                                       triang, mask=valid_profile[t].reshape((-1, 2)))
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(t) + '_graph.jpg'))
                 plt.close(fig)
