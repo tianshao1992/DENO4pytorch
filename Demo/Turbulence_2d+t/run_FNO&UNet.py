@@ -137,14 +137,6 @@ if __name__ == "__main__":
     ################################################################
 
     name = 'FNO'
-    work_path = os.path.join('work', name)
-    isCreated = os.path.exists(work_path)
-    if not isCreated:
-        os.makedirs(work_path)
-
-    # 将控制台的结果输出到log文件
-    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
-
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
@@ -158,10 +150,18 @@ if __name__ == "__main__":
     # ntrain = 4000
     # nvalid = 1000
 
-    ntrain = 1000
+    ntrain = 400
     nvalid = 200
 
-    modes = (12, 12)  # fno
+    work_path = os.path.join('work', name, 'train_size-' + str(ntrain))
+    isCreated = os.path.exists(work_path)
+    if not isCreated:
+        os.makedirs(work_path)
+
+    # 将控制台的结果输出到log文件
+    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+
+    modes = (20, 20)  # fno
     steps = 1  # fno
     padding = 8  # fno
     width = 32  # all
@@ -206,10 +206,10 @@ if __name__ == "__main__":
     ################################################################
 
     # 建立网络
-    if name == 'FNO':
+    if 'FNO' in name:
         Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
                           padding=padding, activation='gelu').to(Device)
-    elif name == 'UNet':
+    elif 'UNet' in name:
         Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:-1] + (out_dim,), width=width,
                            depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
 
