@@ -58,7 +58,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
 
         for t in range(0, T, step):
             # y = yy[..., t:t + step]
-            im = netmodel(xx, grid, edge, grid)['preds']
+            im = netmodel(xx, grid)
             if t == 0:
                 pred = im
             else:
@@ -92,7 +92,7 @@ def valid(dataloader, netmodel, device, lossfunc):
 
             for t in range(0, T, step):
                 # y = yy[..., t:t + step]
-                im = netmodel(xx, grid, edge, grid)['preds']
+                im = netmodel(xx, grid)
                 if t == 0:
                     pred = im
                 else:
@@ -120,7 +120,7 @@ def inference(dataloader, netmodel, device):
         grid, edge = feature_transform(xx)
         for t in range(0, T, step):
             # y = yy[..., t:t + step]
-            im = netmodel(xx, grid, edge, grid)['preds']
+            im = netmodel(xx, grid)
             if t == 0:
                 pred = im
             else:
@@ -137,7 +137,23 @@ if __name__ == "__main__":
     ################################################################
 
     name = 'FNO'
-    work_path = os.path.join('work', name)
+    if torch.cuda.is_available():
+        Device = torch.device('cuda')
+    else:
+        Device = torch.device('cpu')
+
+    # train_file = './data/ns_V1e-3_N5000_T50.mat'
+    train_file = './data/ns_V1e-5_N1200_T20.mat'
+
+    in_dim = 10
+    out_dim = 1
+    # ntrain = 4000
+    # nvalid = 1000
+
+    ntrain = 400
+    nvalid = 200
+
+    work_path = os.path.join('work', name, 'train_size-' + str(ntrain))
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
@@ -145,20 +161,7 @@ if __name__ == "__main__":
     # 将控制台的结果输出到log文件
     sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
 
-    if torch.cuda.is_available():
-        Device = torch.device('cuda')
-    else:
-        Device = torch.device('cpu')
-
-    train_file = './data/ns_V1e-3_N5000_T50.mat'
-
-    in_dim = 10
-    out_dim = 1
-    ntrain = 4000
-    nvalid = 1000
-
-
-    modes = (12, 12)  # fno
+    modes = (20, 20)  # fno
     steps = 1  # fno
     padding = 8  # fno
     width = 32  # all
@@ -176,7 +179,8 @@ if __name__ == "__main__":
     sub = 1
     S = 64
     T_in = 10
-    T = 40
+    # T = 40
+    T = 10
     step = 1
 
     ################################################################
@@ -202,10 +206,10 @@ if __name__ == "__main__":
     ################################################################
 
     # 建立网络
-    if name == 'FNO':
+    if 'FNO' in name:
         Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
                           padding=padding, activation='gelu').to(Device)
-    elif name == 'UNet':
+    elif 'UNet' in name:
         Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:-1] + (out_dim,), width=width,
                            depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
 
@@ -264,7 +268,7 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            for tim_id in range(0, 40, 4):
+            for tim_id in range(0, T, 4):
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
                 Visual.plot_fields_ms(fig, axs, train_true[0, ..., tim_id, None],
                                       train_pred[0, ..., tim_id, None], train_grid[0])

@@ -311,6 +311,9 @@ class MatplotlibVision(object):
         if cmaps is None:
             cmaps = ['RdYlBu_r', 'RdYlBu_r', 'coolwarm']
 
+        x_pos = coord[:, 0]
+        y_pos = coord[:, 1]
+
         size_channel = len(show_channel)
         name_channel = [self.field_name[i] for i in show_channel]
 
@@ -319,7 +322,7 @@ class MatplotlibVision(object):
             ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
             limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
             for j in range(3):
-                f_true = axs[i][j].tripcolor(x, y, ff[j], triangles=edges, cmap=cmaps[j], shading='gouraud',
+                f_true = axs[i][j].tripcolor(x_pos, y_pos, ff[j], triangles=edges, cmap=cmaps[j], shading='gouraud',
                                              antialiased=True, snap=True)
 
                 # f_true = axs[i][j].tricontourf(triObj, ff[j], 20, cmap=cmaps[j])
