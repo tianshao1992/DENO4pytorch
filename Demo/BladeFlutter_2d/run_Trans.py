@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import MatLoader, DataNormer
-from transformer.Transformers import FourierTransformer2D, SimpleTransformer
+from transformer.Transformers_lyz import FourierTransformer2D, SimpleTransformer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.loss_metrics import FieldsLpLoss
 import torch.nn.functional as F
@@ -64,7 +64,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         # grid = grid.reshape(batch_size, 164*36,-1)
         # xx = xx.reshape(batch_size, 164*36,-1)
         # yy = yy.reshape(batch_size, 164 * 36, -1)
-        pred = netmodel(xx[..., 3:], xx[..., :3], edge=None, grid=None)['preds']
+        pred = netmodel(xx, grid, edge=None, grid=None)['preds']
         loss = lossfunc(pred, yy)
         optimizer.zero_grad()
         loss.backward()
@@ -93,7 +93,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             # grid = grid.reshape(batch_size, 164 * 36, -1)
             # xx = xx.reshape(batch_size, 164 * 36, -1)
             # yy = yy.reshape(batch_size, 164 * 36, -1)
-            pred = netmodel(xx[..., 3:], xx[..., :3], edge=None, grid=None)['preds']
+            pred = netmodel(xx, grid, edge=None, grid=None)['preds']
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
@@ -116,7 +116,7 @@ def inference(dataloader, netmodel, device):
         # grid = grid.reshape(batch_size, 164 * 36, -1)
         # xx = xx.reshape(batch_size, 164 * 36, -1)
         # yy = yy.reshape(batch_size, 164 * 36, -1)
-        pred = netmodel(xx[..., 3:], xx[..., :3], edge=None, grid=None)['preds']
+        pred = netmodel(xx, grid, edge=None, grid=None)['preds']
     # pred = pred.reshape(batch_size, 164, 36, -1)
     # equation = model.equation(u_var, y_var, out_pred)
     return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     design = torch.cat([design1, design2], 1)
     design = torch.tile(design[index, None, None, :], (1, coords[0].shape[0], coords[0].shape[1], 1))
     input = torch.concat([coords, design], dim=-1)
-    output = fields
+    output = fields[..., -6:-3]
     print(input.shape, output.shape)
 
     del datamat, coords, design, design1, design2, all_fields, bld_fields
@@ -307,11 +307,14 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+            for fig_id in range(1, 11):
                 fig, axs = plt.subplots(3, 3, figsize=(20, 20), layout='constrained', num=3)
-                Visual.plot_fields_grid(fig, axs, valid_true[fig_id], valid_pred[fig_id])
+                Visual.plot_fields_grid(fig, axs, valid_true[-fig_id], valid_pred[-fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
-                Visual.output_tecplot_struct(valid_true, valid_pred,valid_coord,
+                true = np.concatenate((valid_true[-fig_id, -1:, ...], valid_true[-fig_id], ), axis=0)
+                pred = np.concatenate(( valid_pred[-fig_id, -1:, ...], valid_pred[-fig_id],), axis=0)
+                coord = np.concatenate((valid_coord[-fig_id, -1:, ..., :3], valid_coord[-fig_id, ..., :3], ), axis=0)
+                Visual.output_tecplot_struct(true, pred, coord,
                                              ['Pressure', 'Temperature', 'Static Entropy'],
                                              os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.dat'))

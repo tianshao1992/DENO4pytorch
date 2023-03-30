@@ -1,8 +1,8 @@
 BladeFlutter_2d:
-  node_feats: 4
-  pos_dim: 3
+  node_feats: 7
+  pos_dim: 2
   n_targets: 3
-  n_hidden: 48
+  n_hidden: 16
   num_feat_layers: 2
   num_encoder_layers: 4
   n_head: 1
@@ -23,7 +23,7 @@ BladeFlutter_2d:
   freq_dim: 16
   num_regressor_layers: 2
   fourier_modes: 16
-  spacial_dim: 3
+  spacial_dim: 2
   spacial_fc: False
   dropout: 0.0
   encoder_dropout: 0.0

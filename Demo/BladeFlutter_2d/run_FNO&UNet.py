@@ -313,12 +313,15 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+            for fig_id in range(1, 11):
                 fig, axs = plt.subplots(3, 3, figsize=(20, 20), layout='constrained', num=3)
-                Visual.plot_fields_grid(fig, axs, valid_true[-fig_id-1], valid_pred[-fig_id-1])
+                Visual.plot_fields_grid(fig, axs, valid_true[-fig_id], valid_pred[-fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
-                Visual.output_tecplot_struct(valid_true[-fig_id-1], valid_pred[-fig_id-1], valid_coord[-fig_id-1, ..., :3],
+                true = np.concatenate((valid_true[-fig_id, -1:, ...], valid_true[-fig_id], ), axis=0)
+                pred = np.concatenate(( valid_pred[-fig_id, -1:, ...], valid_pred[-fig_id],), axis=0)
+                coord = np.concatenate((valid_coord[-fig_id, -1:, ..., :3], valid_coord[-fig_id, ..., :3], ), axis=0)
+                Visual.output_tecplot_struct(true, pred, coord,
                                              ['Pressure', 'Temperature', 'Static Entropy'],
                                              os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.dat'))
 
