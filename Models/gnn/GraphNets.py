@@ -16,7 +16,7 @@ from torch.nn import Parameter
 import torch.nn.functional as F
 
 from Models.configs import *
-from basic_layers import Identity
+from basic.basic_layers import Identity
 
 
 class GMMResBlock(nn.Module):
@@ -83,7 +83,7 @@ class KernelNN3(torch.nn.Module):
         self.conv4 = NNConvOld(width_node, width_node, kernel4, aggr='mean')
 
         self.fc2 = torch.nn.Linear(width_node, 128)
-        self.fc3 = torch.nn.Linear(128, 1)
+        self.fc3 = torch.nn.Linear(128, out_width)
 
     def forward(self, data):
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr

@@ -26,10 +26,10 @@ from collections import defaultdict
 from functools import partial
 
 # from utilize import *
-from basic_layers import *
-from graph_layers import *
-from attention_layers import *
-from spectral_layers import *
+from basic.basic_layers import *
+from gnn.graph_layers import *
+from transformer.attention_layers import *
+from fno.spectral_layers import *
 
 
 class SimpleTransformerEncoderLayer(nn.Module):
@@ -621,7 +621,7 @@ class FourierTransformer2D(nn.Module):
         - grid: (batch_size, n-2, n-2, 2) excluding boundary
         '''
         bsz = node.size(0)
-        n_s = int(pos.size(1))
+        n_s1, n_s2 = int(pos.size(1)), int(pos.size(2))
         x_latent = []
         attn_weights = []
 
@@ -649,7 +649,7 @@ class FourierTransformer2D(nn.Module):
             if self.return_latent:
                 x_latent.append(x.contiguous())
 
-        x = x.view(bsz, n_s, n_s, self.n_hidden)
+        x = x.view(bsz, n_s1, n_s2, self.n_hidden)
         x = self.upscaler(x)
 
         if self.return_latent:

@@ -88,43 +88,53 @@ class FieldsLpLoss(object):
 
     def abs(self, x, y):
 
-        if not torch.is_tensor(x):
-            x = torch.tensor(x)
-            y = torch.tensor(y)
-
-
         # Assume uniform mesh
         # h = 1.0 / (x.size()[1] - 1.0) (h ** (self.d / self.p)) *
-        errs = x - y
 
-        avg_dims = tuple(np.arrange(len(x.shape))[1:-1])
-        avg_nums = np.prod(x.shape[1:-1])
+        if torch.is_tensor(x):
 
-        if self.reduction:
-            if self.size_average:
-                return torch.norm(errs, self.p, dim=avg_dims) / avg_nums
-            else:
-                return torch.norm(errs, self.p, dim=avg_dims)
+            all_norms = torch.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
 
-        return errs
+            if self.reduction:
+                if self.size_average:
+                    return torch.mean(all_norms)
+                else:
+                    return all_norms
+        else:
+            all_norms = np.linalg.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]),
+                                   self.p, 1)
+
+            if self.reduction:
+                if self.size_average:
+                    return np.mean(all_norms)
+                else:
+                    return all_norms
+
+        return all_norms
 
     def rel(self, x, y):
 
-        if not torch.is_tensor(x):
-            x = torch.tensor(x)
-            y = torch.tensor(y)
+        if torch.is_tensor(x):
+            diff_norms = torch.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
+            y_norms = torch.norm(y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
 
-        errs = x - y
-        avg_dims = tuple(np.arange(len(x.shape))[1:-1])
-        avg_nums = np.prod(x.shape[1:-1])
+            if self.reduction:
+                if self.size_average:
+                    return torch.mean(diff_norms / y_norms)
+                else:
+                    return diff_norms / y_norms
+        else:
+            diff_norms = np.linalg.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]),
+                                    self.p, 1)
+            y_norms = np.linalg.norm(y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
 
-        if self.reduction:
-            if self.size_average:
-                return torch.norm(errs, self.p, dim=avg_dims) / torch.norm(y, self.p, dim=avg_dims) / avg_nums
-            else:
-                return torch.norm(errs, self.p, dim=avg_dims) / torch.norm(y, self.p, dim=avg_dims)
+            if self.reduction:
+                if self.size_average:
+                    return np.mean(diff_norms / (y_norms+1e-20))
+                else:
+                    return diff_norms / (y_norms+1e-20)
 
-        return errs / torch.norm(y, self.p, dim=avg_dims)
+        return diff_norms / (y_norms+1e-20)
 
     def __call__(self, x, y):
         return self.rel(x, y)

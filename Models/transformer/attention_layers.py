@@ -294,7 +294,7 @@ class SimpleAttention(nn.Module):
                      zip(self.norm_Q, (query[:, i, ...] for i in range(self.n_head)))], dim=1)
 
                 if self.norm_type == 'instance':
-                    key, query = key.transpose(-2, -1), value.transpose(-2, -1)
+                    key, query = key.transpose(-2, -1), query.transpose(-2, -1)
 
         if pos is not None and self.pos_dim > 0:
             assert pos.size(-1) == self.pos_dim
