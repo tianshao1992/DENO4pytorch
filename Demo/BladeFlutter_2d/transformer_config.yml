@@ -1,38 +1,35 @@
 BladeFlutter_2d:
   node_feats: 7
-  edge_feats: null
-  pos_dim: 3
+  pos_dim: 2
   n_targets: 3
-  n_hidden: 96
-  num_feat_layers: 0
+  n_hidden: 16
+  num_feat_layers: 2
   num_encoder_layers: 4
-  n_head: 4
-  pred_len: 0
-  n_freq_targets: 0
-  dim_feedforward: 192
-  feat_extract_type: null
-  attention_type: linear
-  xavier_init: 0.001
+  n_head: 1
+  dim_feedforward: 96
+  attention_type: galerkin
+  feat_extract_type: None
+  xavier_init: 0.01
   diagonal_weight: 0.01
   symmetric_init: False
   layer_norm: True
-  attn_norm: True
+  attn_norm: False
+  norm_eps: 0.0000001
   batch_norm: False
-  spacial_residual: False
   return_attn_weight: False
   return_latent: False
-  residual_type: plus
-  seq_len: null
-  bulk_regression: False
-  decoder_type: pointwise
-  freq_dim: 48
+  decoder_type: ifft2
+  last_activation: True
+  freq_dim: 16
   num_regressor_layers: 2
-  regressor_activation: silu
   fourier_modes: 16
-  spacial_dim: 1
+  spacial_dim: 2
   spacial_fc: False
   dropout: 0.0
   encoder_dropout: 0.0
-  ffn_dropout: 0.0
   decoder_dropout: 0.0
+  ffn_dropout: 0.05
   debug: False
+  upsample_mode: interp
+  downsample_mode: interp
+  boundary_condition: dirichlet

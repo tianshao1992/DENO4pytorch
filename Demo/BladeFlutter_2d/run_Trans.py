@@ -15,8 +15,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import MatLoader, DataNormer
-from transformer.Transformers import FourierTransformer2D, SimpleTransformer
+from transformer.Transformers_lyz import FourierTransformer2D, SimpleTransformer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
+from Utilizes.loss_metrics import FieldsLpLoss
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
@@ -60,10 +61,10 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         yy = yy.to(device)
 
         grid, edge = feature_transform(xx)
-        grid = grid.reshape(batch_size, 164*36,-1)
-        xx = xx.reshape(batch_size, 164*36,-1)
-        yy = yy.reshape(batch_size, 164 * 36, -1)
-        pred = netmodel(xx, xx[..., :3], edge=None, grid=None)['preds']
+        # grid = grid.reshape(batch_size, 164*36,-1)
+        # xx = xx.reshape(batch_size, 164*36,-1)
+        # yy = yy.reshape(batch_size, 164 * 36, -1)
+        pred = netmodel(xx, grid, edge=None, grid=None)['preds']
         loss = lossfunc(pred, yy)
         optimizer.zero_grad()
         loss.backward()
@@ -89,10 +90,10 @@ def valid(dataloader, netmodel, device, lossfunc):
             yy = yy.to(device)
 
             grid, edge = feature_transform(xx)
-            grid = grid.reshape(batch_size, 164 * 36, -1)
-            xx = xx.reshape(batch_size, 164 * 36, -1)
-            yy = yy.reshape(batch_size, 164 * 36, -1)
-            pred = netmodel(xx, xx[..., :3], edge=None, grid=None)['preds']
+            # grid = grid.reshape(batch_size, 164 * 36, -1)
+            # xx = xx.reshape(batch_size, 164 * 36, -1)
+            # yy = yy.reshape(batch_size, 164 * 36, -1)
+            pred = netmodel(xx, grid, edge=None, grid=None)['preds']
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
@@ -112,9 +113,11 @@ def inference(dataloader, netmodel, device):
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
         grid, edge = feature_transform(xx)
-        pred = netmodel(xx.reshape(batch_size, 164*36,-1), xx[..., :3].reshape(batch_size, 164*36,-1),
-                        edge=None, grid=None)['preds']
-    pred = pred.reshape(batch_size, 164, 36, -1)
+        # grid = grid.reshape(batch_size, 164 * 36, -1)
+        # xx = xx.reshape(batch_size, 164 * 36, -1)
+        # yy = yy.reshape(batch_size, 164 * 36, -1)
+        pred = netmodel(xx, grid, edge=None, grid=None)['preds']
+    # pred = pred.reshape(batch_size, 164, 36, -1)
     # equation = model.equation(u_var, y_var, out_pred)
     return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
@@ -124,7 +127,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'TransNoGrid'
+    name = 'TransFFTNoGrid'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -152,9 +155,9 @@ if __name__ == "__main__":
 
     batch_size = 12
     epochs = 3000
-    learning_rate = 0.005
+    learning_rate = 0.001
     scheduler_step = 2500
-    scheduler_gamma = 0.1
+    scheduler_gamma = 0.5
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
@@ -174,7 +177,7 @@ if __name__ == "__main__":
             index.append(ind)
 
     all_fields = torch.cat([F.interpolate(torch.tensor(ff[None, ...],dtype=torch.float32), [164, 36]) for ff in bld_fields], dim=0)
-    fields = torch.permute(all_fields[:, -6:-3, ...], (0, 2, 3, 1))
+    fields = torch.permute(all_fields[:, :, ...], (0, 2, 3, 1))
     coords = torch.permute(all_fields[:, 1:4, ...], (0, 2, 3, 1))
     # bld_elems = [datamat[element[0]][:] for element in datamat['NEW_bld_nodes']] # 在图卷积中使用
 
@@ -183,7 +186,7 @@ if __name__ == "__main__":
     design = torch.cat([design1, design2], 1)
     design = torch.tile(design[index, None, None, :], (1, coords[0].shape[0], coords[0].shape[1], 1))
     input = torch.concat([coords, design], dim=-1)
-    output = fields
+    output = fields[..., -6:-3]
     print(input.shape, output.shape)
 
     del datamat, coords, design, design1, design2, all_fields, bld_fields
@@ -220,7 +223,7 @@ if __name__ == "__main__":
     config = config['BladeFlutter_2d']
 
     # 建立网络
-    Net_model = SimpleTransformer(**config).to(Device)
+    Net_model = FourierTransformer2D(**config).to(Device)
     # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
     # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
     # print(name)
@@ -228,6 +231,7 @@ if __name__ == "__main__":
 
     # 损失函数
     Loss_func = nn.MSELoss()
+    Error_func = FieldsLpLoss(size_average=False)
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
@@ -273,13 +277,29 @@ if __name__ == "__main__":
             train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
             valid_coord, valid_grid, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
-            torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
-                       os.path.join(work_path, 'latest_model.pth'))
+            Error_func.p = 1
+            ErrL1a = Error_func.abs(valid_pred, valid_true)
+            ErrL1r = Error_func.rel(valid_pred, valid_true)
+            Error_func.p = 2
+            ErrL2a = Error_func.abs(valid_pred, valid_true)
+            ErrL2r = Error_func.rel(valid_pred, valid_true)
+
+            fig, axs = plt.subplots(1, 2, figsize=(10, 10), layout='constrained', num=3)
+            Visual.plot_box(fig, axs[0], ErrL1r, legends=Visual.field_name)
+            Visual.plot_box(fig, axs[1], ErrL2r, legends=Visual.field_name)
+            fig.savefig(os.path.join(work_path, 'valid_box.jpg'))
+            plt.close(fig)
 
             train_coord = x_normalizer.back(train_coord)
             valid_coord = x_normalizer.back(valid_coord)
             train_true, valid_true = y_normalizer.back(train_true), y_normalizer.back(valid_true)
             train_pred, valid_pred = y_normalizer.back(train_pred), y_normalizer.back(valid_pred)
+
+            torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict(),
+                        'valid_coord': valid_coord, 'valid_true': valid_true, 'valid_pred': valid_pred,
+                        'ErrL1a': ErrL1a, 'ErrL1r': ErrL1r, 'ErrL2a': ErrL2a, 'ErrL2r': ErrL2r,
+                        },
+                       os.path.join(work_path, 'latest_model.pth'))
 
             for fig_id in range(10):
                 fig, axs = plt.subplots(3, 3, figsize=(20, 20), layout='constrained', num=2)
@@ -287,11 +307,14 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+            for fig_id in range(1, 11):
                 fig, axs = plt.subplots(3, 3, figsize=(20, 20), layout='constrained', num=3)
-                Visual.plot_fields_grid(fig, axs, valid_true[fig_id], valid_pred[fig_id])
+                Visual.plot_fields_grid(fig, axs, valid_true[-fig_id], valid_pred[-fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
-                Visual.output_tecplot_struct(valid_true, valid_pred,valid_coord,
+                true = np.concatenate((valid_true[-fig_id, -1:, ...], valid_true[-fig_id], ), axis=0)
+                pred = np.concatenate(( valid_pred[-fig_id, -1:, ...], valid_pred[-fig_id],), axis=0)
+                coord = np.concatenate((valid_coord[-fig_id, -1:, ..., :3], valid_coord[-fig_id, ..., :3], ), axis=0)
+                Visual.output_tecplot_struct(true, pred, coord,
                                              ['Pressure', 'Temperature', 'Static Entropy'],
                                              os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.dat'))

@@ -10,17 +10,19 @@
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.data import Data, DataLoader
 from gnn.GraphNets import KernelNN3, GMMNet
 from Utilizes.loss_metrics import FieldsLpLoss
-from Utilizes.visual_data import MatplotlibVision
+from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.process_data import DataNormer
+from Utilizes.loss_metrics import FieldsLpLoss
 import matplotlib.pyplot as plt
 import time
 import os
 import h5py
-
+import sys
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     """
@@ -100,6 +102,8 @@ if __name__ == "__main__":
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')
+    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+    print(work_path)
 
     in_dim = 7
     out_dim = 3
@@ -112,7 +116,7 @@ if __name__ == "__main__":
     batch_size = 16
     epochs = 3000
     learning_rate = 0.01
-    scheduler_step = 2000
+    scheduler_step = int(epochs*0.7)
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -187,8 +191,8 @@ if __name__ == "__main__":
     # Net_model = KernelNN3(16, 32, depth, 1, in_width=in_dim, out_width=out_dim).to(device)
 
     # 损失函数
-    # Loss_func = nn.MSELoss()
-    Loss_func = FieldsLpLoss(size_average=False)
+    Loss_func = nn.MSELoss()
+    Error_func = FieldsLpLoss(size_average=False)
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9))
@@ -234,7 +238,28 @@ if __name__ == "__main__":
             train_coord, train_true, train_pred = inference(train_loader, Net_model, device)
             valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, device)
 
-            torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
+            Error_func.p = 1
+            ErrL1a = Error_func.abs(valid_pred, valid_true)
+            ErrL1r = Error_func.rel(valid_pred, valid_true)
+            Error_func.p = 2
+            ErrL2a = Error_func.abs(valid_pred, valid_true)
+            ErrL2r = Error_func.rel(valid_pred, valid_true)
+
+            fig, axs = plt.subplots(1, 2, figsize=(10, 10), layout='constrained', num=3)
+            Visual.plot_box(fig, axs[0], ErrL1r, legends=Visual.field_name)
+            Visual.plot_box(fig, axs[1], ErrL2r, legends=Visual.field_name)
+            fig.savefig(os.path.join(work_path, 'valid_box.jpg'))
+            plt.close(fig)
+
+            train_coord = x_normalizer.back(train_coord)
+            valid_coord = x_normalizer.back(valid_coord)
+            train_true, valid_true = y_normalizer.back(train_true), y_normalizer.back(valid_true)
+            train_pred, valid_pred = y_normalizer.back(train_pred), y_normalizer.back(valid_pred)
+
+            torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict(),
+                        'valid_coord': valid_coord, 'valid_true': valid_true, 'valid_pred': valid_pred,
+                        'ErrL1a': ErrL1a, 'ErrL1r': ErrL1r, 'ErrL2a': ErrL2a, 'ErrL2r': ErrL2r,
+                        },
                        os.path.join(work_path, 'latest_model.pth'))
 
             train_coord = train_coord.reshape((batch_size, 164, 36, -1))
@@ -250,12 +275,15 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+            for fig_id in range(1, 11):
                 fig, axs = plt.subplots(3, 3, figsize=(20, 20), layout='constrained', num=3)
-                Visual.plot_fields_grid(fig, axs, valid_true[fig_id], valid_pred[fig_id])
+                Visual.plot_fields_grid(fig, axs, valid_true[-fig_id], valid_pred[-fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
-                Visual.output_tecplot_struct(valid_true, valid_pred,valid_coord,
+                true = np.concatenate((valid_true[-fig_id, -1:, ...], valid_true[-fig_id], ), axis=0)
+                pred = np.concatenate(( valid_pred[-fig_id, -1:, ...], valid_pred[-fig_id],), axis=0)
+                coord = np.concatenate((valid_coord[-fig_id, -1:, ..., :3], valid_coord[-fig_id, ..., :3], ), axis=0)
+                Visual.output_tecplot_struct(true, pred, coord,
                                              ['Pressure', 'Temperature', 'Static Entropy'],
                                              os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.dat'))
 

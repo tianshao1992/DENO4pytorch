@@ -2,29 +2,30 @@
 # -*- coding: utf-8 -*-
 """
 # @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
-# @Time    : 2023/2/21 12:14
+# @Time    : 2023/2/13 0:17
 # @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
 # @Site    : 
-# @File    : run_FNO&UNet.py
+# @File    : run_Trans.py
 """
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchinfo import summary
-from fno.FNOs import FNO2d
-from cnn.ConvNets import UNet2d
+from Utilizes.process_data import MatLoader, DataNormer
+from transformer.Transformers import FourierTransformer2D, SimpleTransformer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
-from Utilizes.process_data import DataNormer
 from Utilizes.loss_metrics import FieldsLpLoss
-
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import time
 import os
-import h5py
+from torchinfo import summary
 import sys
+import yaml
+import h5py
 
 
 def feature_transform(x):
@@ -35,12 +36,14 @@ def feature_transform(x):
         res: input transform
     """
     shape = x.shape
-    batchsize, size_x, size_y= shape[0], shape[1], shape[2]
+    batchsize, size_x, size_y = shape[0], shape[1], shape[2]
     gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
     gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
     gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
     gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-    return torch.cat((gridx, gridy), dim=-1).to(x.device)
+
+    edge = torch.ones((x.shape[0], 1))
+    return torch.cat((gridx, gridy), dim=-1).to(x.device), edge.to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -56,11 +59,13 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        gd = feature_transform(xx)
 
-        pred = netmodel(xx, gd)
+        grid, edge = feature_transform(xx)
+        grid = grid.reshape(batch_size, 164*36,-1)
+        xx = xx.reshape(batch_size, 164*36,-1)
+        yy = yy.reshape(batch_size, 164 * 36, -1)
+        pred = netmodel(xx, xx[..., :3], edge=None, grid=None)['preds']
         loss = lossfunc(pred, yy)
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -68,7 +73,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1) / batch_size
+    return train_loss / (batch + 1)
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -83,13 +88,16 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            gd = feature_transform(xx)
 
-            pred = netmodel(xx, gd)
+            grid, edge = feature_transform(xx)
+            grid = grid.reshape(batch_size, 164 * 36, -1)
+            xx = xx.reshape(batch_size, 164 * 36, -1)
+            yy = yy.reshape(batch_size, 164 * 36, -1)
+            pred = netmodel(xx, xx[..., :3], edge=None, grid=None)['preds']
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1) / batch_size
+    return valid_loss / (batch + 1)
 
 
 def inference(dataloader, netmodel, device):
@@ -104,11 +112,12 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = feature_transform(xx)
-        pred = netmodel(xx, gd)
-
+        grid, edge = feature_transform(xx)
+        pred = netmodel(xx.reshape(batch_size, 164*36,-1), xx[..., :3].reshape(batch_size, 164*36,-1),
+                        edge=None, grid=None)['preds']
+    pred = pred.reshape(batch_size, 164, 36, -1)
     # equation = model.equation(u_var, y_var, out_pred)
-    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -116,44 +125,40 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'FNO'
-    work_path = os.path.join('work', name + 'ForPTEMode')
+    name = 'TransNoGrid'
+    work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
+
+    # 将控制台的结果输出到log文件
+    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
 
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
 
-    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
-    print(work_path)
-
-    in_dim = 7 # 4(design) + 3(coord)  在FNO模型中会再次+ 2(grid as image)
-    out_dim = 3 # p, t, entropy, modeshape xyzFNO
+    in_dim = 7
+    out_dim = 3
     ntrain = 200
     nvalid = 50
 
-    modes = (64, 16)
-    width = 32
-    depth = 4
-    steps = 1
-    padding = 8
-    dropout = 0
+    modes = (12, 12)  # fno
+    steps = 1  # fno
+    padding = 8  # fno
+    width = 32  # all
+    depth = 4  # all
+    dropout = 0.0
 
-    batch_size = 32
-    epochs = 5000
+    batch_size = 12
+    epochs = 3000
     learning_rate = 0.001
-    scheduler_step = int(epochs*0.7)
-    scheduler_gamma = 0.1
+    scheduler_step = 2500
+    scheduler_gamma = 0.5
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r1 = 3 #
-    r2 = 1
-    s1 = int(((794 - 1) / r1) + 1)
-    s2 = int(((40 - 1) / r2) + 1)
 
     ################################################################
     # load data
@@ -170,7 +175,7 @@ if __name__ == "__main__":
             index.append(ind)
 
     all_fields = torch.cat([F.interpolate(torch.tensor(ff[None, ...],dtype=torch.float32), [164, 36]) for ff in bld_fields], dim=0)
-    fields = torch.permute(all_fields[:, -6:-3, ...], (0, 2, 3, 1))
+    fields = torch.permute(all_fields[:, :, ...], (0, 2, 3, 1))
     coords = torch.permute(all_fields[:, 1:4, ...], (0, 2, 3, 1))
     # bld_elems = [datamat[element[0]][:] for element in datamat['NEW_bld_nodes']] # 在图卷积中使用
 
@@ -182,7 +187,6 @@ if __name__ == "__main__":
     output = fields
     print(input.shape, output.shape)
 
-
     del datamat, coords, design, design1, design2, all_fields, bld_fields
 
     # train_x = input[:ntrain, ::r1, ::r2][:, :s1, :s2]
@@ -191,8 +195,8 @@ if __name__ == "__main__":
     # valid_y = output[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
     train_x = input[:ntrain, ...]
     train_y = output[:ntrain, ...]
-    valid_x = input[ntrain:, ...]
-    valid_y = output[ntrain:, ...]
+    valid_x = input[ntrain:ntrain + nvalid, ...]
+    valid_y = output[ntrain:ntrain + nvalid, ...]
 
     x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
     train_x = x_normalizer.norm(train_x)
@@ -205,24 +209,23 @@ if __name__ == "__main__":
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_y),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
     valid_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(valid_x, valid_y),
-                                               batch_size=batch_size, shuffle=False, drop_last=False)
-    in_sizes = [train_x.shape[1], train_x.shape[2], train_x.shape[3]]
+                                               batch_size=batch_size, shuffle=False, drop_last=True)
+
     ################################################################
     # Neural Networks
     ################################################################
 
+    with open(os.path.join('transformer_config.yml')) as f:
+        config = yaml.full_load(f)
+
+    config = config['BladeFlutter_2d']
+
     # 建立网络
-    if name == 'FNO':
-        Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
-                          padding=padding, activation='gelu', dropout=dropout).to(Device)
-    elif name == 'UNet':
-        Net_model = UNet2d(in_sizes=in_sizes, out_sizes=train_y.shape[1:], width=width,
-                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
-
-    input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
-    input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
-
-    summary(Net_model, input_data=[input1, input2], device=Device)
+    Net_model = SimpleTransformer(**config).to(Device)
+    # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
+    # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
+    # print(name)
+    # summary(Net_model, input_data=[input1, input2], device=Device)
 
     # 损失函数
     Loss_func = nn.MSELoss()
@@ -235,24 +238,14 @@ if __name__ == "__main__":
     # 可视化
     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('p', 't', 'e')) # , 'mode_x', 'mode_y', 'mode_z'
 
-
     star_time = time.time()
     log_loss = [[], []]
-    start_epoch = 0
-
-    # 读入模型
-    if os.path.exists(os.path.join(work_path, 'latest_model.pth')):
-        ck = torch.load(os.path.join(work_path, 'latest_model.pth'))
-        Net_model.load_state_dict(ck['net_model'])
-        log_loss = ck['log_loss']
-        Optimizer.load_state_dict(ck['optimizer'])
-        start_epoch = np.min([epochs, len(log_loss[0]) - 1])
 
     ################################################################
     # train process
     ################################################################
 
-    for epoch in range(start_epoch, epochs+1):
+    for epoch in range(epochs):
 
         Net_model.train()
         log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler))
@@ -264,7 +257,7 @@ if __name__ == "__main__":
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 100 == 0:
+        if epoch > 0 and epoch % 5 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
@@ -276,10 +269,10 @@ if __name__ == "__main__":
         # Visualization
         ################################################################
 
-        if epoch > 0 and epoch % 100 == 0:
+        if epoch >= 0 and epoch % 50 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-
+            train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
             valid_coord, valid_grid, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
             Error_func.p = 1
@@ -295,11 +288,10 @@ if __name__ == "__main__":
             fig.savefig(os.path.join(work_path, 'valid_box.jpg'))
             plt.close(fig)
 
-            train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
-            train_coord = x_normalizer.back(train_coord[-10:])
-            valid_coord = x_normalizer.back(valid_coord[-10:])
-            train_true, valid_true = y_normalizer.back(train_true[-10:]), y_normalizer.back(valid_true[-10:])
-            train_pred, valid_pred = y_normalizer.back(train_pred[-10:]), y_normalizer.back(valid_pred[-10:])
+            train_coord = x_normalizer.back(train_coord)
+            valid_coord = x_normalizer.back(valid_coord)
+            train_true, valid_true = y_normalizer.back(train_true), y_normalizer.back(valid_true)
+            train_pred, valid_pred = y_normalizer.back(train_pred), y_normalizer.back(valid_pred)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict(),
                         'valid_coord': valid_coord, 'valid_true': valid_true, 'valid_pred': valid_pred,
@@ -313,17 +305,11 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(1, 11):
+            for fig_id in range(10):
                 fig, axs = plt.subplots(3, 3, figsize=(20, 20), layout='constrained', num=3)
-                Visual.plot_fields_grid(fig, axs, valid_true[-fig_id], valid_pred[-fig_id])
+                Visual.plot_fields_grid(fig, axs, valid_true[fig_id], valid_pred[fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
-                true = np.concatenate((valid_true[-fig_id, -1:, ...], valid_true[-fig_id], ), axis=0)
-                pred = np.concatenate(( valid_pred[-fig_id, -1:, ...], valid_pred[-fig_id],), axis=0)
-                coord = np.concatenate((valid_coord[-fig_id, -1:, ..., :3], valid_coord[-fig_id, ..., :3], ), axis=0)
-                Visual.output_tecplot_struct(true, pred, coord,
+                Visual.output_tecplot_struct(valid_true, valid_pred,valid_coord,
                                              ['Pressure', 'Temperature', 'Static Entropy'],
                                              os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.dat'))
-
-
-

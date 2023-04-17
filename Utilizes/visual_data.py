@@ -209,14 +209,14 @@ class MatplotlibVision(object):
 
         for i in range(n_vin):
             for j in range(n_bag):
-                parts['boxes'][i + j * n_vin].set_facecolor(colors_map[i])  # violin color
+                parts['boxes'][i + j * n_vin].set_facecolor(colors_map[i%len(colors_map)])  # violin color
                 parts['boxes'][i + j * n_vin].set_edgecolor('grey')  # violin edge
                 parts['boxes'][i + j * n_vin].set_alpha(0.9)
         ax.legend(legends)
         if xticks is None:
             xticks = np.arange(n_vin * n_bag)
         ax.set_xlabel(xlabel)
-        ax.set_axis_style(ax, xticks, x_pos)
+        set_axis_style(ax, xticks, x_pos)
 
     def plot_violin(self, fig, ax, data, title=None, legends=None, xticks=None, xlabel=None, bag_width=1.0):
         ax.set_title(title)
@@ -239,7 +239,7 @@ class MatplotlibVision(object):
 
         for i in range(n_vin):
             for j in range(n_bag):
-                parts['bodies'][i + j * n_vin].set_facecolor(colors_map[i])  # violin color
+                parts['bodies'][i + j * n_vin].set_facecolor(colors_map[i%len(colors_map)])  # violin color
                 parts['bodies'][i + j * n_vin].set_edgecolor('grey')  # violin edge
                 parts['bodies'][i + j * n_vin].set_alpha(0.9)
         ax.legend(legends)
@@ -255,7 +255,7 @@ class MatplotlibVision(object):
         if xticks is None:
             xticks = np.arange(n_vin * n_bag)
         ax.set_xlabel(xlabel)
-        ax.set_axis_style(ax, xticks, x_pos)
+        set_axis_style(ax, xticks, x_pos)
 
     def plot_fields1d(self, fig, axs, real, pred, coord, title=None, xylabels=['x coordinate', 'field'],
                       show_channel=None):
