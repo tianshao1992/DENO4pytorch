@@ -74,7 +74,6 @@ class TextLogger(object):
 
 class MatplotlibVision(object):
     # 主要的绘图类
-
     def __init__(self, log_dir, input_name=('x'), field_name=('f',)):
         """Create a summary writer logging to log_dir."""
         self.log_dir = log_dir
@@ -104,7 +103,6 @@ class MatplotlibVision(object):
     def plot_loss(self, fig, axs, x, y, label, title=None, xylabels=('epoch', 'loss value')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
-
         axs.semilogy(x, y, label=label) #对数坐标
         axs.grid(True)  # 添加网格
         axs.legend(loc="best", prop=self.font)
@@ -191,7 +189,6 @@ class MatplotlibVision(object):
 
     def plot_box(self, fig, ax, data, title=None, legends=None, xlabel=None, xticks=None, bag_width=1.0):
         #绘制箱形图
-
         ax.set_title(title)
         ax.semilogy()
         ax.grid()
@@ -206,16 +203,17 @@ class MatplotlibVision(object):
             p = (np.linspace(0, 1, n_vin + 2) - 0.5) * bag_width
             positions = np.hstack([p[1:-1] + 0.5 + i for i in range(n_bag)]) * n_vin
             x_pos = np.arange(n_bag) * n_vin + n_vin / 2
-
         parts = ax.boxplot(data.reshape(data.shape[0], -1), widths=0.5 * bag_width, positions=positions, vert=True,
                            patch_artist=True, )
+        # parts = ax.boxplot(data.reshape(data.shape[0], -1).T, widths=0.5 * bag_width, positions=positions, vert=True,
 
         for i in range(n_vin):
             for j in range(n_bag):
                 parts['boxes'][i + j * n_vin].set_facecolor(colors_map[i%len(colors_map)])  # violin color
                 parts['boxes'][i + j * n_vin].set_edgecolor('grey')  # violin edge
                 parts['boxes'][i + j * n_vin].set_alpha(0.9)
-        ax.legend(legends)
+        if legends is not None:
+            ax.legend(legends)
         if xticks is None:
             xticks = np.arange(n_vin * n_bag)
         ax.set_xlabel(xlabel)
@@ -464,8 +462,7 @@ class MatplotlibVision(object):
             ff = [real[..., fi], pred[..., fi], real[..., fi] - pred[..., fi]]
             limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
             for j in range(3):
-
-                axs[i][j].cla() # 清除指定的子图
+                axs[i][j].cla() # 清除指定的子图er
                 f_true = axs[i][j].pcolormesh(x_pos, y_pos, ff[j], cmap=cmaps[j], shading='gouraud',
                                               antialiased=True, snap=True)
                 f_true.set_zorder(10)
@@ -497,7 +494,6 @@ class MatplotlibVision(object):
                 axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
     def plot_fields_am(self, fig, axs, out_true, out_pred, coord, p_id, ):
         # 输出gif动图
-
         fmax = out_true.max(axis=(0, 1, 2))  # 云图标尺
         fmin = out_true.min(axis=(0, 1, 2))  # 云图标尺
 

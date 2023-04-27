@@ -8,7 +8,6 @@
 # @File    : process_data.py
 """
 import os.path
-
 import numpy as np
 import scipy
 import scipy.io as sio
@@ -17,7 +16,8 @@ import h5py
 
 import sklearn.metrics
 from scipy.ndimage import gaussian_filter
-# from torch_geometric.data import Data
+from torch_geometric.data import Data
+
 
 
 class DataNormer():
@@ -72,7 +72,6 @@ class DataNormer():
             elif self.method == "mean-std":
                 x = x * (self.std + 1e-10) + self.mean
         return x
-
     def save(self,save_path):
         import pickle
         with open(os.path.join(save_path,'norm.pkl'), 'wb') as f:
@@ -82,6 +81,7 @@ class DataNormer():
         import pickle
         with open(os.path.join(save_path,'norm.pkl'), 'rb') as f:
             self = pickle.load(f)
+
 
 # reading data
 class MatLoader(object):

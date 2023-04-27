@@ -7,19 +7,20 @@
 # @Site    :
 # @File    : run_Darcy_train..py.py
 """
-
+import os
 import numpy as np
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer
 from DeepONets import DeepONetMulti
 from Utilizes.visual_data import MatplotlibVision, TextLogger
-
+from post_data import Post_2d
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import time
-import os
 import sys
 from run_MLP import get_grid, get_origin
 
@@ -114,13 +115,14 @@ if __name__ == "__main__":
 
     in_dim = 28
     out_dim = 5
-    ntrain = 800
-    nvalid = 300
 
+    ntrain = 2700
+    nvalid = 200
     batch_size = 32
     batch_size2 = batch_size
 
-    epochs = 1000
+
+    epochs = 1001
     learning_rate = 0.001
     scheduler_step = 800
     scheduler_gamma = 0.1
@@ -142,7 +144,7 @@ if __name__ == "__main__":
     input = design
     input = torch.tensor(input, dtype=torch.float)
 
-    output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
+    output = fields
     output = torch.tensor(output, dtype=torch.float)
     print(input.shape, output.shape)
 
@@ -187,6 +189,7 @@ if __name__ == "__main__":
                               planes_branch=[64] * 3, planes_trunk=[64] * 3).to(Device)
     # 损失函数
     Loss_func = nn.MSELoss()
+    # Loss_func = nn.SmoothL1Loss()
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
@@ -227,8 +230,8 @@ if __name__ == "__main__":
         ################################################################
         # Visualization
         ################################################################
+        if epoch > 0 and epoch % 100 == 0:
 
-        if epoch > 0 and epoch % 50 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
             train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
@@ -242,14 +245,48 @@ if __name__ == "__main__":
             valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
             valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
 
-            for fig_id in range(10):
+            for fig_id in range(5):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=2)
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+
+            for fig_id in range(5):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20),num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
+
+            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
+            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
+            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
+            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
+
+            train_true = u_normalizer.back(train_true)
+            train_pred = u_normalizer.back(train_pred)
+            valid_true = u_normalizer.back(valid_true)
+            valid_pred = u_normalizer.back(valid_pred)
+
+            for fig_id in range(5):
+                post_true = Post_2d(train_true[fig_id], grid)
+                post_pred = Post_2d(train_pred[fig_id], grid)
+                # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
+                # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+
+            for fig_id in range(5):
+                post_true = Post_2d(valid_true[fig_id], grid)
+                post_pred = Post_2d(valid_pred[fig_id], grid)
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+

@@ -139,12 +139,17 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
+<<<<<<< HEAD
     name = 'Trans-'
+=======
+    name = 'Trans'
+>>>>>>> origin/master
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
 
+<<<<<<< HEAD
     train_file = './data/ns_V1e-3_N5000_T50.mat'
     # train_file = './data/ns_V1e-5_N1200_T20.mat'
 
@@ -154,6 +159,17 @@ if __name__ == "__main__":
     nvalid = 1000
     # ntrain = 50
     # nvalid = 200
+=======
+    # train_file = './data/ns_V1e-3_N5000_T50.mat'
+    train_file = './data/ns_V1e-5_N1200_T20.mat'
+
+    in_dim = 10
+    out_dim = 1
+    # ntrain = 4000
+    # nvalid = 1000
+    ntrain = 1000
+    nvalid = 200
+>>>>>>> origin/master
 
     work_path = os.path.join('work', name, 'train_size-' + str(ntrain))
     isCreated = os.path.exists(work_path)
@@ -171,9 +187,15 @@ if __name__ == "__main__":
     dropout = 0.0
 
     batch_size = 4
+<<<<<<< HEAD
     epochs = 400
     learning_rate = 0.001
     scheduler_step = 300
+=======
+    epochs = 500
+    learning_rate = 0.001
+    scheduler_step = 400
+>>>>>>> origin/master
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -181,7 +203,11 @@ if __name__ == "__main__":
     sub = 1
     S = 64
     T_in = 10
+<<<<<<< HEAD
     T = 40
+=======
+    T = 10
+>>>>>>> origin/master
     step = 1
 
     ################################################################
@@ -272,7 +298,11 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
+<<<<<<< HEAD
             for tim_id in range(0, T, 1):
+=======
+            for tim_id in range(0, 10, 1):
+>>>>>>> origin/master
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
                 Visual.plot_fields_ms(fig, axs, train_true[0, ..., tim_id, None],
                                       train_pred[0, ..., tim_id, None], train_grid[0])

@@ -14,12 +14,20 @@ from torchinfo import summary
 from fno.FNOs import FNO2d
 from cnn.ConvNets import UNet2d
 from Utilizes.visual_data import MatplotlibVision
+<<<<<<< HEAD
 from Utilizes.process_data import DataNormer
+=======
+from Utilizes.process_data import DataNormer, MatLoader
+>>>>>>> origin/master
 from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import time
 import os
+<<<<<<< HEAD
+=======
+from post_data import Post_2d
+>>>>>>> origin/master
 
 class MLP(nn.Module):
     def __init__(self, layers, is_BatchNorm=True):
@@ -66,7 +74,11 @@ def get_grid():
 
 
 
+<<<<<<< HEAD
 def get_origin():
+=======
+def get_origin_old():
+>>>>>>> origin/master
     # sample_num = 500
     # sample_start = 0
 
@@ -98,6 +110,62 @@ def get_origin():
 
     return design, fields
 
+<<<<<<< HEAD
+=======
+def get_origin_6field(realpath=None):
+    if realpath is None:
+        sample_files = [os.path.join("data","sampleRst_500"),
+                       os.path.join("data", "sampleRst_900"),
+                        os.path.join("data", "sampleRst_1500")]
+    else:
+        sample_files = [os.path.join(realpath,"sampleRst_500"),
+                       os.path.join(realpath, "sampleRst_900"),
+                        os.path.join(realpath, "sampleRst_1500")]
+
+    design = []
+    fields = []
+    for file in sample_files:
+        reader = MatLoader(file)
+        design.append(reader.read_field('input'))
+        fields.append(reader.read_field('output'))
+
+    design = np.concatenate(design, axis=0)
+    fields = np.concatenate(fields, axis=0)
+
+    return design, fields
+
+def get_origin(quanlityList = ["Static Pressure", "Static Temperature", "Density",
+                                # "Vxyz_X", "Vxyz_Y", "Vxyz_Z",
+                                'Relative Total Pressure', 'Relative Total Temperature',
+                                # 'Entropy'
+                               ],
+                realpath = None
+                ):
+    if realpath is None:
+        sample_files = [os.path.join("data", "sampleRstZip_1500"),
+                        os.path.join("data", "sampleRstZip_500"),
+                        os.path.join("data", "sampleRstZip_970")
+                        ]
+    else:
+        sample_files = [os.path.join(realpath, "sampleRstZip_1500"),
+                        os.path.join(realpath, "sampleRstZip_500"),
+                        os.path.join(realpath, "sampleRstZip_970")
+                        ]
+    design = []
+    fields = []
+    for ii, file in enumerate(sample_files):
+        reader = MatLoader(file)
+        design.append(reader.read_field('design'))
+        output = np.zeros([design[ii].shape[0],64,64,len(quanlityList)])
+        for jj, quanlity in enumerate(quanlityList):
+            output[:,:,:,jj] = reader.read_field(quanlity).clone()
+        fields.append(output)
+
+    design = np.concatenate(design, axis=0)
+    fields = np.concatenate(fields, axis=0)
+
+    return design, fields
+>>>>>>> origin/master
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     """
@@ -116,6 +184,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
 
         loss = lossfunc(pred, output)
 
+<<<<<<< HEAD
         grid_size = 64
 
         weighted_lines = 3
@@ -125,6 +194,8 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         weighted_mat = np.concatenate((temp1,temp2,temp1),axis=0).reshape(output[0].shape)
         weighted_mat = np.tile(weighted_mat[None,:],(output.shape[0],1))
 
+=======
+>>>>>>> origin/master
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -194,11 +265,19 @@ if __name__ == "__main__":
     in_dim = 28
     out_dim = 5
 
+<<<<<<< HEAD
     ntrain = 800
     nvalid = 300
 
     batch_size = 32
     epochs = 1000
+=======
+    ntrain = 2700
+    nvalid = 250
+
+    batch_size = 32
+    epochs = 1001
+>>>>>>> origin/master
     learning_rate = 0.001
     scheduler_step = 800
     scheduler_gamma = 0.1
@@ -212,7 +291,13 @@ if __name__ == "__main__":
     input = design
     input = torch.tensor(input, dtype=torch.float)
 
+<<<<<<< HEAD
     output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
+=======
+    # output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
+    output = fields
+    # output = fields[:, :, :, :-1].transpose((0, 2, 1, 3))
+>>>>>>> origin/master
     # output = output.reshape([output.shape[0],-1])
     output = torch.tensor(output, dtype=torch.float)
     print(input.shape, output.shape)
@@ -226,7 +311,11 @@ if __name__ == "__main__":
     train_x = x_normalizer.norm(train_x)
     valid_x = x_normalizer.norm(valid_x)
 
+<<<<<<< HEAD
     y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
+=======
+    y_normalizer = DataNormer(train_y.numpy(), method='mean-std',axis=(0,1,2,))
+>>>>>>> origin/master
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
@@ -238,10 +327,17 @@ if __name__ == "__main__":
     valid_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(valid_x, valid_y),
                                                batch_size=batch_size, shuffle=False, drop_last=True)
 
+<<<<<<< HEAD
 ################################################################
 # Neural Networks
 ################################################################
 
+=======
+
+# Neural Networks
+################################################################
+################################################################
+>>>>>>> origin/master
     # 建立网络
     layer_mat = [in_dim, 256, 256, 256, 256, 256, 256, 256, 256, out_dim*64*64]
     Net_model =  MLP(layer_mat,is_BatchNorm=False)
@@ -251,6 +347,10 @@ if __name__ == "__main__":
 
     # 损失函数
     Loss_func = nn.MSELoss()
+<<<<<<< HEAD
+=======
+    # Loss_func = nn.SmoothL1Loss()
+>>>>>>> origin/master
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
     # 下降策略
@@ -291,7 +391,11 @@ if __name__ == "__main__":
             plt.close(fig)
 
 
+<<<<<<< HEAD
         if epoch > 0 and epoch % 50 == 0:
+=======
+        if epoch > 0 and epoch % 100 == 0:
+>>>>>>> origin/master
             train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
             valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
@@ -303,14 +407,59 @@ if __name__ == "__main__":
             valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
             valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
 
+<<<<<<< HEAD
             for fig_id in range(10):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=2)
+=======
+            for fig_id in range(5):
+                fig, axs = plt.subplots(out_dim, 3, figsize=(20, 15), num=2)
+>>>>>>> origin/master
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id],grid)
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
+<<<<<<< HEAD
             for fig_id in range(10):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id],grid)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
+=======
+            for fig_id in range(5):
+                fig, axs = plt.subplots(out_dim, 3, figsize=(20, 15), num=3)
+                Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id],grid)
+                fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+
+            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
+            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
+            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
+            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
+
+            train_true = y_normalizer.back(train_true)
+            train_pred = y_normalizer.back(train_pred)
+            valid_true = y_normalizer.back(valid_true)
+            valid_pred = y_normalizer.back(valid_pred)
+
+            for fig_id in range(5):
+                post_true = Post_2d(train_true[fig_id], grid)
+                post_pred = Post_2d(train_pred[fig_id], grid)
+                # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
+                # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+
+            for fig_id in range(5):
+                post_true = Post_2d(valid_true[fig_id], grid)
+                post_pred = Post_2d(valid_pred[fig_id], grid)
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+>>>>>>> origin/master

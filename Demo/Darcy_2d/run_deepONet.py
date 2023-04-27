@@ -13,7 +13,12 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer, MatLoader
+<<<<<<< HEAD
 from basic_layers import DeepONetMulti
+=======
+# from basic_layers import DeepONetMulti
+from DeepONets import DeepONetMulti
+>>>>>>> origin/master
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -38,7 +43,11 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         f = f.to(device)
         x = x.to(device)
         u = u.to(device)
+<<<<<<< HEAD
         pred = netmodel([f, ], x, size_set=False)
+=======
+        pred = netmodel([f, ], x, size_set=False) #加方括号将输入变为list
+>>>>>>> origin/master
 
         loss = lossfunc(pred, u)
 
@@ -112,8 +121,16 @@ if __name__ == "__main__":
     else:
         Device = torch.device('cpu')
 
+<<<<<<< HEAD
     train_file = os.path.join('data', name, 'Darcy_Triangular.mat')
     valid_file = os.path.join('data', name, 'Darcy_Triangular.mat')
+=======
+    # train_file = os.path.join('data', name, 'Darcy_Triangular.mat')
+    # valid_file = os.path.join('data', name, 'Darcy_Triangular.mat')
+
+    train_file = "D:\WQN\CODE\DENO4pytorch-main\Demo\Darcy_2d\data\darcy_triangular_notch\Darcy_Triangular.mat"
+    valid_file = "D:\WQN\CODE\DENO4pytorch-main\Demo\Darcy_2d\data\darcy_triangular_notch\Darcy_Triangular.mat"
+>>>>>>> origin/master
 
     in_dim = 1
     out_dim = 1
@@ -144,11 +161,16 @@ if __name__ == "__main__":
     train_grid_y = reader.read_field('yy')
     train_grid = torch.tile(torch.cat((train_grid_x, train_grid_y), axis=-1), [train_f.shape[0], 1, 1])
 
+<<<<<<< HEAD
     valid_f = reader.read_field('f_bc')[-nvalid:]
+=======
+    valid_f = reader.read_field('f_bc')[-nvalid:] #从最后取值
+>>>>>>> origin/master
     valid_u = reader.read_field('u_field')[-nvalid:, :, None]
     valid_grid = torch.tile(torch.cat((train_grid_x, train_grid_y), axis=-1), [valid_u.shape[0], 1, 1])
     del reader
 
+<<<<<<< HEAD
     f_normalizer = DataNormer(train_f.numpy(), method='mean-std', axis=(0,))
     train_f = f_normalizer.norm(train_f)
     valid_f = f_normalizer.norm(valid_f)
@@ -158,6 +180,17 @@ if __name__ == "__main__":
     valid_u = u_normalizer.norm(valid_u)
 
     grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std', axis=(0, 1))
+=======
+    f_normalizer = DataNormer(train_f.numpy(), method='mean-std', axis=(0,)) #学习一下
+    train_f = f_normalizer.norm(train_f)
+    valid_f = f_normalizer.norm(valid_f)
+
+    u_normalizer = DataNormer(train_u.numpy(), method='mean-std', axis=(0,))# 按行归一
+    train_u = u_normalizer.norm(train_u)
+    valid_u = u_normalizer.norm(valid_u)
+
+    grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std', axis=(0, 1)) #按位置归一
+>>>>>>> origin/master
     train_grid = grid_normalizer.norm(train_grid)
     valid_grid = grid_normalizer.norm(valid_grid)
 
@@ -190,7 +223,11 @@ if __name__ == "__main__":
     ################################################################
 
     # 生成网格文件
+<<<<<<< HEAD
     triang = tri.Triangulation(train_grid_x[:, 0], train_grid_y[:, 0])
+=======
+    triang = tri.Triangulation(train_grid_x[:, 0], train_grid_y[:, 0])  # 这个变量的用法还不清楚
+>>>>>>> origin/master
 
     for epoch in range(epochs):
 

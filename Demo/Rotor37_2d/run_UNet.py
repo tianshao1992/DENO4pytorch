@@ -7,8 +7,11 @@
 @Site ：run_FNO.py
 @File ：run_FNO.py
 """
+import os
 import numpy as np
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import torch
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
@@ -19,41 +22,10 @@ from Utilizes.process_data import DataNormer
 
 import matplotlib.pyplot as plt
 import time
-import os
 from run_MLP import get_grid
+from run_MLP import get_grid, get_origin
+from post_data import Post_2d
 
-
-def get_origin():
-    # sample_num = 500
-    # sample_start = 0
-
-    design_files = [os.path.join('data', 'rotor37_600_sam.dat'),
-                    os.path.join('data', 'rotor37_900_sam.dat')]
-    field_paths = [os.path.join('data', 'Rotor37_span_600_data_64cut_clean'),
-                   os.path.join('data', 'Rotor37_span_900_data_64cut_clean')]
-
-    fields = []
-    case_index = []
-    for path in field_paths:
-        names = os.listdir(path)
-        fields.append([])
-        case_index.append([])
-        for i in range(len(names)):
-            # 处理后数据格式为<class 'tuple'>: (3, 5, 64，64)
-            if 'case_' + str(i) + '.npy' in names:
-                fields[-1].append(np.load(os.path.join(path, 'case_' + str(i) + '.npy'))
-                                  .astype(np.float32).transpose((1, 2, 0, 3)))
-                case_index[-1].append(i)
-        fields[-1] = np.stack(fields[-1], axis=0)
-
-    design = []
-    for i, file in enumerate(design_files):
-        design.append(np.loadtxt(file, dtype=np.float32)[case_index[i]])
-
-    design = np.concatenate(design, axis=0)
-    fields = np.concatenate(fields, axis=0)
-
-    return design, fields
 
 
 def feature_transform(x):
@@ -161,8 +133,8 @@ if __name__ == "__main__":
 
     in_dim = 28
     out_dim = 5
-    ntrain = 800
-    nvalid = 300
+    ntrain = 2700
+    nvalid = 20
 
     modes = (12, 12)
     width = 64
@@ -172,7 +144,7 @@ if __name__ == "__main__":
     dropout = 0.0
 
     batch_size = 32
-    epochs = 1000
+    epochs = 1001
     learning_rate = 0.001
     scheduler_step = 800
     scheduler_gamma = 0.1
@@ -190,8 +162,8 @@ if __name__ == "__main__":
 
     input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     input = torch.tensor(input, dtype=torch.float)
-
-    output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
+    # output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
+    output = fields
     output = torch.tensor(output, dtype=torch.float)
     print(input.shape, output.shape)
 
@@ -260,7 +232,8 @@ if __name__ == "__main__":
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 5 == 0:
+
+        if epoch > 0 and epoch % 10 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
@@ -272,7 +245,7 @@ if __name__ == "__main__":
         # Visualization
         ################################################################
 
-        if epoch > 0 and epoch % 50 == 0:
+        if epoch > 0 and epoch % 100 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
             train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
@@ -281,14 +254,48 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
+
             for fig_id in range(10):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=2)
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
+            for fig_id in range(5):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
+
+            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
+            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
+            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
+            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
+
+            train_true = y_normalizer.back(train_true)
+            train_pred = y_normalizer.back(train_pred)
+            valid_true = y_normalizer.back(valid_true)
+            valid_pred = y_normalizer.back(valid_pred)
+
+            for fig_id in range(5):
+                post_true = Post_2d(train_true[fig_id], grid)
+                post_pred = Post_2d(train_pred[fig_id], grid)
+                # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
+                # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+
+            for fig_id in range(5):
+                post_true = Post_2d(valid_true[fig_id], grid)
+                post_pred = Post_2d(valid_pred[fig_id], grid)
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+

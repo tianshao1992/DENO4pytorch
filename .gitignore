@@ -133,6 +133,7 @@ venv/
 data/
 */work/
 */*/work/
+*/*/work*/
 */*/data/
 *.npz
 *.npy

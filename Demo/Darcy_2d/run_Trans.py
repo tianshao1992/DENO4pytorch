@@ -115,7 +115,11 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
+<<<<<<< HEAD
     name = 'Transformer_galerkin_inverse'
+=======
+    name = 'Transformer_galerkin'
+>>>>>>> origin/master
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -265,13 +269,21 @@ if __name__ == "__main__":
                        os.path.join(work_path, 'latest_model.pth'))
 
             for fig_id in range(batch_size):
+<<<<<<< HEAD
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
+=======
+                fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=2)
+>>>>>>> origin/master
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
             for fig_id in range(batch_size):
+<<<<<<< HEAD
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
+=======
+                fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=3)
+>>>>>>> origin/master
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
