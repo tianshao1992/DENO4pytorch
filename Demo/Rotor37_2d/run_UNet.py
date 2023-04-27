@@ -146,7 +146,7 @@ if __name__ == "__main__":
     ################################################################
     grid = get_grid()
 
-    name = 'FNO'
+    name = 'UNet'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:

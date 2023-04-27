@@ -1,59 +1,28 @@
-
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-# @copyright (c) 2023 Baidu.com, Inc. Allrights Reserved
-@Time ： 2023/4/17 22:06
-@Author ： Liu Tianyuan (liutianyuan02@baidu.com)
-@Site ：run_FNO.py
-@File ：run_FNO.py
+# @Copyright (c) 2022 Baidu.com, Inc. All Rights Reserved
+# @Time    : 2023/2/11 2:35
+# @Author  : Liu Tianyuan (liutianyuan02@baidu.com)
+# @Site    :
+# @File    : run_Trans.py
 """
+
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
-from fno.FNOs import FNO2d
-from cnn.ConvNets import UNet2d
-from Utilizes.visual_data import MatplotlibVision
-from Utilizes.process_data import DataNormer
+from Utilizes.process_data import DataNormer, MatLoader
+from transformer.Transformers import SimpleTransformer, FourierTransformer2D
+from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
 import time
 import os
-from run_MLP import get_grid
-
-
-def get_origin():
-    # sample_num = 500
-    # sample_start = 0
-
-    design_files = [os.path.join('data', 'rotor37_600_sam.dat'),
-                    os.path.join('data', 'rotor37_900_sam.dat')]
-    field_paths = [os.path.join('data', 'Rotor37_span_600_data_64cut_clean'),
-                   os.path.join('data', 'Rotor37_span_900_data_64cut_clean')]
-
-    fields = []
-    case_index = []
-    for path in field_paths:
-        names = os.listdir(path)
-        fields.append([])
-        case_index.append([])
-        for i in range(len(names)):
-            # 处理后数据格式为<class 'tuple'>: (3, 5, 64，64)
-            if 'case_' + str(i) + '.npy' in names:
-                fields[-1].append(np.load(os.path.join(path, 'case_' + str(i) + '.npy'))
-                                  .astype(np.float32).transpose((1, 2, 0, 3)))
-                case_index[-1].append(i)
-        fields[-1] = np.stack(fields[-1], axis=0)
-
-    design = []
-    for i, file in enumerate(design_files):
-        design.append(np.loadtxt(file, dtype=np.float32)[case_index[i]])
-
-    design = np.concatenate(design, axis=0)
-    fields = np.concatenate(fields, axis=0)
-
-    return design, fields
+import sys
+import yaml
+from run_MLP import get_grid, get_origin
 
 
 def feature_transform(x):
@@ -69,7 +38,9 @@ def feature_transform(x):
     gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
     gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
     gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-    return torch.cat((gridx, gridy), dim=-1).to(x.device)
+
+    edge = torch.ones((x.shape[0], 1))
+    return torch.cat((gridx, gridy), dim=-1).to(x.device), edge.to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -81,13 +52,14 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         optimizer: optimizer
         scheduler: scheduler
     """
+
     train_loss = 0
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        gd = feature_transform(xx)
+        grid, edge = feature_transform(xx)
 
-        pred = netmodel(xx, gd)
+        pred = netmodel(xx, grid, edge, grid)['preds']
         loss = lossfunc(pred, yy)
 
         optimizer.zero_grad()
@@ -97,7 +69,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1) / batch_size
+    return train_loss / (batch + 1)
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -112,16 +84,16 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            gd = feature_transform(xx)
+            grid, edge = feature_transform(xx)
 
-            pred = netmodel(xx, gd)
+            pred = netmodel(xx, grid, edge, grid)['preds']
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1) / batch_size
+    return valid_loss / (batch + 1)
 
 
-def inference(dataloader, netmodel, device): # 这个是？？
+def inference(dataloader, netmodel, device):
     """
     Args:
         dataloader: input coordinates
@@ -129,31 +101,32 @@ def inference(dataloader, netmodel, device): # 这个是？？
     Returns:
         out_pred: predicted fields
     """
-
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        gd = feature_transform(xx)
-        pred = netmodel(xx, gd)
+        grid, edge = feature_transform(xx)
+        pred = netmodel(xx, grid, edge, grid)['preds']
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
     ################################################################
     # configs
     ################################################################
-    grid = get_grid()
 
-    name = 'FNO'
+    name = 'Transformer'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
 
+    # 将控制台的结果输出到log文件
+    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+
     if torch.cuda.is_available():
-        Device = torch.device('cuda')
+        Device = torch.device('cuda:0')
     else:
         Device = torch.device('cpu')
 
@@ -165,24 +138,29 @@ if __name__ == "__main__":
     nvalid = 300
 
     modes = (12, 12)
-    width = 64
+    width = 32
     depth = 4
     steps = 1
-    padding = 8
+    padding = 9
     dropout = 0.0
 
-    batch_size = 32
-    epochs = 1000
+    batch_size = 8
+    epochs = 400
     learning_rate = 0.001
-    scheduler_step = 800
+    scheduler_step = 300
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r1 = 1
-    r2 = 1
-    s1 = int(((64 - 1) / r1) + 1)
-    s2 = int(((64 - 1) / r2) + 1)
+    #这部分应该是重采样
+    #不进行稀疏采样
+    r_train = 1
+    h_train = int(((64 - 1) / r_train) + 1)
+    s_train = h_train
+
+    r_valid = 1
+    h_valid = int(((64 - 1) / r_valid) + 1)
+    s_valid = h_valid
 
     ################################################################
     # load data
@@ -193,12 +171,13 @@ if __name__ == "__main__":
 
     output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
     output = torch.tensor(output, dtype=torch.float)
+
     print(input.shape, output.shape)
 
-    train_x = input[:ntrain, ::r1, ::r2][:, :s1, :s2]
-    train_y = output[:ntrain, ::r1, ::r2][:, :s1, :s2]
-    valid_x = input[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
-    valid_y = output[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
+    train_x = input[:ntrain, :, :]
+    train_y = output[:ntrain, :, :]
+    valid_x = input[ntrain:ntrain + nvalid, :, :]
+    valid_y = output[ntrain:ntrain + nvalid, :, :]
 
     x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
     train_x = x_normalizer.norm(train_x)
@@ -214,26 +193,18 @@ if __name__ == "__main__":
                                                batch_size=batch_size, shuffle=False, drop_last=True)
 
     ################################################################
-    # Neural Networks
+    #  Neural Networks
     ################################################################
+    with open(os.path.join('transformer_config.yml')) as f:
+        config = yaml.full_load(f)
+        config = config['Rotor37_2d']
 
     # 建立网络
-    if name == 'FNO':
-        Net_model = FNO2d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
-                          padding=padding, activation='gelu').to(Device)
-    elif name == 'UNet':
-        Net_model = UNet2d(in_sizes=train_x.shape[1:], out_sizes=train_y.shape[1:], width=width,
-                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
-
-    input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
-    input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
-    print(name)
-    summary(Net_model, input_data=[input1, input2], device=Device)
+    Net_model = FourierTransformer2D(**config).to(Device)
+    # summary(Net_model, input_size=(batch_size, train_x.shape[1]), device=Device)
 
     # 损失函数
     Loss_func = nn.MSELoss()
-    # Loss_func = FieldsLpLoss(size_average=False)
-    # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
     # 下降策略
@@ -247,7 +218,7 @@ if __name__ == "__main__":
     ################################################################
     # train process
     ################################################################
-
+    grid = get_grid()
     for epoch in range(epochs):
 
         Net_model.train()
@@ -256,11 +227,11 @@ if __name__ == "__main__":
         Net_model.eval()
         log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
         print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
-              format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
+              format(epoch, learning_rate, log_loss[0][-1], log_loss[1][-1], time.time() - star_time))
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 5 == 0:
+        if epoch > 0 and epoch % 10 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
@@ -275,20 +246,20 @@ if __name__ == "__main__":
         if epoch > 0 and epoch % 50 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-            train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
-            valid_coord, valid_grid, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
+            train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
+            valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            for fig_id in range(10):
-                fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=2)
+            for fig_id in range(batch_size):
+                fig, axs = plt.subplots(out_dim, 3, figsize=(18, 25), num=2)
                 Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
-                fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=3)
+            for fig_id in range(batch_size):
+                fig, axs = plt.subplots(out_dim, 3, figsize=(18, 25), num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)

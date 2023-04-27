@@ -73,6 +73,7 @@ class TextLogger(object):
 
 
 class MatplotlibVision(object):
+    # 主要的绘图类
 
     def __init__(self, log_dir, input_name=('x'), field_name=('f',)):
         """Create a summary writer logging to log_dir."""
@@ -104,7 +105,7 @@ class MatplotlibVision(object):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
-        axs.semilogy(x, y, label=label)
+        axs.semilogy(x, y, label=label) #对数坐标
         axs.grid(True)  # 添加网格
         axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
@@ -189,6 +190,8 @@ class MatplotlibVision(object):
         axs.set_title(title, fontdict=self.font)
 
     def plot_box(self, fig, ax, data, title=None, legends=None, xlabel=None, xticks=None, bag_width=1.0):
+        #绘制箱形图
+
         ax.set_title(title)
         ax.semilogy()
         ax.grid()
@@ -462,7 +465,7 @@ class MatplotlibVision(object):
             limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
             for j in range(3):
 
-                axs[i][j].cla()
+                axs[i][j].cla() # 清除指定的子图
                 f_true = axs[i][j].pcolormesh(x_pos, y_pos, ff[j], cmap=cmaps[j], shading='gouraud',
                                               antialiased=True, snap=True)
                 f_true.set_zorder(10)
@@ -493,6 +496,7 @@ class MatplotlibVision(object):
                 axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
                 axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
     def plot_fields_am(self, fig, axs, out_true, out_pred, coord, p_id, ):
+        # 输出gif动图
 
         fmax = out_true.max(axis=(0, 1, 2))  # 云图标尺
         fmin = out_true.min(axis=(0, 1, 2))  # 云图标尺
