@@ -42,16 +42,27 @@ class DeepONetMulti(nn.Module):
         :param activation: activation function
         """
         super(DeepONetMulti, self).__init__()
+<<<<<<< HEAD
         self.branches = nn.ModuleList()
         self.trunks = nn.ModuleList()
         for dim in operator_dims:
             self.branches.append(FcnSingle([dim] + planes_branch, activation=activation))
+=======
+        self.branches = nn.ModuleList() # 分支网络
+        self.trunks = nn.ModuleList() # 主干网络
+        for dim in operator_dims:
+            self.branches.append(FcnSingle([dim] + planes_branch, activation=activation))# FcnSingle是从basic_layers里导入的
+>>>>>>> origin/master
         for _ in range(output_dim):
             self.trunks.append(FcnSingle([input_dim] + planes_trunk, activation=activation))
 
         self.reset_parameters()
 
+<<<<<<< HEAD
     def reset_parameters(self):
+=======
+    def reset_parameters(self): # 初始化所有网络的参数
+>>>>>>> origin/master
         """
         weight initialize
         """
@@ -66,20 +77,35 @@ class DeepONetMulti(nn.Module):
         forward compute
         :param u_vars: tensor list[(batch_size, ..., operator_dims[0]), (batch_size, ..., operator_dims[1]), ...]
         :param y_var: (batch_size, ..., input_dim)
+<<<<<<< HEAD
         :param size_set: bool, true for standard inputs, false for reduce points number in operator inputs
         """
         B = 1.
         for u_var, branch in zip(u_vars, self.branches):
+=======
+        :param size_set: bool, true for standard inputs, false for reduce points number in operator inputs # 注意一下这里
+        """
+        B = 1.
+        for u_var, branch in zip(u_vars, self.branches): #这是一个nn.ModuleList()，brach的类型是？
+>>>>>>> origin/master
             B *= branch(u_var)
         if not size_set:
             B_size = list(y_var.shape[1:-1])
             for i in range(len(B_size)):
                 B = B.unsqueeze(1)
             B = torch.tile(B, [1, ] + B_size + [1, ])
+<<<<<<< HEAD
         out_var = []
         for trunk in self.trunks:
             T = trunk(y_var)
             out_var.append(torch.sum(B * T, dim=-1))
+=======
+
+        out_var = []
+        for trunk in self.trunks:
+            T = trunk(y_var)
+            out_var.append(torch.sum(B * T, dim=-1)) # 用这种方式实现两个网络的乘积
+>>>>>>> origin/master
         out_var = torch.stack(out_var, dim=-1)
         return out_var
 

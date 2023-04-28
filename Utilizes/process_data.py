@@ -7,6 +7,7 @@
 # @Site    : 
 # @File    : process_data.py
 """
+import os.path
 import numpy as np
 import scipy
 import scipy.io as sio
@@ -15,7 +16,8 @@ import h5py
 
 import sklearn.metrics
 from scipy.ndimage import gaussian_filter
-from torch_geometric.data import Data
+# from torch_geometric.data import Data
+
 
 
 class DataNormer():
@@ -70,6 +72,15 @@ class DataNormer():
             elif self.method == "mean-std":
                 x = x * (self.std + 1e-10) + self.mean
         return x
+    def save(self,save_path):
+        import pickle
+        with open(os.path.join(save_path,'norm.pkl'), 'wb') as f:
+            pickle.dump(self, f)
+
+    def load(self,save_path):
+        import pickle
+        with open(os.path.join(save_path,'norm.pkl'), 'rb') as f:
+            self = pickle.load(f)
 
 
 # reading data
@@ -129,6 +140,7 @@ class MatLoader(object):
 
 
 class SquareMeshGenerator(object):
+    # 在多维空间中获得正交网格
     def __init__(self, real_space, mesh_size):
         super(SquareMeshGenerator, self).__init__()
 

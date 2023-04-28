@@ -7,22 +7,22 @@
 # @Site    :
 # @File    : run_Darcy_train..py.py
 """
-
+import os
 import numpy as np
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from Utilizes.process_data import DataNormer, MatLoader
-
+from Utilizes.process_data import DataNormer
 from DeepONets import DeepONetMulti
 from Utilizes.visual_data import MatplotlibVision, TextLogger
-
+from post_data import Post_2d
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import time
-import os
 import sys
-
+from run_MLP import get_grid, get_origin
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     """
@@ -39,8 +39,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         f = f.to(device)
         x = x.to(device)
         u = u.to(device)
-        pred = netmodel([f, ], x, size_set=False) #加方括号将输入变为list
-
+        pred = netmodel([f, ], x, size_set=False)
 
         loss = lossfunc(pred, u)
 
@@ -87,8 +86,6 @@ def inference(dataloader, netmodel, device):
         f, x, u = next(iter(dataloader))
         f = f.to(device)
         x = x.to(device)
-        # u = u.to(device)
-        # u = u.to(device)
         pred = netmodel([f, ], x, size_set=False)
 
     # equation = model.equation(u_var, y_var, out_pred)
@@ -100,7 +97,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'darcy_triangular_notch'
+    name = 'deepONet'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -114,55 +111,70 @@ if __name__ == "__main__":
     else:
         Device = torch.device('cpu')
 
+    design, fields = get_origin()
 
-    train_file = os.path.join('data', name, 'Darcy_Triangular.mat')
-    valid_file = os.path.join('data', name, 'Darcy_Triangular.mat')
+    in_dim = 28
+    out_dim = 5
 
-    in_dim = 1
-    out_dim = 1
-    ntrain = 1900
-    nvalid = 100
-
+    ntrain = 2700
+    nvalid = 200
     batch_size = 32
     batch_size2 = batch_size
 
-    epochs = 10000
+
+    epochs = 1001
     learning_rate = 0.001
-    scheduler_step = 2000
+    scheduler_step = 800
     scheduler_gamma = 0.1
 
-    print(epochs, learning_rate, scheduler_step, scheduler_gamma)
 
-    r = 2295
-    s = 101
+
+    print(epochs, learning_rate, scheduler_step, scheduler_gamma)
+    r = out_dim*64*64
+    s = 28
 
     ################################################################
     # load data
     ################################################################
 
-    reader = MatLoader(train_file)
-    train_f = reader.read_field('f_bc')[:ntrain]
-    train_u = reader.read_field('u_field')[:ntrain, :, None]
-    train_grid_x = reader.read_field('xx')
-    train_grid_y = reader.read_field('yy')
-    train_grid = torch.tile(torch.cat((train_grid_x, train_grid_y), axis=-1), [train_f.shape[0], 1, 1])
+    grid = get_grid()
+    grid_trans = torch.tensor(grid[np.newaxis,:,:,:], dtype=torch.float)
 
-    valid_f = reader.read_field('f_bc')[-nvalid:]
-    valid_u = reader.read_field('u_field')[-nvalid:, :, None]
-    valid_grid = torch.tile(torch.cat((train_grid_x, train_grid_y), axis=-1), [valid_u.shape[0], 1, 1])
-    del reader
 
-    f_normalizer = DataNormer(train_f.numpy(), method='mean-std', axis=(0,))
+    input = design
+    input = torch.tensor(input, dtype=torch.float)
+
+    output = fields
+    output = torch.tensor(output, dtype=torch.float)
+    print(input.shape, output.shape)
+
+    train_f = input[:ntrain, :]
+    train_u = output[:ntrain,:,:,:] #这里的u还没有展开，需要先归一化再展开
+    valid_f = input[ntrain:ntrain + nvalid, :]
+    valid_u = output[ntrain:ntrain + nvalid, :,:,:]
+    train_grid = torch.tile(grid_trans, [train_f.shape[0], 1, 1, 1])#所有样本的坐标是一致的。
+    valid_grid = torch.tile(grid_trans, [valid_f.shape[0], 1, 1, 1])
+
+    u_show = train_u.numpy()
+    gird_show = train_grid.numpy()
+
+    f_normalizer = DataNormer(train_f.numpy(), method='mean-std')
     train_f = f_normalizer.norm(train_f)
     valid_f = f_normalizer.norm(valid_f)
 
-    u_normalizer = DataNormer(train_u.numpy(), method='mean-std', axis=(0,))
+    u_normalizer = DataNormer(train_u.numpy(), method='mean-std')
     train_u = u_normalizer.norm(train_u)
     valid_u = u_normalizer.norm(valid_u)
 
-    grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std', axis=(0, 1))
+    grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std')#这里的axis不一样了
     train_grid = grid_normalizer.norm(train_grid)
     valid_grid = grid_normalizer.norm(valid_grid)
+
+    # grid_trans = grid_trans.reshape([1, -1, 2])
+    train_grid = train_grid.reshape([train_u.shape[0], -1, 2])
+    valid_grid = valid_grid.reshape([valid_u.shape[0], -1, 2])
+    train_u = train_u.reshape([train_u.shape[0],-1, out_dim])
+    valid_u = valid_u.reshape([valid_u.shape[0],-1, out_dim])
 
     train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_f, train_grid, train_u),
                                                batch_size=batch_size, shuffle=True, drop_last=True)
@@ -173,17 +185,18 @@ if __name__ == "__main__":
     #  Neural Networks
     ################################################################
     # 建立网络
-    Net_model = DeepONetMulti(input_dim=2, operator_dims=[101, ], output_dim=1,
+    Net_model = DeepONetMulti(input_dim=2, operator_dims=[28, ], output_dim=5,
                               planes_branch=[64] * 3, planes_trunk=[64] * 3).to(Device)
     # 损失函数
     Loss_func = nn.MSELoss()
+    # Loss_func = nn.SmoothL1Loss()
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
     # 下降策略
     Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     # 可视化
-    Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('f',))
+    Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('p', 't', 'rho', 'alf', 'v'))
 
     star_time = time.time()
     log_loss = [[], []]
@@ -192,8 +205,7 @@ if __name__ == "__main__":
     # train process
     ################################################################
 
-    triang = tri.Triangulation(train_grid_x[:, 0], train_grid_y[:, 0])
-
+    # 生成网格文件
 
     for epoch in range(epochs):
 
@@ -218,8 +230,8 @@ if __name__ == "__main__":
         ################################################################
         # Visualization
         ################################################################
-
         if epoch > 0 and epoch % 100 == 0:
+
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
             train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
@@ -228,16 +240,53 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-            for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=2)
-                Visual.plot_fields_tr(fig, axs, train_true[fig_id], train_pred[fig_id], train_coord[fig_id],
-                                      edges=triang.triangles)
+            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
+            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
+            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
+            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
+
+            for fig_id in range(5):
+                fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20), num=2)
+                Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            for fig_id in range(10):
-                fig, axs = plt.subplots(1, 3, figsize=(18, 5), layout='constrained', num=3)
-                Visual.plot_fields_tr(fig, axs, valid_true[fig_id], valid_pred[fig_id], valid_coord[fig_id],
-                                      edges=triang.triangles)
+
+            for fig_id in range(5):
+                fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20),num=3)
+                Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
+
+            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
+            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
+            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
+            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
+
+            train_true = u_normalizer.back(train_true)
+            train_pred = u_normalizer.back(train_pred)
+            valid_true = u_normalizer.back(valid_true)
+            valid_pred = u_normalizer.back(valid_pred)
+
+            for fig_id in range(5):
+                post_true = Post_2d(train_true[fig_id], grid)
+                post_pred = Post_2d(train_pred[fig_id], grid)
+                # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
+                # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+
+            for fig_id in range(5):
+                post_true = Post_2d(valid_true[fig_id], grid)
+                post_pred = Post_2d(valid_pred[fig_id], grid)
+                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
+                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
+                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
+                                  title="train_solution", xylabels=("efficiency", "span"))
+                fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
+                plt.close(fig)
+
