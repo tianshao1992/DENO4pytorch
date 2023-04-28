@@ -31,8 +31,10 @@ def plot_span_curve(post, parameterList, save_path = None, fig_id = 0, label = N
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
         value_span = getattr(post, parameter_Name)
-        Visual.plot_value(fig, axs, value_span[:, -1], np.linspace(0,1,post.n_1d), label=label,
-                          title=parameter_Name, xylabels=("efficiency", "span"))
+
+        for ii in range(post.num):
+            Visual.plot_value(fig, axs, value_span[ii, :, -1], np.linspace(0,1,post.n_1d), label=label,
+                              title=parameter_Name, xylabels=("efficiency", "span"))
 
         if save_path is None:
             jpg_path = os.path.join(work_path, parameter_Name + "_" + str(fig_id) + '.jpg')
@@ -54,9 +56,10 @@ if __name__ == "__main__":
                                     # 'Entropy'
                                     ])
     # design, fields = get_origin()
-
+    output2 = output + np.random.rand(64,64,7)
     ii = 0
-    post = Post_2d(output[:,:,:],grid,
+    post = Post_2d(np.concatenate((output[None,:,:,:],output2[None,:,:,:]), axis=0),
+                   grid,
                    inputDict = {
                         "PressureStatic" : 0,
                         "TemperatureStatic" : 1,

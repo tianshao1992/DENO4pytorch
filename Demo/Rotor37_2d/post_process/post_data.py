@@ -18,10 +18,8 @@ class Post_2d(object):
         else:
             self.inputDict = inputDict
 
-        self.grid_check()
+        self.input_check()
         self.set_basic_const()
-        self.n_1d = self.data_2d.shape[0]
-        self.n_2d = self.data_2d.shape[1]
 
         self._PressureStatic= None
         self._TemperatureStatic = None
@@ -84,16 +82,26 @@ class Post_2d(object):
             # 如果不设置，就对全局进行计算
             shape_index = [np.arange(self.n_1d),np.arange(self.n_2d)]
 
-    def grid_check(self):
+    def input_check(self):
         gridshape = self.grid.shape
         datashape = self.data_2d.shape
 
         if len(gridshape) != 3 or gridshape[2] != 2:
             print("invalid grid input!")
-        if len(gridshape) != 3:
+        if len(gridshape) != 3 and len(gridshape):
             print("invalid data input!")
-        if gridshape[:2] != datashape[:2]:
+        if len(datashape) == 3:
+            self.data_2d = self.data_2d[None, :, :, :]
+            datashape = self.data_2d.shape
+            print("one sample input!")
+        if len(datashape) == 4:
+            self.num = datashape[0]
+            print(str(self.num) + " samples input!")
+        if gridshape[:2] != datashape[1:3]:
             print("dismatch data & grid input!")
+
+        self.n_1d = self.data_2d.shape[1]
+        self.n_2d = self.data_2d.shape[2]
 
     def span_density_average(self, data, shape_index=None, location="outlet"): #输入为2维ndarry
         if len(data.shape)<2:
@@ -123,14 +131,19 @@ class Post_2d(object):
                 return line.split("=")[0].strip()
         return None
 
+    def get_para_from_input(self, parameter):
+        if parameter in self.inputDict.keys():
+            rst = self.data_2d[..., self.inputDict[parameter]]
+        else:
+            eval("rst = self._" + parameter)
+        return rst
+
     #=================================================================================#
 #各类具体参数设置
 
     #===============================================================#
     #基本参数获取：1.静压；2.静温；3.密度；4.速度方向；5.速度大小
-    # ===============================================================#
-
-
+    # ==============================================================#
     def set_PressureStatic(self, x):
         self.PressureStatic = x
     def set_TemperatureStatic(self, x):
@@ -153,27 +166,30 @@ class Post_2d(object):
 
     def get_PressureStatic(self):
         if self._PressureStatic is None:
-            rst = self.data_2d[:,:,self.inputDict["PressureStatic"]]
+            rst = self.data_2d[..., self.inputDict["PressureStatic"]]
             self._PressureStatic = rst
             return rst
         else:
             return self._PressureStatic
     def get_TemperatureStatic(self):
         if self._TemperatureStatic is None:
-            rst = self.data_2d[:,:,self.inputDict["TemperatureStatic"]]
+            rst = self.data_2d[..., self.inputDict["TemperatureStatic"]]
             self._TemperatureStatic = rst
             return rst
         else:
             return self._TemperatureStatic
     def get_Density(self):
         if self._Density is None:
-            return self.data_2d[:,:,self.inputDict["Density"]]
+            if "Density" in self.inputDict.keys():
+                return self.data_2d[..., self.inputDict["Density"]]
+            else:
+                print("Density" + " is not exist")
         else:
             return self._Density
     def get_DensityFlow(self):
         if self._DensityFlow is None:
             if "DensityFlow" in self.inputDict.keys():
-                rst = self.data_2d[:, :, self.inputDict["DensityFlow"]]
+                rst = self.data_2d[..., self.inputDict["DensityFlow"]]
             else:
                 rst = self.Density * self.VelocityX
             self._DensityFlow = rst
@@ -182,21 +198,21 @@ class Post_2d(object):
             return self._DensityFlow
     def get_VelocityX(self):
         if self._VelocityX is None:
-            rst = self.data_2d[:,:,self.inputDict["VelocityX"]]
+            rst = self.data_2d[..., self.inputDict["VelocityX"]]
             self._VelocityX = rst
             return rst
         else:
             return self._VelocityX
     def get_VelocityY(self):
         if self._VelocityY is None:
-            rst = self.data_2d[:,:,self.inputDict["VelocityY"]]
+            rst = self.data_2d[..., self.inputDict["VelocityY"]]
             self._VelocityY = rst
             return rst
         else:
             return self._VelocityY
     def get_VelocityZ(self):
         if self._VelocityZ is None:
-            rst = np.zeros([self.n_1d,self.n_2d])
+            rst = np.zeros([self.num, self.n_1d, self.n_2d])
             self._VelocityZ = rst
             return rst
         else:
@@ -244,7 +260,7 @@ class Post_2d(object):
     def get_Uaxis(self):
         if self._Uaxis is None:
             rst = self.rotateSpeed * 2 * np.pi /60
-            rst = self.grid[:,:,1] * rst
+            rst = np.tile(self.grid[None, :, :, 1], [self.num, 1, 1]) * rst
             self._Uaxis = rst
             return rst
         else:
@@ -349,14 +365,14 @@ class Post_2d(object):
             return self._TemperatureTotalV
     def get_PressureRatioV(self):
         if self._PressureRatioV is None:
-            rst = self.PressureTotalV / np.tile(self.PressureTotalV[:, 0], [self.n_1d, 1])
+            rst = self.PressureTotalV / np.tile(self.PressureTotalV[..., :1], [1, 1, self.n_1d])
             self._PressureRatioV = rst
             return rst
         else:
             return self._PressureRatioV
     def get_TemperatureRatioV(self):
         if self._TemperatureRatioV is None:
-            rst = self.TemperatureTotalV / np.tile(self.TemperatureTotalV[:, 0], [self.n_1d, 1])
+            rst = self.TemperatureTotalV / np.tile(self.TemperatureTotalV[..., :1], [1, 1, self.n_1d])
             self._TemperatureRatioV = rst
             return rst
         else:
@@ -386,14 +402,14 @@ class Post_2d(object):
             return self._TemperatureTotalW
     def get_PressureRatioW(self):
         if self._PressureRatioW is None:
-            rst = self.PressureTotalW / np.tile(self.PressureTotalW[:, 0], [self.n_1d, 1])
+            rst = self.PressureTotalW / np.tile(self.PressureTotalW[...,  :1], [1, 1, self.n_1d])
             self._PressureRatioW = rst
             return rst
         else:
             return self._PressureRatioW
     def get_TemperatureRatioW(self):
         if self._TemperatureRatioW is None:
-            rst = self.TemperatureTotalW / np.tile(self.TemperatureTotalW[:, 0], [self.n_1d, 1])
+            rst = self.TemperatureTotalW / np.tile(self.TemperatureTotalW[...,  :1], [1, 1, self.n_1d])
             self._TemperatureRatioW = rst
             return rst
         else:
@@ -401,9 +417,9 @@ class Post_2d(object):
     def get_Efficiency(self):
         if self._Efficiency is None:
             num = int(np.round(self.n_2d / 2))
-            rst = np.abs(np.power(self.PressureRatioV[:, num:], (self.kappa - 1) / self.kappa) - 1) + 1e-5
-            rst = rst / (np.abs(self.TemperatureRatioV[:, num:] - 1) + 1e-5)
-            rst = np.concatenate((np.zeros([self.n_1d, num]), rst), axis=1)
+            rst = np.abs(np.power(self.PressureRatioV[..., num:], (self.kappa - 1) / self.kappa) - 1) + 1e-5
+            rst = rst / (np.abs(self.TemperatureRatioV[..., num:] - 1) + 1e-5)
+            rst = np.concatenate((np.zeros([self.num, self.n_1d, num]), rst), axis=2)
             self._Efficiency = rst
             return rst
         else:
@@ -419,7 +435,7 @@ class Post_2d(object):
     def get_PressureLoss(self):
         if self._PressureLoss is None:
             rst = self.PressureRatioV - 1
-            rst = rst / (1 - np.tile(self.PressureStatic[:, 0] / self.PressureTotalV[:, 0], [self.n_1d, 1]))
+            rst = rst / (1 - np.tile(self.PressureStatic[...,  :1] / self.PressureTotalV[...,  :1], [1, 1, self.n_1d]))
             self._PressureLoss = rst
             return rst
         else:
@@ -428,16 +444,16 @@ class Post_2d(object):
     def get_PressureLossR(self):
         if self._PressureLossR is None:
             rst = 1 - self.PressureRatioW
-            rst = rst / (1 - np.tile(self.PressureStatic[:, 0] / self.PressureTotalW[:, 0], [self.n_1d, 1]))
+            rst = rst / (1 - np.tile(self.PressureStatic[...,  :1] / self.PressureTotalW[...,  :1], [1, 1, self.n_1d]))
             self._PressureLossR = rst
             return rst
         else:
             return self._PressureLoss
     def get_DFactor(self):
         if self._DFactor is None:
-            rst = self.VelocityY - np.tile(self.VelocityY[:, 0], [self.n_1d, 1])  # delta V theta 周向速度差
-            rst = 0.5 * rst / np.tile(self.MagV[:, 0], [self.n_1d, 1]) / self.sigma
-            rst = rst + 1 - self.MagV / np.tile(self.MagV[:, 0], [self.n_1d, 1])
+            rst = self.VelocityY - np.tile(self.VelocityY[...,  :1], [1, 1, self.n_1d])  # delta V theta 周向速度差
+            rst = 0.5 * rst / np.tile(self.MagV[...,  :1], [1, 1, self.n_1d]) / self.sigma
+            rst = rst + 1 - self.MagV / np.tile(self.MagV[...,  :1], [1, 1, self.n_1d])
             self._DFactor = rst
             return rst
         else:
@@ -445,9 +461,9 @@ class Post_2d(object):
 
     def get_DFactorR(self):
         if self._DFactorR is None:
-            rst = self.WelocityY - np.tile(self.WelocityY[:, 0], [self.n_1d, 1])  # delta V theta 周向速度差
-            rst = 0.5 * rst / np.tile(self.MagW[:, 0], [self.n_1d, 1]) / self.sigma
-            rst = rst + 1 - self.MagW / np.tile(self.MagW[:, 0], [self.n_1d, 1])
+            rst = self.WelocityY - np.tile(self.WelocityY[...,  :1], [1, 1, self.n_1d])  # delta V theta 周向速度差
+            rst = 0.5 * rst / np.tile(self.MagW[...,  :1], [1, 1, self.n_1d]) / self.sigma
+            rst = rst + 1 - self.MagW / np.tile(self.MagW[...,  :1], [1, 1, self.n_1d])
             self._DFactorR = rst
             return rst
         else:

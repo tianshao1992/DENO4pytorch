@@ -135,6 +135,7 @@ data/
 */*/work/
 */*/work*/
 */*/data/
+*/*/data*/
 *.npz
 *.npy
 *.mat
