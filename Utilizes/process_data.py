@@ -16,7 +16,7 @@ import h5py
 
 import sklearn.metrics
 from scipy.ndimage import gaussian_filter
-from torch_geometric.data import Data
+# from torch_geometric.data import Data
 
 
 

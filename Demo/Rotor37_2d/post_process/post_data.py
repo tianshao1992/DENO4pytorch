@@ -3,7 +3,6 @@ import inspect
 import os
 
 class Post_2d(object):
-
     def __init__(self,data_2d,grid,inputDict=None): #默认输入格式为64*64*5
         self.grid = grid
         self.data_2d = data_2d
@@ -27,6 +26,7 @@ class Post_2d(object):
         self._PressureStatic= None
         self._TemperatureStatic = None
         self._Density = None
+        self._DensityFlow = None
 
         self._VelocityX = None
         self._VelocityY = None
@@ -69,7 +69,7 @@ class Post_2d(object):
                         kappa = 1.403,
                         Cp = 1004,
                         sigma = 1.6,
-                        rotateSpeed = -17188#代表稠度
+                        rotateSpeed = -17188 # rpm
                         ):
         self.kappa = kappa
         self.Cp = Cp
@@ -95,31 +95,32 @@ class Post_2d(object):
         if gridshape[:2] != datashape[:2]:
             print("dismatch data & grid input!")
 
-    def span_density_average(self,data,shape_index): #输入为2维ndarry
+    def span_density_average(self, data, shape_index=None, location="outlet"): #输入为2维ndarry
         if len(data.shape)<2:
             print("error input in function span_density_average.")
 
-        density_norm = self.Density[shape_index]\
-                       /np.tile(np.mean(self.Density[shape_index],axis=0),shape_index.shape[1])
+        if shape_index is None:
+            shape = slice(0, None)
+            if location=="outlet":
+                shape = slice(-1, None)
+        else:
+            shape = slice(shape_index[0], shape_index[1])
+
+        density_norm = self.rhoV[:,shape]\
+                       /np.tile(np.mean(self.rhoV[:,shape],axis=0),self.n_2d)
+
         return data * density_norm
 
     def span_space_average(self, data):
+        if len(data.shape)<2:
+            print("error input in function span_density_average.")
+
         return np.mean(data, axis=0)
 
     def get_variable_name(var):
-        """
-        获取变量的名称字符串。
-
-        Args:
-            var: 要获取名称的变量。
-
-        Returns:
-            变量的名称字符串。
-        """
         for line in inspect.getframeinfo(inspect.currentframe().f_back)[3]:
             if line.strip().startswith(var + " "):
                 return line.split("=")[0].strip()
-
         return None
 
     #=================================================================================#
@@ -136,6 +137,8 @@ class Post_2d(object):
         self.TemperatureStatic = x
     def set_Density(self, x):
         self.Density = x
+    def set_DensityFlow(self, x):
+        self._DensityFlow = x
     def set_VelocityX(self, x):
         self.VelocityX = x
     def set_VelocityY(self, x):
@@ -167,6 +170,16 @@ class Post_2d(object):
             return self.data_2d[:,:,self.inputDict["Density"]]
         else:
             return self._Density
+    def get_DensityFlow(self):
+        if self._DensityFlow is None:
+            if "DensityFlow" in self.inputDict.keys():
+                rst = self.data_2d[:, :, self.inputDict["DensityFlow"]]
+            else:
+                rst = self.Density * self.VelocityX
+            self._DensityFlow = rst
+            return rst
+        else:
+            return self._DensityFlow
     def get_VelocityX(self):
         if self._VelocityX is None:
             rst = self.data_2d[:,:,self.inputDict["VelocityX"]]
@@ -207,6 +220,7 @@ class Post_2d(object):
     PressureStatic = property(get_PressureStatic, set_PressureStatic)
     TemperatureStatic = property(get_TemperatureStatic, set_TemperatureStatic)
     Density = property(get_Density, set_Density)
+    DensityFlow = property(get_DensityFlow, set_DensityFlow)
     VelocityX = property(get_VelocityX, set_VelocityX)
     VelocityY = property(get_VelocityY, set_VelocityY)
     VelocityZ = property(get_VelocityZ, set_VelocityZ)

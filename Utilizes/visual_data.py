@@ -155,6 +155,7 @@ class MatplotlibVision(object):
         axs.scatter(true, pred, marker='.')
 
         axs.plot([min_value, max_value], [min_value, max_value], 'r-', linewidth=5.0)
+        # 在两个曲线之间填充颜色
         axs.fill_between([min_value, max_value], [0.95 * min_value, 0.95 * max_value],
                          [1.05 * min_value, 1.05 * max_value],
                          alpha=0.2, color='b')
@@ -176,7 +177,8 @@ class MatplotlibVision(object):
         # sbn.set_color_codes()
         # ax.bar(np.arange(len(error)), error*100, )
 
-        error = pd.DataFrame(error) * 100
+        error = pd.DataFrame(error) * 100 # 转换格式
+        # 绘制针对单变量的分布图
         sbn.distplot(error, bins=20, norm_hist=True, rug=True, fit=stats.norm, kde=False,
                      rug_kws={"color": "g"}, fit_kws={"color": "r", "lw": 3}, hist_kws={"color": "b"})
         # plt.xlim([-1, 1])

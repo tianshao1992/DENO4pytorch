@@ -308,4 +308,3 @@ if __name__ == "__main__":
                                       title="train_solution", xylabels=("efficiency", "span"))
                     fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
->>>>>>> origin/master

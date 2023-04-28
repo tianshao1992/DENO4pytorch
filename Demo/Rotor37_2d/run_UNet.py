@@ -24,9 +24,7 @@ import matplotlib.pyplot as plt
 import time
 from run_MLP import get_grid
 from run_MLP import get_grid, get_origin
-from post_data import Post_2d
-
-
+from post_process.post_data import Post_2d
 
 def feature_transform(x):
     """
@@ -159,7 +157,6 @@ if __name__ == "__main__":
     ################################################################
     # load data
     ################################################################
-
     input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     input = torch.tensor(input, dtype=torch.float)
     # output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
