@@ -106,6 +106,8 @@ class Post_2d(object):
     def span_density_average(self, data, shape_index=None, location="outlet"): #输入为2维ndarry
         if len(data.shape)<2:
             print("error input in function span_density_average.")
+        if len(data.shape)==2:
+            data = data[:, :, None]
 
         if shape_index is None:
             shape = slice(0, None)
@@ -113,11 +115,11 @@ class Post_2d(object):
                 shape = slice(-1, None)
         else:
             shape = slice(shape_index[0], shape_index[1])
+        density_aver = np.mean(self.DensityFlow[..., shape], axis=1)
+        density_norm = self.DensityFlow[..., shape]\
+                       /np.tile(density_aver[..., None], (1, self.n_2d, 1))
 
-        density_norm = self.rhoV[:,shape]\
-                       /np.tile(np.mean(self.rhoV[:,shape],axis=0),self.n_2d)
-
-        return data * density_norm
+        return np.mean(data * density_norm, axis=1)
 
     def span_space_average(self, data):
         if len(data.shape)<2:

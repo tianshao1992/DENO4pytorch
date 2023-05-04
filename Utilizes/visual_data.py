@@ -124,6 +124,23 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
+    def plot_value_std(self, fig, axs, x, y, label, std = None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1):
+        """
+        stdaxis 表示std所在的坐标维度 x-0, y-1
+        """
+        axs.plot(x, y, label=label)
+        std = std * rangeIndex
+        if stdaxis==0:
+            plt.fill_betweenx(y, x - std / 2, x + std / 2, alpha=0.3, label='Variance Range')
+        elif stdaxis==1:
+            plt.fill_between(x, y - std/2, y + std/2, alpha=0.3, label='Variance Range')
+        axs.grid(True)  # 添加网格
+        axs.legend(loc="best", prop=self.font)
+        axs.set_xlabel(xylabels[0], fontdict=self.font)
+        axs.set_ylabel(xylabels[1], fontdict=self.font)
+        axs.tick_params('both', labelsize=self.font["size"], )
+        axs.set_title(title, fontdict=self.font)
+
     def plot_scatter(self, fig, axs, true, pred, axis=0, title=None, xylabels=('x', 'y')):
         # sbn.set(color_codes=True)
 

@@ -85,18 +85,31 @@ def get_origin(quanlityList = ["Static Pressure", "Static Temperature", "Density
                                 'Relative Total Pressure', 'Relative Total Temperature',
                                 # 'Entropy'
                                ],
-                realpath = None
+                realpath = None,
+                existcheck = True
                 ):
     if realpath is None:
         sample_files = [os.path.join("data", "sampleRstZip_1500"),
                         os.path.join("data", "sampleRstZip_500"),
                         os.path.join("data", "sampleRstZip_970")
                         ]
+
     else:
         sample_files = [os.path.join(realpath, "sampleRstZip_1500"),
                         os.path.join(realpath, "sampleRstZip_500"),
                         os.path.join(realpath, "sampleRstZip_970")
                         ]
+    if existcheck:
+        sample_files_exists = []
+        for file in sample_files:
+            if os.path.exists(file + '.mat'):
+                sample_files_exists.append(file)
+            else:
+                print("The data file {} is not exist, CHECK PLEASE!".format(file))
+
+        sample_files = sample_files_exists
+
+
     design = []
     fields = []
     for ii, file in enumerate(sample_files):
