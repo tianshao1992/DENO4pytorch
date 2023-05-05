@@ -2,7 +2,7 @@ import torch
 import os
 import numpy as np
 
-from post_data import Post_2d
+from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
 

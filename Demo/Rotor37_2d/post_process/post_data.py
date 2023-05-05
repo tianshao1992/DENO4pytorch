@@ -104,28 +104,35 @@ class Post_2d(object):
         self.n_2d = self.data_2d.shape[2]
 
     def span_density_average(self, data, shape_index=None, location="outlet"): #输入为2维ndarry
+        # data check
         if len(data.shape)<2:
             print("error input in function span_density_average.")
         if len(data.shape)==2:
             data = data[:, :, None]
 
+        # shape check
         if shape_index is None:
             shape = slice(0, None)
             if location=="outlet":
                 shape = slice(-1, None)
         else:
             shape = slice(shape_index[0], shape_index[1])
-        density_aver = np.mean(self.DensityFlow[..., shape], axis=1)
-        density_norm = self.DensityFlow[..., shape]\
-                       /np.tile(density_aver[..., None], (1, self.n_2d, 1))
 
-        return np.mean(data * density_norm, axis=1)
+        if self.DensityFlow is not None:
+            density_aver = np.mean(self.DensityFlow[..., shape], axis=1)
+            density_norm = self.DensityFlow[..., shape]\
+                           /np.tile(density_aver[..., None], (1, self.n_2d, 1))
+
+            return np.mean(data * density_norm, axis=1)
+        else:
+            print("The parameter DensityFlow is not exist, CHECK PLEASE!")
+            return self.span_space_average(data)
 
     def span_space_average(self, data):
         if len(data.shape)<2:
             print("error input in function span_density_average.")
 
-        return np.mean(data, axis=0)
+        return np.mean(data, axis=1)
 
     def get_variable_name(var):
         for line in inspect.getframeinfo(inspect.currentframe().f_back)[3]:
@@ -193,14 +200,20 @@ class Post_2d(object):
             if "DensityFlow" in self.inputDict.keys():
                 rst = self.data_2d[..., self.inputDict["DensityFlow"]]
             else:
-                rst = self.Density * self.VelocityX
+                if self.VelocityX is not None:
+                    rst = self.Density * self.VelocityX
+                else:
+                    rst = None
             self._DensityFlow = rst
             return rst
         else:
             return self._DensityFlow
     def get_VelocityX(self):
         if self._VelocityX is None:
-            rst = self.data_2d[..., self.inputDict["VelocityX"]]
+            if "VelocityX" in self.inputDict.keys():
+                rst = self.data_2d[..., self.inputDict["VelocityX"]]
+            else:
+                rst = None
             self._VelocityX = rst
             return rst
         else:
@@ -446,11 +459,11 @@ class Post_2d(object):
     def get_PressureLossR(self):
         if self._PressureLossR is None:
             rst = 1 - self.PressureRatioW
-            rst = rst / (1 - np.tile(self.PressureStatic[...,  :1] / self.PressureTotalW[...,  :1], [1, 1, self.n_1d]))
+            rst = rst / (1 - np.tile(self.PressureStatic[..., :1] / self.PressureTotalW[..., :1], [1, 1, self.n_1d]))
             self._PressureLossR = rst
             return rst
         else:
-            return self._PressureLoss
+            return self._PressureLossR
     def get_DFactor(self):
         if self._DFactor is None:
             rst = self.VelocityY - np.tile(self.VelocityY[...,  :1], [1, 1, self.n_1d])  # delta V theta 周向速度差

@@ -28,7 +28,7 @@ import time
 
 import sys
 from run_MLP import get_grid, get_origin
-from post_data import Post_2d
+from post_process.post_data import Post_2d
 
 
 
