@@ -68,7 +68,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         # weighted_mat = np.tile(weighted_mat[None,:],(output.shape[0],1))
 
         optimizer.zero_grad()
-        loss.backward()
+        loss.backward() # 自动微分
         optimizer.step()
 
         train_loss += loss.item()

@@ -7,9 +7,8 @@ from Utilizes.visual_data import MatplotlibVision
 from Utilizes.process_data import DataNormer, MatLoader
 import matplotlib.pyplot as plt
 from post_data import Post_2d
-import sys
-# sys.path.append("..")
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
+
 
 def load_Npz(npzFile, quanlityList=None):
     loaded_dict = np.load(npzFile)
@@ -42,7 +41,7 @@ def plot_span_curve(post, parameterList, save_path = None, fig_id = 0, label = N
         plt.close(fig)
 
 
-def plot_span_std(post, parameterList, save_path = None, fig_id = 0, label = None):
+def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None):
     # 绘制一组样本的mean-std分布
     if not isinstance(parameterList,list):
         parameterList = [parameterList]
@@ -54,10 +53,9 @@ def plot_span_std(post, parameterList, save_path = None, fig_id = 0, label = Non
 
         normalizer = DataNormer(value_span, method='mean-std', axis=(0, )) #这里对网格上的具体数据进行平均
 
-        for ii in range(post.num):
-            Visual.plot_value_std(fig, axs, normalizer.mean[:, -1], np.linspace(0,1,post.n_1d), label=label,
-                              std=normalizer.std[:,-1],rangeIndex=10,stdaxis=0,
-                              title=parameter_Name, xylabels=(parameter_Name, "span"))
+        Visual.plot_value_std(fig, axs, normalizer.mean[:, -1], np.linspace(0,1,post.n_1d), label=label,
+                          std=normalizer.std[:,-1], rangeIndex=1e2, stdaxis=0,
+                          title=parameter_Name, xylabels=(parameter_Name, "span"))
 
         if save_path is None:
             jpg_path = os.path.join(work_path, parameter_Name + "_std_" + str(fig_id) + '.jpg')

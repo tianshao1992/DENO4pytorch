@@ -384,7 +384,7 @@ class Post_2d(object):
     def get_PressureTotalW(self):
         if self._PressureTotalW is None:
             if "PressureTotalW" in self.inputDict.keys():
-                rst = self.data_2d[:, :, self.inputDict["PressureTotalW"]]
+                rst = self.data_2d[..., self.inputDict["PressureTotalW"]]
             else:
                 rst = self.PressureStatic * \
                       np.power(self.TemperatureTotalW / self.TemperatureStatic, self.kappa / (self.kappa - 1))
@@ -395,7 +395,7 @@ class Post_2d(object):
     def get_TemperatureTotalW(self):
         if self._TemperatureTotalW is None:
             if "TemperatureTotalW" in self.inputDict.keys():
-                rst = self.data_2d[:, :, self.inputDict["TemperatureTotalW"]]
+                rst = self.data_2d[..., self.inputDict["TemperatureTotalW"]]
             else:
                 rst = self.TemperatureStatic + 0.5 * self.MagW * self.MagW / self.Cp
             self._TemperatureTotalW = rst
@@ -411,7 +411,7 @@ class Post_2d(object):
             return self._PressureRatioW
     def get_TemperatureRatioW(self):
         if self._TemperatureRatioW is None:
-            rst = self.TemperatureTotalW / np.tile(self.TemperatureTotalW[...,  :1], [1, 1, self.n_1d])
+            rst = self.TemperatureTotalW / np.tile(self.TemperatureTotalW[..., :1], [1, 1, self.n_1d])
             self._TemperatureRatioW = rst
             return rst
         else:
