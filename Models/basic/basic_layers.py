@@ -22,7 +22,7 @@ from Models.configs import *
 
 
 class FcnSingle(nn.Module):
-    def __init__(self, planes: list, activation="gelu"):
+    def __init__(self, planes: list, activation="gelu", last_activation=False):
         # =============================================================================
         #     Inspired by M. Raissi a, P. Perdikaris b,∗, G.E. Karniadakis.
         #     "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems
@@ -38,11 +38,9 @@ class FcnSingle(nn.Module):
             self.layers.append(nn.Linear(self.planes[i], self.planes[i + 1]))
             self.layers.append(self.active)
         self.layers.append(nn.Linear(self.planes[-2], self.planes[-1]))
-<<<<<<< HEAD
-        self.layers = nn.Sequential(*self.layers)
-=======
-        self.layers = nn.Sequential(*self.layers) #*的作用是解包
->>>>>>> origin/master
+        if last_activation:
+            self.layers.append(self.active)
+        self.layers = nn.Sequential(*self.layers)  # *的作用是解包
         # self.reset_parameters()
 
     def reset_parameters(self):
