@@ -17,7 +17,6 @@ from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer
 from DeepONets import DeepONetMulti
 from Utilizes.visual_data import MatplotlibVision, TextLogger
-from post_data import Post_2d
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import time
@@ -159,16 +158,18 @@ if __name__ == "__main__":
     gird_show = train_grid.numpy()
 
     f_normalizer = DataNormer(train_f.numpy(), method='mean-std')
+    f_normalizer.save(os.path.join(work_path, 'x_norm.pkl'))
     train_f = f_normalizer.norm(train_f)
     valid_f = f_normalizer.norm(valid_f)
 
     u_normalizer = DataNormer(train_u.numpy(), method='mean-std')
+    u_normalizer.save(os.path.join(work_path, 'y_norm.pkl'))
     train_u = u_normalizer.norm(train_u)
     valid_u = u_normalizer.norm(valid_u)
 
-    grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std')#这里的axis不一样了
-    train_grid = grid_normalizer.norm(train_grid)
-    valid_grid = grid_normalizer.norm(valid_grid)
+    # grid_normalizer = DataNormer(train_grid.numpy(), method='mean-std')#这里的axis不一样了
+    # train_grid = grid_normalizer.norm(train_grid)
+    # valid_grid = grid_normalizer.norm(valid_grid)
 
     # grid_trans = grid_trans.reshape([1, -1, 2])
     train_grid = train_grid.reshape([train_u.shape[0], -1, 2])
@@ -251,42 +252,9 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-
             for fig_id in range(5):
                 fig, axs = plt.subplots(out_dim, 3, figsize=(18, 20),num=3)
                 Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
-                plt.close(fig)
-
-            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
-            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
-            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
-            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
-
-            train_true = u_normalizer.back(train_true)
-            train_pred = u_normalizer.back(train_pred)
-            valid_true = u_normalizer.back(valid_true)
-            valid_pred = u_normalizer.back(valid_pred)
-
-            for fig_id in range(5):
-                post_true = Post_2d(train_true[fig_id], grid)
-                post_pred = Post_2d(train_pred[fig_id], grid)
-                # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
-                # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
-                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
-                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
-                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
-                                  title="train_solution", xylabels=("efficiency", "span"))
-                fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
-                plt.close(fig)
-
-            for fig_id in range(5):
-                post_true = Post_2d(valid_true[fig_id], grid)
-                post_pred = Post_2d(valid_pred[fig_id], grid)
-                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
-                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
-                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
-                                  title="train_solution", xylabels=("efficiency", "span"))
-                fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 

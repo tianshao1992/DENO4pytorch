@@ -6,20 +6,8 @@ import numpy as np
 from post_data import Post_2d
 from run_MLP import get_grid, get_origin
 
-from load_model import loaddata, rebuild_model
+from load_model import loaddata, rebuild_model, get_true_pred
 import yaml
-
-def get_true_pred(loader, Net_model, Device):
-    if 'MLP' in name:
-        grid, true, pred = inference(loader, Net_model, Device)
-    else:
-        coord, grid, true, pred = inference(loader, Net_model, Device)
-    true = true.reshape([true.shape[0], 64, 64, out_dim])
-    pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
-
-    return true, pred
-
-
 
 if __name__ == "__main__":
     # name = 'MLP'
@@ -50,10 +38,10 @@ if __name__ == "__main__":
             Net_model, inference = rebuild_model(work_path, Device)
             if Net_model is not None:
                 # load data
-                train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(nameReal,1250,150)
+                train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(nameReal, 1250, 150)
 
-                train_true, train_pred = get_true_pred(train_loader, Net_model, Device)
-                valid_true, valid_pred = get_true_pred(valid_loader, Net_model, Device)
+                train_true, train_pred = get_true_pred(train_loader, Net_model, inference, Device)
+                valid_true, valid_pred = get_true_pred(valid_loader, Net_model, inference, Device)
 
                 np.save(os.path.join(work_path, "true_train.npy"), train_true)
                 np.save(os.path.join(work_path, "true_valid.npy"), valid_true)

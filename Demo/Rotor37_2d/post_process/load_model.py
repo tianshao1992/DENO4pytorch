@@ -5,6 +5,7 @@ import numpy as np
 from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
+import yaml
 
 
 
@@ -109,6 +110,17 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
     else:
         print("The pth file is not exist, CHECK PLEASE!")
         return None, None
+
+def get_true_pred(loader, Net_model, inference, Device,
+                  name='MLP', out_dim=5):
+    if name in ('MLP'):
+        grid, true, pred = inference(loader, Net_model, Device)
+    else:
+        coord, grid, true, pred = inference(loader, Net_model, Device)
+    true = true.reshape([true.shape[0], 64, 64, out_dim])
+    pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
+
+    return true, pred
 
 if __name__ == "__main__":
     #建立模型并读入参数
