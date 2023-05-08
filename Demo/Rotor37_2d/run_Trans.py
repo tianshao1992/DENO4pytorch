@@ -26,6 +26,7 @@ import sys
 import yaml
 from run_MLP import get_grid, get_origin
 from post_process.post_data import Post_2d
+
 def feature_transform(x):
     """
     Args:
@@ -271,3 +272,4 @@ if __name__ == "__main__":
                     Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
                     fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
+
