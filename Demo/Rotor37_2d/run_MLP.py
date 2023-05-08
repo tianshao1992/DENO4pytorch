@@ -20,7 +20,16 @@ from utilizes_rotor37 import get_grid, get_origin
 from post_process.post_data import Post_2d
 
 class MLP(nn.Module):
-    def __init__(self, layers, is_BatchNorm=True):
+    def __init__(self, layers=None, is_BatchNorm=True,
+                 in_dim=None,
+                 out_dim=None,
+                 n_hidden=None,
+                 num_layers=None):
+        if layers is None:
+            layers = [in_dim]
+            for ii in range(num_layers-2):
+                layers.append(n_hidden)
+            layers.append(out_dim)
         super(MLP, self).__init__()
         self.depth = len(layers)
         self.activation = nn.GELU
@@ -187,7 +196,7 @@ if __name__ == "__main__":
 
     # 建立网络
     layer_mat = [in_dim, 256, 256, 256, 256, 256, 256, 256, 256, out_dim*64*64]
-    Net_model =  MLP(layer_mat,is_BatchNorm=False)
+    Net_model =  MLP(layer_mat=layer_mat, is_BatchNorm=False)
     Net_model = Net_model.to(Device)
     print(name)
     # summary(Net_model, input_size=(batch_size, train_x.shape[1]), device=Device)

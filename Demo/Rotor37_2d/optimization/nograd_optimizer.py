@@ -47,10 +47,16 @@ if __name__ == "__main__":
     para = ng.p.Array(shape=(1, 28), lower=0, upper=1)
 
     #选择并设置优化器
-    optimizer = ng.optimizers.NGOpt(parametrization=para, budget=50)
+    optimizer = ng.optimizers.NGOpt(parametrization=para, budget=200)
 
     #获得优化结果
     recommendation = optimizer.minimize(targetFunc)
-
-    # show the recommended keyword arguments of the function
     print(recommendation.value)
+
+    # for i in range(10):
+    #     candidate = optimizer.ask()
+    #     value = targetFunc(candidate.value)
+    #     optimizer.tell(candidate, value)
+    #     optimizer.provide_recommendation()
+    #     print(optimizer.current_bests["minimum"])
+    #     # optimizer.watch(watch = "x", note = "iteration " + str(i))

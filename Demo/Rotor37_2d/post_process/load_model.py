@@ -5,10 +5,7 @@ import numpy as np
 from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
-
-
-
-
+import yaml
 
 def loaddata(name,ntrain,nvalid):
     batch_size = 128
@@ -109,6 +106,50 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
     else:
         print("The pth file is not exist, CHECK PLEASE!")
         return None, None
+def import_model_by_name(name):
+    model_func = None
+    inference = None
+    train = None
+    valid = None
+
+    if 'MLP' in name:
+        from run_MLP import MLP
+        from run_MLP import inference, train, valid
+        model_func = MLP
+    elif 'deepONet' in name:
+        from don.DeepONets import DeepONetMulti
+        from run_deepONet import inference, train, valid
+        model_func = DeepONetMulti
+    elif 'FNO' in name:
+        from fno.FNOs import FNO2d
+        from run_FNO import inference, train, valid
+        model_func = FNO2d
+    elif 'UNet' in name:
+        from cnn.ConvNets import UNet2d
+        from run_UNet import inference, train, valid
+        model_func = UNet2d
+    elif 'Transformer' in name:
+        from transformer.Transformers import FourierTransformer2D
+        from run_Trans import inference, train, valid
+        model_func = FourierTransformer2D
+
+    return model_func, inference, train, valid
+
+def build_model_yml(yml_path, device, name=None):
+    """
+    build a new model based on yml file
+    """
+    # load the yml file
+    with open(yml_path) as f:
+        config = yaml.full_load(f)
+        config = config[name + 'config'] #字典里面有字典
+
+    # build the model
+    model_func, inference, train, valid = import_model_by_name(name)
+    net_model = model_func(**config).to(device)
+
+    return net_model, inference, train, valid
+
 
 if __name__ == "__main__":
     #建立模型并读入参数
