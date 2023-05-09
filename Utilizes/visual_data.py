@@ -222,9 +222,11 @@ class MatplotlibVision(object):
             p = (np.linspace(0, 1, n_vin + 2) - 0.5) * bag_width
             positions = np.hstack([p[1:-1] + 0.5 + i for i in range(n_bag)]) * n_vin
             x_pos = np.arange(n_bag) * n_vin + n_vin / 2
-        parts = ax.boxplot(data.reshape(data.shape[0], -1), widths=0.5 * bag_width, positions=positions, vert=True,
-                           patch_artist=True, )
-        # parts = ax.boxplot(data.reshape(data.shape[0], -1).T, widths=0.5 * bag_width, positions=positions, vert=True,
+        # parts = ax.boxplot(data.reshape(data.shape[0], -1), widths=0.5 * bag_width, positions=positions, vert=True,
+        #                    patch_artist=True, )
+        parts = ax.boxplot(data.reshape(data.shape[0], -1).T,
+                           widths=0.5 * bag_width, positions=positions,
+                           vert=True, patch_artist=True, )
 
         for i in range(n_vin):
             for j in range(n_bag):

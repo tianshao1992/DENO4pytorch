@@ -3,11 +3,13 @@ from torch.utils.data import DataLoader
 # print(torch.__version__)
 import numpy as np
 import os
+import torch
 from Utilizes.visual_data import MatplotlibVision
 from Utilizes.process_data import DataNormer, MatLoader
 import matplotlib.pyplot as plt
 from post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
+from post_process.load_model import loaddata, rebuild_model, get_true_pred
 
 
 def load_Npz(npzFile, quanlityList=None):
@@ -63,7 +65,8 @@ def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, wor
         plt.close(fig)
 
 
-def plot_error(post_true, post_pred, parameterList, save_path = None, fig_id = 0, label = None):
+def plot_error(post_true, post_pred, parameterList,
+               save_path = None, fig_id = 0, label=None, work_path=None):
     """
     针对某个对象0维性能参数，绘制预测误差表示图
     """
@@ -92,59 +95,101 @@ def plot_saliency_map():
     对于28个变量的贡献度进行分析
     """
 
-
-if __name__ == "__main__":
-
+def a_case():
     work_path = os.path.join("..", "data_collect")
     isCreated = os.path.exists(work_path)
     if not isCreated: os.mkdir(work_path)
 
     grid = get_grid(real_path=os.path.join("..", "data"))
-    # output = load_Npz(os.path.join("..", "data", "sampleRstZip.npz"),
-    #                   quanlityList=["Static Pressure", "Static Temperature", "Density",
-    #                                 'Relative Total Pressure', 'Relative Total Temperature',
-    #                                 "Vxyz_X", "Vxyz_Y",
-    #                                 # "Vxyz_Z",
-    #                                 # 'Entropy'
-    #                                 ])
-
-
     design, field = get_origin(realpath=os.path.join("..", "data"),
-                             quanlityList=["Static Pressure", "Static Temperature", "Density",
-                                           'Relative Total Pressure', 'Relative Total Temperature',
-                                           "Vxyz_X", "Vxyz_Y",
-                                           ])
+                               quanlityList=["Static Pressure", "Static Temperature", "Density",
+                                             'Relative Total Pressure', 'Relative Total Temperature',
+                                             "Vxyz_X", "Vxyz_Y",
+                                             ])
     true = field
-
-    # design, fields = get_origin()
-    pred = true + np.random.rand(*true.shape)*0.5 - 1
-    input_para =  {
-                        "PressureStatic" : 0,
-                        "TemperatureStatic" : 1,
-                        "Density" : 2,
-                        "PressureTotalW" : 3,
-                        "TemperatureTotalW" : 4,
-                        "VelocityX" : 5,
-                        "VelocityY" : 6,
-                                }
+    pred = true + np.random.rand(*true.shape) * 0.5 - 1
+    input_para = {
+        "PressureStatic": 0,
+        "TemperatureStatic": 1,
+        "Density": 2,
+        "PressureTotalW": 3,
+        "TemperatureTotalW": 4,
+        "VelocityX": 5,
+        "VelocityY": 6,
+    }
     ii = 0
-    # post_2 = Post_2d(np.concatenate((true[ii,:,:,:],pred[ii,:,:,:]), axis=0),
-    #                grid,
-    #                inputDict=input_para,
-    #                )
-    post_true = Post_2d(true,grid,
-                   inputDict=input_para,
-                   )
-    post_pred = Post_2d(pred,grid,
-                   inputDict=input_para,
-                   )
+    post_true = Post_2d(true, grid,
+                        inputDict=input_para,
+                        )
+    post_pred = Post_2d(pred, grid,
+                        inputDict=input_para,
+                        )
 
     fig_id = 0
-
     parameterList = ["Efficiency", "EntropyStatic"]
-    # plot_span_std(post_2, parameterList, save_path=None, fig_id=0, label=None)
-    # eff = post_2.span_density_average(post_2.Efficiency[:, :, -1])
     plot_error(post_true, post_pred, parameterList, save_path=None, fig_id=0, label=None)
+
+
+
+if __name__ == "__main__":
+    work_path = os.path.join("..", "data_collect")
+    isCreated = os.path.exists(work_path)
+    if not isCreated: os.mkdir(work_path)
+
+    name = 'MLP'
+    input_dim = 28
+    output_dim = 5
+    work_load_path = os.path.join("..", "work")
+    work_path = os.path.join(work_load_path, name)
+
+    if torch.cuda.is_available():
+        Device = torch.device('cuda')
+    else:
+        Device = torch.device('cpu')
+
+    x_normlizer = DataNormer([1, 1], method="mean-std", axis=0)
+    norm_save_x = os.path.join("work_path", "x_norm.pkl")
+    x_normlizer.load(norm_save_x)
+    y_normlizer = DataNormer([1, 1], method="mean-std", axis=0)
+    norm_save_y = os.path.join("work_path", "y_norm.pkl")
+    y_normlizer.load(norm_save_y)
+
+    Net_model, inference = rebuild_model(work_path, Device, name=name)
+    train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, 2700, 250)
+
+    # train_true, train_pred = get_true_pred(train_loader, Net_model, inference, Device)
+    # valid_true, valid_pred = get_true_pred(valid_loader, Net_model, inference, Device, name=name)
+    # valid_true = y_normalizer.back(valid_true)
+    # valid_pred = y_normalizer.back(valid_pred)
+
+    train_true, train_pred = get_true_pred(train_loader, Net_model, inference, Device, name=name)
+    train_true = y_normalizer.back(train_true)
+    train_pred = y_normalizer.back(train_pred)
+
+
+    true = train_true
+    pred = train_pred
+    input_para = {
+        "PressureStatic": 0,
+        "TemperatureStatic": 1,
+        "DensityFlow": 2,
+        "PressureTotalW": 3,
+        "TemperatureTotalW": 4,
+    }
+    ii = 0
+    grid = get_grid(real_path=os.path.join("..", "data"))
+    post_true = Post_2d(true, grid,
+                        inputDict=input_para,
+                        )
+    post_pred = Post_2d(pred, grid,
+                        inputDict=input_para,
+                        )
+
+    fig_id = 0
+    parameterList = ["PressureLossR", "EntropyStatic"]
+    plot_error(post_true, post_pred, parameterList, save_path=None, fig_id=0, label=None, work_path=work_path)
+
+
 
 
 

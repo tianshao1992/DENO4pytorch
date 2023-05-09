@@ -1,4 +1,4 @@
-Trans_config:
+Rotor37_2d:
   node_feats: 28
   pos_dim: 2
   n_targets: 5
@@ -34,30 +34,3 @@ Trans_config:
   upsample_mode: interp
   downsample_mode: interp
   boundary_condition: dirichlet
-
-MLP_config:
-  in_dim: 28
-  out_dim: 5*64*64
-  is_BatchNorm: False
-  n_hidden: 256
-  layer_num: 8
-
-FNO_config:
-  in_dim: 28
-  out_dim: 5
-  modes: 12
-  width: 64
-  depth: 4
-  steps: 1
-  padding: 8
-  activation: 'gelu'
-
-Optimizer_config:
-  lr: 0.001
-  betas: (0.7 0.9)
-  weight_decay: 1e-4
-
-Scheduler_config:
-  step_size: 800
-  gamma: 0.1
-

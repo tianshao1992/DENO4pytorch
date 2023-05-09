@@ -80,13 +80,14 @@ def get_origin_6field(realpath=None):
 
     return design, fields
 
-def get_origin(quanlityList = ["Static Pressure", "Static Temperature", "Density",
+def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFlow",
                                 # "Vxyz_X", "Vxyz_Y", "Vxyz_Z",
                                 'Relative Total Pressure', 'Relative Total Temperature',
                                 # 'Entropy'
                                ],
-                realpath = None,
-                existcheck = True
+                realpath=None,
+                existcheck=True,
+                shuffled=False,
                 ):
     if realpath is None:
         sample_files = [os.path.join("data", "sampleRstZip_1500"),
@@ -115,9 +116,9 @@ def get_origin(quanlityList = ["Static Pressure", "Static Temperature", "Density
     for ii, file in enumerate(sample_files):
         reader = MatLoader(file)
         design.append(reader.read_field('design'))
-        output = np.zeros([design[ii].shape[0],64,64,len(quanlityList)])
+        output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
         for jj, quanlity in enumerate(quanlityList):
-            if quanlity=="rhoV":
+            if quanlity=="DensityFlow": #设置一个需要计算获得的数据
                 output[:, :, :, jj] = (reader.read_field("Density")*reader.read_field("Vxyz_X")).clone()
             else:
                 output[:, :, :, jj] = reader.read_field(quanlity).clone()
@@ -125,5 +126,11 @@ def get_origin(quanlityList = ["Static Pressure", "Static Temperature", "Density
 
     design = np.concatenate(design, axis=0)
     fields = np.concatenate(fields, axis=0)
+
+    if shuffled:
+        np.random.seed(8905)
+        idx = np.random.permutation(design.shape[0])
+        design = design[idx]
+        fields = fields[idx]
 
     return design, fields

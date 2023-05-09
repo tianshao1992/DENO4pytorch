@@ -7,9 +7,10 @@ from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
 import yaml
 
-def loaddata(name,ntrain,nvalid):
+
+def loaddata(name, ntrain, nvalid, shuffled=False):
     batch_size = 128
-    design, fields = get_origin(realpath=os.path.join("..", "data"))  # 获取原始数据
+    design, fields = get_origin(realpath=os.path.join("..", "data"), shuffled=shuffled)  # 获取原始数据
     if name in ("FNO", "UNet", "Transformer"):
         input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     else:
@@ -38,7 +39,7 @@ def loaddata(name,ntrain,nvalid):
     valid_y = valid_y.reshape([valid_x.shape[0], -1])
 
     if name in ("deepONet"):
-        grid = get_grid()
+        grid = get_grid(real_path=os.path.join("..", "data"))
         grid_trans = torch.tensor(grid[np.newaxis, :, :, :], dtype=torch.float)
         train_grid = torch.tile(grid_trans, [train_x.shape[0], 1, 1, 1])  # 所有样本的坐标是一致的。
         valid_grid = torch.tile(grid_trans, [valid_x.shape[0], 1, 1, 1])
@@ -77,7 +78,7 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
         from don.DeepONets import DeepONetMulti
         from run_deepONet import inference
         Net_model = DeepONetMulti(input_dim=2, operator_dims=[28, ], output_dim=5,
-                                  planes_branch=[128] * 5, planes_trunk=[128] * 5).to(Device)
+                                  planes_branch=[64] * 3, planes_trunk=[64] * 3).to(Device)
     elif 'FNO' in name:
         from fno.FNOs import FNO2d
         from run_FNO import inference
@@ -89,7 +90,7 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
         Net_model = UNet2d(in_sizes=[64, 64, 28], out_sizes=[64, 64, 5], width=64,
                            depth=4, steps=1, activation='gelu', dropout=0).to(Device)
     elif 'Transformer' in name:
-        from transformer.Transformers import SimpleTransformer, FourierTransformer2D
+        from transformer.Transformers import FourierTransformer2D
         from run_Trans import inference
         with open(os.path.join('transformer_config.yml')) as f:
             config = yaml.full_load(f)
@@ -142,7 +143,7 @@ def build_model_yml(yml_path, device, name=None):
     # load the yml file
     with open(yml_path) as f:
         config = yaml.full_load(f)
-        config = config[name + 'config'] #字典里面有字典
+        config = config[name + '_config'] #字典里面有字典
 
     # build the model
     model_func, inference, train, valid = import_model_by_name(name)
@@ -150,6 +151,17 @@ def build_model_yml(yml_path, device, name=None):
 
     return net_model, inference, train, valid
 
+
+def get_true_pred(loader, Net_model, inference, Device,
+                  name=None, out_dim=5):
+    if name in ('MLP'):
+        grid, true, pred = inference(loader, Net_model, Device)
+    else:
+        coord, grid, true, pred = inference(loader, Net_model, Device)
+    true = true.reshape([true.shape[0], 64, 64, out_dim])
+    pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
+
+    return true, pred
 
 if __name__ == "__main__":
     #建立模型并读入参数

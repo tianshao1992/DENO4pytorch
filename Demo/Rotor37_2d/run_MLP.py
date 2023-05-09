@@ -68,14 +68,6 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
 
         loss = lossfunc(pred, output)
 
-        # grid_size = 64
-        # weighted_lines = 3
-        # weighted_cof = 1.5
-        # temp1 = np.ones([weighted_lines, grid_size])*weighted_cof
-        # temp2 = np.ones([grid_size-weighted_lines*2, grid_size])
-        # weighted_mat = np.concatenate((temp1,temp2,temp1),axis=0).reshape(output[0].shape)
-        # weighted_mat = np.tile(weighted_mat[None,:],(output.shape[0],1))
-
         optimizer.zero_grad()
         loss.backward() # 自动微分
         optimizer.step()
@@ -156,13 +148,13 @@ if __name__ == "__main__":
 # load data
 ################################################################
 
-    design, fields = get_origin() #获取原始数据
-
+    design, fields = get_origin(quanlityList=["Static Pressure", "Static Temperature",
+                                             "DensityFlow",
+                                             'Relative Total Pressure', 'Relative Total Temperature'
+                                            ]) #获取原始数据
     input = design
     input = torch.tensor(input, dtype=torch.float)
-    # output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
     output = fields
-    # output = output.reshape([output.shape[0],-1])
     output = torch.tensor(output, dtype=torch.float)
     print(input.shape, output.shape)
 
@@ -172,12 +164,12 @@ if __name__ == "__main__":
     valid_y = output[-nvalid:, :]
 
     x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
-    x_normalizer.load(os.path.join(work_path,'x_norm.pkl'))
+    x_normalizer.save(os.path.join(work_path, 'x_norm.pkl')) # 将normalizer保存下来
     train_x = x_normalizer.norm(train_x)
     valid_x = x_normalizer.norm(valid_x)
 
     y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
-    y_normalizer.load(os.path.join(work_path,'y_norm.pkl'))
+    y_normalizer.save(os.path.join(work_path, 'y_norm.pkl'))
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
@@ -209,7 +201,7 @@ if __name__ == "__main__":
     # 下降策略
     Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     # 可视化
-    Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('p', 't', 'rho', 'alf', 'v'))
+    Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
 
     star_time = time.time()
     log_loss = [[], []]
@@ -270,34 +262,3 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
-            train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
-            train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
-            valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
-            valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
-
-            train_true = y_normalizer.back(train_true)
-            train_pred = y_normalizer.back(train_pred)
-            valid_true = y_normalizer.back(valid_true)
-            valid_pred = y_normalizer.back(valid_pred)
-
-            for fig_id in range(5):
-                post_true = Post_2d(train_true[fig_id], grid)
-                post_pred = Post_2d(train_pred[fig_id], grid)
-                # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
-                # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
-                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
-                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
-                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
-                                  title="train_solution", xylabels=("efficiency", "span"))
-                fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
-                plt.close(fig)
-
-            for fig_id in range(5):
-                post_true = Post_2d(valid_true[fig_id], grid)
-                post_pred = Post_2d(valid_pred[fig_id], grid)
-                fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
-                Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
-                Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
-                                  title="train_solution", xylabels=("efficiency", "span"))
-                fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
-                plt.close(fig)
