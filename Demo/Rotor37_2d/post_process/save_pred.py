@@ -4,7 +4,7 @@ import torch
 import os
 import numpy as np
 from post_data import Post_2d
-from run_MLP import get_grid, get_origin
+from run_MLP import get_grid, get_origin, valid
 
 from load_model import loaddata, rebuild_model, get_true_pred
 import yaml
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     ]
 
     for filename in filenameList:
-        work_load_path = os.path.join(r"D:\WQN\CODE\DENO4pytorch-main\Demo\Rotor37_2d/", filename)
+        work_load_path = os.path.join("..", filename)
         workList = os.listdir(work_load_path)
         out_dim = 5
         for name in ['MLP']:#workList:#['MLP','deepONet','FNO','UNet','Transformer']:
@@ -44,6 +44,8 @@ if __name__ == "__main__":
                 # load data
                 train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(nameReal, 1250, 150)
 
+                loss = valid(valid_loader, Net_model, Device, torch.nn.MSELoss())
+                print(loss)
                 train_true, train_pred = get_true_pred(train_loader, Net_model, inference, Device, name=nameReal)
                 valid_true, valid_pred = get_true_pred(valid_loader, Net_model, inference, Device, name=nameReal)
 

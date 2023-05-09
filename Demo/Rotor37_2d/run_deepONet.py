@@ -15,7 +15,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import DataNormer
-from DeepONets import DeepONetMulti
+from don.DeepONets import DeepONetMulti
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri

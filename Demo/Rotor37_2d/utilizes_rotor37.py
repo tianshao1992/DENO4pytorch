@@ -1,5 +1,7 @@
 import numpy as np
+import yaml
 from Utilizes.process_data import DataNormer, MatLoader
+from post_process.post_data import Post_2d
 import os
 
 def get_grid(real_path = None):
@@ -88,6 +90,7 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
                 realpath=None,
                 existcheck=True,
                 shuffled=False,
+                getridbad=True
                 ):
     if realpath is None:
         sample_files = [os.path.join("data", "sampleRstZip_1500"),
@@ -127,10 +130,65 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
     design = np.concatenate(design, axis=0)
     fields = np.concatenate(fields, axis=0)
 
+    if getridbad:
+        if realpath is None:
+            file_path = os.path.join("data", "sus_bad_data.yml")
+        else:
+            file_path = os.path.join(realpath, "sus_bad_data.yml")
+        with open(file_path, 'r') as f:
+            sus_bad_dict = yaml.load(f, Loader=yaml.FullLoader)
+        sus_bad_idx = []
+        for key in sus_bad_dict.keys():
+            sus_bad_idx.extend(sus_bad_dict[key])
+        sus_bad_idx = np.array(sus_bad_idx)
+        sus_bad_idx = np.unique(sus_bad_idx)
+
+        design = np.delete(design, sus_bad_idx, axis=0)
+        fields = np.delete(fields, sus_bad_idx, axis=0)
+
     if shuffled:
-        np.random.seed(8905)
+        # np.random.seed(8905)
         idx = np.random.permutation(design.shape[0])
+        print(idx[:10])
         design = design[idx]
         fields = fields[idx]
 
     return design, fields
+
+
+
+def get_value(data_2d, input_para=None, parameterList=None):
+    if not isinstance(parameterList, list):
+        parameterList = [parameterList]
+
+    if input_para is None:
+        input_para = {
+            "PressureStatic": 0,
+            "TemperatureStatic": 1,
+            "DensityFlow": 2,
+            "PressureTotalW": 3,
+            "TemperatureTotalW": 4,
+        }
+
+    grid = get_grid()
+    post_pred = Post_2d(data_2d, grid,
+                        inputDict=input_para,
+                        )
+
+    Rst = []
+    for parameter_Name in parameterList:
+        value = getattr(post_pred, parameter_Name)
+        value = post_pred.span_density_average(value[..., -1])
+        Rst.append(value)
+
+    return np.concatenate(Rst, axis=1)
+
+if __name__ == "__main__":
+    design, field = get_origin()
+    grid = get_grid()
+    Rst = get_value(field, parameterList="EntropyStatic")
+    # np.savetxt(os.path.join("Rst.txt"), Rst)
+    # file_path = os.path.join("data", "sus_bad_data.yml")
+    # import yaml
+    # with open(file_path,'r') as f:
+    #     data = yaml.load(f, Loader=yaml.FullLoader)

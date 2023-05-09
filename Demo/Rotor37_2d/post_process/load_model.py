@@ -9,34 +9,41 @@ import yaml
 
 
 def loaddata(name, ntrain, nvalid, shuffled=False):
-    batch_size = 128
+    batch_size = 32
     design, fields = get_origin(realpath=os.path.join("..", "data"), shuffled=shuffled)  # 获取原始数据
     if name in ("FNO", "UNet", "Transformer"):
         input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     else:
         input = design
-
-    input = torch.tensor(input, dtype=torch.float)
-
     output = fields
-    output = torch.tensor(output, dtype=torch.float)
+
+    # input = torch.tensor(input, dtype=torch.float)
+    # output = torch.tensor(output, dtype=torch.float)
     print(input.shape, output.shape)
 
     train_x = input[:ntrain, :]
     train_y = output[:ntrain, :]
-    valid_x = input[ntrain:ntrain + nvalid, :]
-    valid_y = output[ntrain:ntrain + nvalid, :]
+    valid_x = input[-nvalid:, :]
+    valid_y = output[-nvalid:, :]
 
-    x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
+    x_normalizer = DataNormer(train_x, method='mean-std')
     train_x = x_normalizer.norm(train_x)
     valid_x = x_normalizer.norm(valid_x)
 
-    y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
+    y_normalizer = DataNormer(train_y, method='mean-std')
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
-    train_y = train_y.reshape([train_x.shape[0], -1])
-    valid_y = valid_y.reshape([valid_x.shape[0], -1])
+    train_y = train_y.reshape([train_y.shape[0], -1])
+    valid_y = valid_y.reshape([valid_y.shape[0], -1])
+
+    # 完成了归一化后再转换数据
+    train_x = torch.tensor(train_x, dtype=torch.float)
+    train_y = torch.tensor(train_y, dtype=torch.float)
+    valid_x = torch.tensor(valid_x, dtype=torch.float)
+    valid_y = torch.tensor(valid_y, dtype=torch.float)
+
+
 
     if name in ("deepONet"):
         grid = get_grid(real_path=os.path.join("..", "data"))
