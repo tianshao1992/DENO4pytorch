@@ -28,12 +28,12 @@ if __name__ == "__main__":
     for filename in filenameList:
         work_load_path = os.path.join(r"D:\WQN\CODE\DENO4pytorch-main\Demo\Rotor37_2d/",filename)
         workList = os.listdir(work_load_path)
-        for name in workList:#['MLP','deepONet','FNO','UNet','Transformer']:
+        for name in ['MLP']:#workList:#['MLP','deepONet','FNO','UNet','Transformer']:
             nameReal = name.split("_")[0]
-            modes = 10
+            modes = None
             if len(name.split("_"))==2:
                 modes = int(name.split("_")[1])
-            work_path = os.path.join(work_load_path,name)
+            work_path = os.path.join(work_load_path, name)
 
             # load_data
             if os.path.exists(os.path.join(work_path, "true_train.npy")):
@@ -46,9 +46,9 @@ if __name__ == "__main__":
                 Loss_func = nn.MSELoss()
                 Error_func = FieldsLpLoss(size_average=False)
 
-                Error_func.p = 1
-                ErrL1a = Error_func.abs(valid_pred, valid_true)
-                ErrL1r = Error_func.rel(valid_pred, valid_true)
+                # Error_func.p = 1
+                # ErrL1a = Error_func.abs(valid_pred, valid_true)
+                # ErrL1r = Error_func.rel(valid_pred, valid_true)
                 Error_func.p = 2
                 ErrL2a = Error_func.abs(valid_pred, valid_true)
                 ErrL2r = Error_func.rel(valid_pred, valid_true)

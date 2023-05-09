@@ -43,7 +43,7 @@ class DLModelPost(object):
         pred = pred.reshape([pred.shape[0], self.grid_size, self.grid_size, -1])
         pred = self.out_norm.back(pred)
 
-        return pred.detach().numpy()
+        return pred.detach().cpu().numpy()
 
     def predictor_value(self, input, input_para=None, parameterList=None, input_norm=False):
         if not isinstance(parameterList, list):

@@ -17,7 +17,7 @@ def change_yml(name, yml_path=None, **kwargs):
     template_path = os.path.join("..", "data", "config_template.yml")
     with open(template_path) as f:
         config_all = yaml.full_load(f)
-        config_para = config_all[name + 'config']
+        config_para = config_all[name + '_config']
     # 修改参数
     for key in kwargs.keys():
         if key in config_para.keys():
@@ -27,7 +27,9 @@ def change_yml(name, yml_path=None, **kwargs):
     # 保存到新的文件
     with open(yml_path, 'r') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
-    data[name + 'config'] = config_para
+    if data is None:
+        data = {}
+    data[name + '_config'] = config_para
     with open(yml_path, 'w') as f:
         yaml.dump(data, f)
 
@@ -48,6 +50,9 @@ def add_yml(key_set_list, yml_path=None):
 class WorkPrj(object):
     def __init__(self, work_path):
         self.root = work_path
+        isExist = os.path.exists(self.root)
+        if not isExist:
+            os.mkdir(self.root)
         self.pth = os.path.join(self.root, 'latest_model.pth')
         self.svg = os.path.join(self.root, 'log_loss.svg')
         self.yml= os.path.join(self.root, 'config.yml')
@@ -67,7 +72,8 @@ class DLModelWhole(object):
         self.device = device
         self.work = work
         self.name = name
-        self.net_model, self.inference, self.train, self.valid = build_model_yml(work.yml, self.name)
+        self.net_model, self.inference, self.train, self.valid = \
+            build_model_yml(work.yml, self.device, name=name)
 
         self.in_norm = in_norm
         self.out_norm = out_norm
@@ -85,7 +91,9 @@ class DLModelWhole(object):
         # 损失函数
         self.Loss_func = torch.nn.MSELoss()
         # 优化算法
-        self.Optimizer = torch.optim.Adam(self.net_model.parameters(), **config["Optimizer_config"])
+        temp = config["Optimizer_config"]
+        temp['betas'] = tuple(float(x) for x in temp['betas'][0].split())
+        self.Optimizer = torch.optim.Adam(self.net_model.parameters(), **temp)
         # 下降策略
         self.Scheduler = torch.optim.lr_scheduler.StepLR(self.Optimizer, **config["Scheduler_config"])
 
@@ -120,9 +128,10 @@ class DLModelWhole(object):
 
 if __name__ == "__main__":
     name = "MLP"
+    id = 0
     train_num = 2500
     valid_num = 450
-    work = WorkPrj(os.path.join("..", "work", name))
+    work = WorkPrj(os.path.join("..", "work", name + "_" + str(id)))
 
     if torch.cuda.is_available():
         Device = torch.device('cuda')
@@ -131,11 +140,11 @@ if __name__ == "__main__":
 
     config_dict = {
                     'n_hidden': 512,
-                    'layer_num': 10,
+                    'num_layers': 10,
                   }
     change_yml(name, yml_path=work.yml, **config_dict)
     add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
-    train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num)
+    train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)
     x_normalizer.save(work.x_norm)
     y_normalizer.save(work.y_norm)
     DL_model = DLModelWhole(Device, name=name, work=work)
@@ -146,7 +155,7 @@ if __name__ == "__main__":
 
     Rst = []
     for batch, (input, output) in enumerate(valid_loader):
-        Rst.append(post.predictor_value(input, parameterList=None, input_norm=True))
+        Rst.append(post.predictor_value(input, parameterList="PressureLossR", input_norm=True))
 
     Rst = np.concatenate(Rst, axis=1)
 
