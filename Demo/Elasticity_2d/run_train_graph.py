@@ -99,9 +99,8 @@ if __name__ == "__main__":
     else:
         device = torch.device('cpu')
 
-    PATH = '../../Models'
-    INPUT_PATH = PATH + '/data/Meshes/Random_UnitCell_XY_10.npy'
-    OUTPUT_PATH = PATH + '/data/Meshes/Random_UnitCell_sigma_10.npy'
+    INPUT_PATH = './data/Meshes/Random_UnitCell_XY_10.npy'
+    OUTPUT_PATH = './data/Meshes/Random_UnitCell_sigma_10.npy'
 
     ntrain = 1000
     nvalid = 200

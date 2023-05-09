@@ -5,6 +5,8 @@
 @Department : Baidu ACG
 @File : visual_data.py
 """
+import os
+import logging
 import sys
 import numpy as np
 import matplotlib.gridspec as gridspec
@@ -16,7 +18,6 @@ from scipy import stats
 from matplotlib.animation import FuncAnimation
 import matplotlib.tri as tri
 import matplotlib.cm as cm
-import os
 from matplotlib import ticker, rcParams
 from matplotlib.ticker import MultipleLocator
 import matplotlib as mpl
@@ -54,16 +55,63 @@ class TextLogger(object):
     log文件记录所有打印结果
     """
 
-    def __init__(self, filename, stream=sys.stdout):
+    def __init__(self, filename, level=logging.INFO, stream=sys.stdout):
         self.terminal = stream
-        self.log = open(filename, 'a')
+        # self.log = open(filename, 'a')
 
-    def write(self, message):
+        formatter = logging.Formatter("%(levelname)s: %(asctime)s:   %(message)s",
+                                      "%m-%d %H:%M:%S")
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        # logger = logging.getLogger()
+        # logger.setLevel(level)
+        handler = logging.FileHandler(filename)
+        handler.setFormatter(formatter)
+        handler.setLevel(level)
+        logger.addHandler(handler)
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        stream_handler.setLevel(level)
+        logger.addHandler(stream_handler)
+
+    @staticmethod
+    def info(message: str):
+        # info级别的日志，绿色
+        logging.info("\033[0;32m" + message + "\033[0m")
+
+    @staticmethod
+    def warning(message: str):
+        # warning级别的日志，黄色
+        logging.warning("\033[0;33m" + message + "\033[0m")
+
+    @staticmethod
+    def important(message: str):
+        # 重要信息的日志，红色加下划线
+        logging.info("\033[4;31m" + message + "\033[0m")
+
+    @staticmethod
+    def conclusion(message: str):
+        # 结论级别的日志，紫红色加下划线
+        logging.info("\033[4;35m" + message + "\033[0m")
+
+    @staticmethod
+    def error(message: str):
+        # error级别的日志，红色
+        logging.error("\033[0;31m" + "-" * 120 + '\n| ' + message + "\033[0m" + "\n" + "└" + "-" * 150)
+
+    @staticmethod
+    def debug(message: str):
+        # debug级别的日志，灰色
+        logging.debug("\033[0;37m" + message + "\033[0m")
+
+    @staticmethod
+    def write(message):
         """
         文本输出记录
         """
-        self.terminal.write(message)
-        self.log.write(message)
+        logging.info(message)
 
     def flush(self):
         """

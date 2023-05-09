@@ -74,7 +74,8 @@ class FNO2d(nn.Module):
         2维FNO网络
     """
 
-    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu', dropout=0.0):
+    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2,
+                 activation='gelu', dropout=0.0):
         super(FNO2d, self).__init__()
 
         """
@@ -201,10 +202,9 @@ if __name__ == '__main__':
 
     x = torch.ones([10, 32, 32, 4])
     g = torch.ones([10, 32, 32, 2])
-    layer = FNO2d(in_dim=4, out_dim=1, modes=(8, 8), width=32, depth=4, steps=1, padding=2, activation='gelu')
+    layer = FNO2d(in_dim=4, out_dim=1, modes=(12, 12), width=64, depth=4, steps=1, padding=2, activation='gelu')
     y = layer(x, g)
     print(y.shape)
-
 
     x = torch.ones([10, 32, 32, 32, 4])
     g = torch.ones([10, 32, 32, 32, 3])
