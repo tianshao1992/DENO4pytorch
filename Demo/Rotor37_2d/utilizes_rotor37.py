@@ -132,9 +132,9 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
 
     if getridbad:
         if realpath is None:
-            file_path = os.path.join("data", "sus_bad_data.yml")
+            file_path = os.path.join("data", "sus_bad.yml")
         else:
-            file_path = os.path.join(realpath, "sus_bad_data.yml")
+            file_path = os.path.join(realpath, "sus_bad.yml")
         with open(file_path, 'r') as f:
             sus_bad_dict = yaml.load(f, Loader=yaml.FullLoader)
         sus_bad_idx = []
