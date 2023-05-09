@@ -28,7 +28,7 @@ import time
 
 import sys
 from run_MLP import get_grid, get_origin
-from post_data import Post_2d
+from post_process.post_data import Post_2d
 
 
 
@@ -138,7 +138,11 @@ if __name__ == "__main__":
         else:
             Device = torch.device('cpu')
 
-        design, fields = get_origin()
+        # design, fields = get_origin()
+        design, fields = get_origin(quanlityList=["Static Pressure", "Static Temperature",
+                                                  "DensityFlow",
+                                                  'Relative Total Pressure', 'Relative Total Temperature'
+                                                  ])  # 获取原始数据
 
         in_dim = 28
         out_dim = 5
@@ -277,34 +281,3 @@ if __name__ == "__main__":
                     fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
 
-                train_true = train_true.reshape([train_true.shape[0], 64, 64, out_dim])
-                train_pred = train_pred.reshape([train_pred.shape[0], 64, 64, out_dim])
-                valid_true = valid_true.reshape([valid_true.shape[0], 64, 64, out_dim])
-                valid_pred = valid_pred.reshape([valid_pred.shape[0], 64, 64, out_dim])
-
-                train_true = y_normalizer.back(train_true)
-                train_pred = y_normalizer.back(train_pred)
-                valid_true = y_normalizer.back(valid_true)
-                valid_pred = y_normalizer.back(valid_pred)
-
-                for fig_id in range(5):
-                    post_true = Post_2d(train_true[fig_id], grid)
-                    post_pred = Post_2d(train_pred[fig_id], grid)
-                    # plt.plot(post_true.Efficiency[:,-1],np.arange(64),label="true")
-                    # plt.plot(post_pred.Efficiency[:, -1], np.arange(64), label="pred")
-                    fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
-                    Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
-                    Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
-                                      title="train_solution", xylabels=("efficiency", "span"))
-                    fig.savefig(os.path.join(work_path, 'train_solution_eff_' + str(fig_id) + '.jpg'))
-                    plt.close(fig)
-
-                for fig_id in range(5):
-                    post_true = Post_2d(valid_true[fig_id], grid)
-                    post_pred = Post_2d(valid_pred[fig_id], grid)
-                    fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=1)
-                    Visual.plot_value(fig, axs, post_true.Efficiency[:, -1], np.arange(64), label="true")
-                    Visual.plot_value(fig, axs, post_pred.Efficiency[:, -1], np.arange(64), label="pred",
-                                      title="train_solution", xylabels=("efficiency", "span"))
-                    fig.savefig(os.path.join(work_path, 'valid_solution_eff_' + str(fig_id) + '.jpg'))
-                    plt.close(fig)

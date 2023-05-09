@@ -74,13 +74,24 @@ class DataNormer():
         return x
     def save(self,save_path):
         import pickle
-        with open(os.path.join(save_path,'norm.pkl'), 'wb') as f:
+        with open(save_path, 'wb') as f:
             pickle.dump(self, f)
 
     def load(self,save_path):
         import pickle
-        with open(os.path.join(save_path,'norm.pkl'), 'rb') as f:
-            self = pickle.load(f)
+        isExist = os.path.exists(save_path)
+        if isExist:
+            with open(save_path, 'rb') as f:
+                load = pickle.load(f)
+            self.method = load.method
+            if load.method == "mean-std":
+                self.std = load.std
+                self.mean = load.mean
+            elif load.method == "min-max":
+                self.min = load.min
+                self.max = load.max
+        else:
+            print("The pkl file is not exist, CHECK PLEASE!")
 
 
 # reading data
@@ -140,8 +151,12 @@ class MatLoader(object):
 
 
 class SquareMeshGenerator(object):
-    # 在多维空间中获得正交网格
     def __init__(self, real_space, mesh_size):
+        """
+        在多维空间中获得正交网格
+        real_space shape[d, 2] 空间的上下界
+        mesh_size shape[d] 每个维度的采样密度
+        """
         super(SquareMeshGenerator, self).__init__()
 
         self.d = len(real_space)
@@ -151,18 +166,19 @@ class SquareMeshGenerator(object):
 
         if self.d == 1:
             self.n = mesh_size[0]
-            self.grid = np.linspace(real_space[0][0], real_space[0][1], self.n).reshape((self.n, 1))
+            self.grid = np.linspace(real_space[0][0], real_space[0][1], int(self.n)).reshape((int(self.n), 1))
         else:
             self.n = 1
             grids = []
             for j in range(self.d):
-                grids.append(np.linspace(real_space[j][0], real_space[j][1], mesh_size[j]))
+                grids.append(np.linspace(real_space[j][0], real_space[j][1], int(mesh_size[j])))
                 self.n *= mesh_size[j]
 
             self.grid = np.vstack([xx.ravel() for xx in np.meshgrid(*grids)]).T
+            # 将多个N维网格点坐标组合成一个 (N, d) 的数组
 
     def ball_connectivity(self, r):
-        pwd = sklearn.metrics.pairwise_distances(self.grid)
+        pwd = sklearn.metrics.pairwise_distances(self.grid) #计算距离矩阵
         self.edge_index = np.vstack(np.where(pwd <= r))
         self.n_edges = self.edge_index.shape[1]
 
