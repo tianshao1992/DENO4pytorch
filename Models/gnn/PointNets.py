@@ -17,11 +17,12 @@ from configs import activation_dict
 
 
 class PointNetfeature(nn.Module):
-    def __init__(self, input_dim, scaling=1.0, activation='relu',
+    def __init__(self, input_dim, scaling=1.0, activation='relu', max_pool=True,
                  global_feat=True, input_transform=False, feature_transform=False):
         super(PointNetfeature, self).__init__()
 
         self.feature_size = int(64 * scaling)
+        self.max_pool = max_pool
         self.input_transform = input_transform
         self.global_feat = global_feat
         self.feature_transform = feature_transform
@@ -64,7 +65,10 @@ class PointNetfeature(nn.Module):
         pointfeat = x
         x = self.activation(self.bn2(self.conv2(x)))
         x = self.bn3(self.conv3(x))
-        x = torch.max(x, 2, keepdim=True)[0]
+        if self.max_pool:
+            x = torch.max(x, 2, keepdim=True)[0]
+        else:
+            x = torch.mean(x, 2, keepdim=True)
         x = x.view(-1, self.feature_size * 16)
         if self.global_feat:
             return x, trans, trans_feat
@@ -111,7 +115,7 @@ class BasicPointNet(nn.Module):
     # Guidance: We recommend opening and running the code on **[Google Colab](https://research.google.com/colaboratory)** as a first try.
 
     def __init__(self, input_dim, output_dim,
-                 scaling=1.0, activation='relu',
+                 scaling=1.0, activation='relu', max_pool=True,
                  input_transform=True, feature_transform=True):
         super(BasicPointNet, self).__init__()
 
@@ -121,7 +125,7 @@ class BasicPointNet(nn.Module):
         self.activation = activation
 
         self.feature_layer = PointNetfeature(input_dim=input_dim, scaling=scaling, activation=activation,
-                                             global_feat=False,
+                                             global_feat=False, max_pool=max_pool,
                                              input_transform=input_transform,
                                              feature_transform=feature_transform)
 
@@ -137,7 +141,7 @@ class BasicPointNet(nn.Module):
 
 
 if __name__ == '__main__':
-    NetModel = BasicPointNet(input_dim=3, output_dim=2, scaling=1.0, activation='relu',
+    NetModel = BasicPointNet(input_dim=3, output_dim=2, scaling=1.0, activation='relu', max_pool=False,
                              input_transform=False, feature_transform=True)
     x = torch.randn(32, 1024, 3)
     output, trans, trans_feature = NetModel(x)
