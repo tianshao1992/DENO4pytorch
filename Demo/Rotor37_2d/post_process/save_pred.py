@@ -36,7 +36,7 @@ if __name__ == "__main__":
         work_load_path = os.path.join(r"D:\WQN\CODE\DENO4pytorch-main\Demo\Rotor37_2d/",filename)
         workList = os.listdir(work_load_path)
         out_dim = 5
-        for name in workList:#['MLP','deepONet','FNO','UNet','Transformer']:
+        for name in ['MLP']:#workList:#['MLP','deepONet','FNO','UNet','Transformer']:
             nameReal = name.split("_")[0]
             mode = 10
             if len(name.split("_"))==2:
