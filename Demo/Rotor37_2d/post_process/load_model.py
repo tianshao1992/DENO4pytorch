@@ -1,7 +1,6 @@
 import torch
 import os
 import numpy as np
-
 from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
@@ -34,8 +33,9 @@ def loaddata(name, ntrain, nvalid, shuffled=False):
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
-    train_y = train_y.reshape([train_y.shape[0], -1])
-    valid_y = valid_y.reshape([valid_y.shape[0], -1])
+    if name in ("MLP"):
+        train_y = train_y.reshape([train_y.shape[0], -1])
+        valid_y = valid_y.reshape([valid_y.shape[0], -1])
 
     # 完成了归一化后再转换数据
     train_x = torch.tensor(train_x, dtype=torch.float)

@@ -1,5 +1,5 @@
-import torch
 import os
+import torch
 import numpy as np
 from post_process.post_data import Post_2d
 from run_FNO import feature_transform
@@ -25,6 +25,10 @@ def change_yml(name, yml_path=None, **kwargs):
         else:
             print("The keywords {} is illegal, CHECK PLEASE".format(key))
     # 保存到新的文件
+    isExist = os.path.exists(yml_path)
+    if not isExist:
+        with open(yml_path, 'w') as f:
+            pass
     with open(yml_path, 'r') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
     if data is None:
@@ -110,6 +114,7 @@ class DLModelWhole(object):
             print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
                   format(epoch, self.Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1],
                          time.time() - star_time))
+            print(os.environ['CUDA_VISIBLE_DEVICES'])
             star_time = time.time()
 
             if epoch > 0 and epoch % 5 == 0:
@@ -131,7 +136,7 @@ if __name__ == "__main__":
     id = 0
     train_num = 2500
     valid_num = 450
-    work = WorkPrj(os.path.join("..", "work", name + "_" + str(id)))
+    work = WorkPrj(os.path.join("..", "work_train", name + "_" + str(id)))
 
     if torch.cuda.is_available():
         Device = torch.device('cuda')

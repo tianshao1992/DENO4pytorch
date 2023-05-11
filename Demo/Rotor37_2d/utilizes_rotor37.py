@@ -117,14 +117,14 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
     design = []
     fields = []
     for ii, file in enumerate(sample_files):
-        reader = MatLoader(file)
+        reader = MatLoader(file, to_torch=False)
         design.append(reader.read_field('design'))
         output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
         for jj, quanlity in enumerate(quanlityList):
             if quanlity=="DensityFlow": #设置一个需要计算获得的数据
-                output[:, :, :, jj] = (reader.read_field("Density")*reader.read_field("Vxyz_X")).clone()
+                output[:, :, :, jj] = (reader.read_field("Density")*reader.read_field("Vxyz_X")).copy()
             else:
-                output[:, :, :, jj] = reader.read_field(quanlity).clone()
+                output[:, :, :, jj] = reader.read_field(quanlity).copy()
         fields.append(output)
 
     design = np.concatenate(design, axis=0)
@@ -132,9 +132,9 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
 
     if getridbad:
         if realpath is None:
-            file_path = os.path.join("data", "sus_bad.yml")
+            file_path = os.path.join("data", "sus_bad_data.yml")
         else:
-            file_path = os.path.join(realpath, "sus_bad.yml")
+            file_path = os.path.join(realpath, "sus_bad_data.yml")
         with open(file_path, 'r') as f:
             sus_bad_dict = yaml.load(f, Loader=yaml.FullLoader)
         sus_bad_idx = []
@@ -147,9 +147,9 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
         fields = np.delete(fields, sus_bad_idx, axis=0)
 
     if shuffled:
-        # np.random.seed(8905)
+        np.random.seed(8905)
         idx = np.random.permutation(design.shape[0])
-        print(idx[:10])
+        # print(idx[:10])
         design = design[idx]
         fields = fields[idx]
 

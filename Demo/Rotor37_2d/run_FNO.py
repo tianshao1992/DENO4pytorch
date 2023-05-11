@@ -11,7 +11,6 @@ import os
 import numpy as np
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
@@ -73,7 +72,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1) / batch_size
+    return train_loss / (batch + 1)
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -94,8 +93,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1) / batch_size
-
+    return valid_loss / (batch + 1)
 
 def inference(dataloader, netmodel, device): # 这个是？？
     """
@@ -130,7 +128,7 @@ if __name__ == "__main__":
             os.makedirs(work_path)
 
         # 将控制台的结果输出到log文件
-        sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+        # sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
         #  torch.cuda.set_device(1)
 
         if torch.cuda.is_available():

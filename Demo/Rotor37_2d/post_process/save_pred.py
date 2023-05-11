@@ -9,10 +9,11 @@ from run_MLP import get_grid, get_origin, valid
 from load_model import loaddata, rebuild_model, get_true_pred
 import yaml
 
+
 if __name__ == "__main__":
     # name = 'MLP'
     filenameList =[
-        "work",
+        "work_train",
      # 'work_2700_MSELoss',
      # 'work_FNO_mode_L1smoothLoss',
      # 'work_FNO_mode_MSELoss',
@@ -24,7 +25,7 @@ if __name__ == "__main__":
         work_load_path = os.path.join("..", filename)
         workList = os.listdir(work_load_path)
         out_dim = 5
-        for name in ['MLP']:#workList:#['MLP','deepONet','FNO','UNet','Transformer']:
+        for name in ['FNO_0']:#workList:#['MLP','deepONet','FNO','UNet','Transformer']:
             nameReal = name.split("_")[0]
             mode = None
             if len(name.split("_"))==2:
