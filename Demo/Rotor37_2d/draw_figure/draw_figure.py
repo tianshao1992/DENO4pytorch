@@ -7,7 +7,7 @@ import torch
 from Utilizes.visual_data import MatplotlibVision
 from Utilizes.process_data import DataNormer, MatLoader
 import matplotlib.pyplot as plt
-from post_data import Post_2d
+from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from post_process.load_model import loaddata, rebuild_model, get_true_pred
 
@@ -126,7 +126,7 @@ def a_case():
                         )
 
     fig_id = 0
-    parameterList = ["Efficiency", "EntropyStatic"]
+    parameterList = ["Efficiency", "EntropyStatic",""]
     plot_error(post_true, post_pred, parameterList, save_path=None, fig_id=0, label=None)
 
 
