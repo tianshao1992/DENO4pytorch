@@ -53,10 +53,8 @@ if __name__ == "__main__":
             
             if Net_model is not None:
                 # load data
-                train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(nameReal, 1250, 150)
+                train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(nameReal, 2500, 400, shuffled=True)
 
-                loss = valid(valid_loader, Net_model, Device, torch.nn.MSELoss())
-                print(loss)
                 train_true, train_pred = get_true_pred(train_loader, Net_model, inference, Device, name=nameReal)
                 valid_true, valid_pred = get_true_pred(valid_loader, Net_model, inference, Device, name=nameReal)
 
