@@ -272,7 +272,7 @@ class MatplotlibVision(object):
             x_pos = np.arange(n_bag) * n_vin + n_vin / 2
         # parts = ax.boxplot(data.reshape(data.shape[0], -1), widths=0.5 * bag_width, positions=positions, vert=True,
         #                    patch_artist=True, )
-        parts = ax.boxplot(data.reshape(data.shape[0], -1).T,
+        parts = ax.boxplot(data.reshape(data.shape[0], -1),
                            widths=0.5 * bag_width, positions=positions,
                            vert=True, patch_artist=True, )
 

@@ -1,6 +1,7 @@
 import torch
 import os
 import numpy as np
+from torch.utils.data import DataLoader
 from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
@@ -160,13 +161,29 @@ def build_model_yml(yml_path, device, name=None):
 
 
 def get_true_pred(loader, Net_model, inference, Device,
-                  name=None, out_dim=5):
-    if name in ('MLP'):
-        grid, true, pred = inference(loader, Net_model, Device)
-    else:
-        coord, grid, true, pred = inference(loader, Net_model, Device)
-    true = true.reshape([true.shape[0], 64, 64, out_dim])
-    pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
+                  name=None, out_dim=5, iters=0):
+    true_list = []
+    pred_list = []
+    for ii, (data_x, data_y) in enumerate(loader):
+        if ii > iters:
+            break
+        sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_y),
+                                                 batch_size=loader.batch_size,
+                                                 shuffle=False,
+                                                 drop_last=True)
+    # for ii in range(iters):
+        if name in ('MLP'):
+            _, true, pred = inference(sub_loader, Net_model, Device)
+        else:
+            _, _, true, pred = inference(sub_loader, Net_model, Device)
+        true = true.reshape([true.shape[0], 64, 64, out_dim])
+        pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
+
+        true_list.append(true)
+        pred_list.append(pred)
+
+    true = np.concatenate(true_list, axis=0)
+    pred = np.concatenate(pred_list, axis=0)
 
     return true, pred
 
