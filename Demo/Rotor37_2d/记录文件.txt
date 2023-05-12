@@ -1,0 +1,4 @@
+work_train 
+work_train_1  fno可取（但是relu没有测试，需要重新做relu实验），tran效果较差需要重新跑
+work_train_FNO1  fno有relu效果还可以，但是没有加上mode
+work_train_FNO2  fno mode+relu测试激活函数
