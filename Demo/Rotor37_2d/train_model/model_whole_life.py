@@ -63,6 +63,17 @@ class WorkPrj(object):
         self.x_norm = os.path.join(self.root, 'x_norm.pkl')
         self.y_norm = os.path.join(self.root, 'y_norm.pkl')
 
+    def config(self, name):
+        with open(self.yml) as f:
+            config_all = yaml.full_load(f)
+
+        if name + "_config" in config_all.keys():
+            return config_all[name + "_config"]
+        else:
+            return None
+
+
+
     # def exist_check(self):
 
 class DLModelWhole(object):
@@ -72,6 +83,7 @@ class DLModelWhole(object):
                  out_norm=None,
                  grid_size=64,
                  work=None,
+                 epochs=1000,
                  ):
         self.device = device
         self.work = work
@@ -83,7 +95,7 @@ class DLModelWhole(object):
         self.out_norm = out_norm
         self.grid_size = grid_size
 
-        self.epochs = 1000
+        self.epochs = epochs
 
         self.Loss_func = None
         self.Optimizer = None

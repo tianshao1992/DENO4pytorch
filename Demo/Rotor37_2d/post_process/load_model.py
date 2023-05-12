@@ -7,9 +7,20 @@ from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
 import yaml
 
+def get_noise(shape, scale):
+    random_array = np.random.randn(np.prod(shape))
+    random_array = (random_array-1)*2
+    random_array = random_array.reshape(shape)
 
-def loaddata(name, ntrain, nvalid, shuffled=False):
-    batch_size = 32
+    return random_array * scale
+
+def loaddata(name,
+             ntrain=2500,
+             nvalid=400,
+             shuffled=False,
+             noise_scale=None,
+             batch_size=32):
+
     design, fields = get_origin(realpath=os.path.join("..", "data"), shuffled=shuffled)  # 获取原始数据
     if name in ("FNO", "UNet", "Transformer"):
         input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
@@ -38,13 +49,15 @@ def loaddata(name, ntrain, nvalid, shuffled=False):
         train_y = train_y.reshape([train_y.shape[0], -1])
         valid_y = valid_y.reshape([valid_y.shape[0], -1])
 
+    if noise_scale is not None: # 向数据中增加噪声
+        noise_train = get_noise(train_y.shape, noise_scale)
+        train_y = train_y + noise_train
+
     # 完成了归一化后再转换数据
     train_x = torch.tensor(train_x, dtype=torch.float)
     train_y = torch.tensor(train_y, dtype=torch.float)
     valid_x = torch.tensor(valid_x, dtype=torch.float)
     valid_y = torch.tensor(valid_y, dtype=torch.float)
-
-
 
     if name in ("deepONet"):
         grid = get_grid(real_path=os.path.join("..", "data"))
@@ -95,7 +108,7 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
     elif 'UNet' in name:
         from cnn.ConvNets import UNet2d
         from run_UNet import inference
-        Net_model = UNet2d(in_sizes=[64, 64, 28], out_sizes=[64, 64, 5], width=64,
+        Net_model = UNet2d(in_sizes=(64, 64, 28), out_sizes=(64, 64, 5), width=64,
                            depth=4, steps=1, activation='gelu', dropout=0).to(Device)
     elif 'Transformer' in name:
         from transformer.Transformers import FourierTransformer2D
@@ -115,6 +128,7 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
     else:
         print("The pth file is not exist, CHECK PLEASE!")
         return None, None
+
 def import_model_by_name(name):
     model_func = None
     inference = None
@@ -195,10 +209,10 @@ if __name__ == "__main__":
     in_dim = 28
     out_dim = 5
 
-    layer_mat = [in_dim, 256, 256, 256, 256, 256, 256, 256, 256, out_dim * 64 * 64]
-    Net_model = MLP(layer_mat, is_BatchNorm=False)
-
-    checkpoint = torch.load(os.path.join(work_path, 'latest_model.pth'))
-    Net_model.load_state_dict(checkpoint['net_model'])
+    # layer_mat = [in_dim, 256, 256, 256, 256, 256, 256, 256, 256, out_dim * 64 * 64]
+    # Net_model = MLP(layer_mat, is_BatchNorm=False)
+    #
+    # checkpoint = torch.load(os.path.join(work_path, 'latest_model.pth'))
+    # Net_model.load_state_dict(checkpoint['net_model'])
 
     #输出预测结果

@@ -30,6 +30,9 @@ class Post_2d(object):
         self._VelocityY = None
         self._VelocityZ = None
 
+        self._V2 = None
+        self._W2 = None
+
         self._AlphaV = None
         self._MagV = None
 
@@ -47,6 +50,9 @@ class Post_2d(object):
 
         self._PressureTotalW = None
         self._TemperatureTotalW = None
+        self._PressureTotalRot = None
+        self._TemperatureTotalRot = None
+        self._TemperatureIsentropic = None
 
         self._PressureRatioV = None
         self._TemperatureRatioV = None
@@ -55,26 +61,29 @@ class Post_2d(object):
         self._TemperatureRatioW = None
 
         self._Efficiency = None
+        self._EfficiencyPoly = None
         self._EfficiencyR = None
         self._PressureLoss = None
         self._DFactor = None
         self._PressureLossR = None
         self._DFactorR = None
         self._EntropyStatic = None
+        self._MachIsentropic = None
+        self._Load = None
 
 
     def set_basic_const(self,
-                        kappa = 1.403,
+                        kappa = 1.400,
                         Cp = 1004,
                         sigma = 1.6,
-                        rotateSpeed = -17188 # rpm
+                        rotateSpeed = -17188, # rpm
+                        Rg = 287
                         ):
         self.kappa = kappa
         self.Cp = Cp
         self.sigma = sigma# 代表稠度
         self.rotateSpeed = rotateSpeed
-
-
+        self.Rg = Rg
 
 
     def get_parameter(self,shape_index=None): #计算各种性能参数,shape表示针对哪一部分进行计算
@@ -169,8 +178,8 @@ class Post_2d(object):
         self.VelocityZ = x
     def set_AlphaV(self, x):
         self.AlphaV = x
-    def set_MagV(self, x):
-        self.MagV = x
+    def set_V2(self, x):
+        self.V2 = x
 
 
     def get_PressureStatic(self):
@@ -239,10 +248,13 @@ class Post_2d(object):
         else:
             return self._AlphaV
 
-    def get_MagV(self):
-        if self._MagV is None:
-            rst = np.power(self.VelocityX,2) + np.power(self.VelocityY,2) + np.power(self.VelocityZ,2)
-            rst = np.sqrt(rst)
+    def get_V2(self):
+        if self._V2 is None:
+            if "V2" in self.inputDict.keys():
+                rst = self.data_2d[..., self.inputDict["V2"]]
+            else:
+                rst = np.power(self.VelocityX,2) + np.power(self.VelocityY,2) + np.power(self.VelocityZ,2)
+            self._V2 = rst
             return rst
         else:
             return self._MagV
@@ -256,13 +268,13 @@ class Post_2d(object):
     VelocityY = property(get_VelocityY, set_VelocityY)
     VelocityZ = property(get_VelocityZ, set_VelocityZ)
     AlphaV = property(get_AlphaV, set_AlphaV)
-    MagV = property(get_MagV, set_MagV)
+    V2 = property(get_V2, set_V2)
 
 
     def set_AlphaW(self, x):
         self.AlphaV = x
-    def set_MagW(self, x):
-        self.MagV = x
+    def set_W2(self, x):
+        self.W2 = x
     def set_Uaxis(self, x):
         self.Uaxis = x
     def set_WelocityX(self, x):
@@ -306,20 +318,23 @@ class Post_2d(object):
             return np.arctan(self.WelocityY / self.WelocityX)
         else:
             return self._AlphaW
-    def get_MagW(self):
-        if self._MagW is None:
-            rst = np.power(self.WelocityX,2) + np.power(self.WelocityY,2) + np.power(self.WelocityZ,2)
-            rst = np.sqrt(rst)
+    def get_W2(self):
+        if self._W2 is None:
+            if "W2" in self.inputDict.keys():
+                rst = self.data_2d[..., self.inputDict["W2"]]
+            else:
+                rst = np.power(self.WelocityX,2) + np.power(self.WelocityY,2) + np.power(self.WelocityZ,2)
+            self._W2 = rst
             return rst
         else:
-            return self._MagW
+            return self._W2
 
     Uaxis = property(get_Uaxis, set_Uaxis)
     WelocityX = property(get_WelocityX, set_WelocityX)
     WelocityY = property(get_WelocityY, set_WelocityY)
     WelocityZ = property(get_WelocityZ, set_WelocityZ)
     AlphaW = property(get_AlphaW, set_AlphaW)
-    MagW = property(get_MagW, set_MagW)
+    W2 = property(get_W2, set_W2)
     #
     # ===============================================================#
     # 其他物理场参数获取：1.总压；2.总温；3.速度x；4.速度y
@@ -339,6 +354,15 @@ class Post_2d(object):
         self.PressureTotalW = x
     def set_TemperatureTotalW(self, x):
         self.TemperatureTotalW = x
+
+    def set_PressureTotalRot(self, x):
+        self.PressureTotalRot = x
+    def set_TemperatureTotalRot(self, x):
+        self.TemperatureTotalRot = x
+    def set_TemperatureIsentropic(self, x):
+        self.TemperatureIsentropic = x
+
+
     def set_PressureRatioW(self, x):
         self.PressureRatioW = x
     def set_TemperatureRatioW(self, x):
@@ -346,6 +370,8 @@ class Post_2d(object):
 
     def set_Efficiency(self, x):
         self.Efficiency = x
+    def set_EfficiencyPoly(self, x):
+        self.EfficiencyPoly = x
     def set_EfficiencyR(self, x):
         self.EfficiencyR = x
     def set_PressureLoss(self, x):
@@ -360,20 +386,30 @@ class Post_2d(object):
 
     def set_EntropyStatic(self, x):
         self.EntropyStatic = x
+    def set_MachIsentropic(self, x):
+        self.MachIsentropic = x
+    def set_Load(self, x):
+        self.Load = x
 
 
 
     def get_PressureTotalV(self):
         if self._PressureTotalV is None:
-            rst = self.PressureStatic * \
-                  np.power(self.TemperatureTotalV / self.TemperatureStatic, self.kappa / (self.kappa - 1))
+            if "PressureTotalV" in self.inputDict.keys():
+                rst = self.data_2d[..., self.inputDict["PressureTotalV"]]
+            else:
+                rst = self.PressureStatic * \
+                      np.power(self.TemperatureTotalV / self.TemperatureStatic, self.kappa / (self.kappa - 1))
             self._PressureTotalV = rst
             return rst
         else:
             return self._PressureTotalV
     def get_TemperatureTotalV(self):
         if self._TemperatureTotalV is None:
-            rst = self.TemperatureStatic + 0.5 * self.MagV * self.MagV / self.Cp
+            if "TemperatureTotalV" in self.inputDict.keys():
+                rst = self.data_2d[..., self.inputDict["TemperatureTotalV"]]
+            else:
+                rst = self.TemperatureStatic + 0.5 * self.V2 / self.Cp
             self._TemperatureTotalV = rst
             return rst
         else:
@@ -410,14 +446,44 @@ class Post_2d(object):
             if "TemperatureTotalW" in self.inputDict.keys():
                 rst = self.data_2d[..., self.inputDict["TemperatureTotalW"]]
             else:
-                rst = self.TemperatureStatic + 0.5 * self.MagW * self.MagW / self.Cp
+                rst = self.TemperatureStatic + 0.5 * self.W2 / self.Cp
             self._TemperatureTotalW = rst
             return rst
         else:
             return self._TemperatureTotalW
+
+    def get_PressureTotalRot(self):
+        if self._PressureTotalRot is None:
+            if "PressureTotalRot" in self.inputDict.keys():
+                rst = self.data_2d[..., self.inputDict["PressureTotalRot"]]
+            else:
+                rst = self.PressureStatic * \
+                      np.power(self.TemperatureTotalRot / self.TemperatureStatic, self.kappa / (self.kappa - 1))
+            self._PressureTotalRot = rst
+            return rst
+        else:
+            return self._PressureTotalRot
+    def get_TemperatureTotalRot(self):
+        if self._TemperatureTotalRot is None:
+            rst = self.TemperatureStatic + 0.5 * self.Uaxis * self.Uaxis / self.Cp
+            self._TemperatureTotalRot = rst
+            return rst
+        else:
+            return self._TemperatureTotalRot
+
+    def get_TemperatureIsentropic(self):
+        if self._TemperatureIsentropic is None:
+            rst = np.tile(self.PressureTotalRot[..., :1], [1, 1, self.n_1d])/self.PressureStatic
+            rst = np.power(rst, (self.kappa - 1) / self.kappa)
+            rst = 1 / rst * np.tile(self.TemperatureTotalRot[..., :1], [1, 1, self.n_1d])
+            self._TemperatureIsentropic = rst
+            return rst
+        else:
+            return self._TemperatureIsentropic
+
     def get_PressureRatioW(self):
         if self._PressureRatioW is None:
-            rst = self.PressureTotalW / np.tile(self.PressureTotalW[...,  :1], [1, 1, self.n_1d])
+            rst = self.PressureTotalW / np.tile(self.PressureTotalW[..., :1], [1, 1, self.n_1d])
             self._PressureRatioW = rst
             return rst
         else:
@@ -429,16 +495,24 @@ class Post_2d(object):
             return rst
         else:
             return self._TemperatureRatioW
+
     def get_Efficiency(self):
         if self._Efficiency is None:
-            num = int(np.round(self.n_2d / 2))
-            rst = np.abs(np.power(self.PressureRatioV[..., num:], (self.kappa - 1) / self.kappa) - 1) + 1e-5
-            rst = rst / (np.abs(self.TemperatureRatioV[..., num:] - 1) + 1e-5)
-            rst = np.concatenate((np.zeros([self.num, self.n_1d, num]), rst), axis=2)
+            rst = np.abs(np.power(self.PressureRatioV, (self.kappa - 1) / self.kappa) - 1) + 1e-5
+            rst = rst / (np.abs(self.TemperatureRatioV - 1) + 1e-5)
             self._Efficiency = rst
             return rst
         else:
             return self._Efficiency
+
+    def get_EfficiencyPoly(self):
+        if self._EfficiencyPoly is None:
+            rst = np.log(self.PressureRatioV) / (np.log(self.TemperatureRatioV) + 1e-5)
+            rst = rst * self.Rg / self.Cp
+            self._EfficiencyPoly = rst
+            return rst
+        else:
+            return self._EfficiencyPoly
     def get_EfficiencyR(self):
         if self._EfficiencyR is None:
             rst = np.abs(np.power(self.PressureRatioW, (self.kappa - 1) / self.kappa) - 1) + 1e-5
@@ -450,7 +524,7 @@ class Post_2d(object):
     def get_PressureLoss(self):
         if self._PressureLoss is None:
             rst = self.PressureRatioV - 1
-            rst = rst / (1 - np.tile(self.PressureStatic[...,  :1] / self.PressureTotalV[...,  :1], [1, 1, self.n_1d]))
+            rst = rst / (1 - np.tile(self.PressureStatic[..., :1] / self.PressureTotalV[..., :1], [1, 1, self.n_1d]))
             self._PressureLoss = rst
             return rst
         else:
@@ -483,8 +557,6 @@ class Post_2d(object):
             return rst
         else:
             return self._DFactorR
-
-
     def get_EntropyStatic(self):
         if self._EntropyStatic is None:
             rst = (1-self.kappa) / self.kappa * np.log2(self.PressureStatic / 101325)
@@ -495,6 +567,27 @@ class Post_2d(object):
         else:
             return self._EntropyStatic
 
+    def get_MachIsentropic(self):
+        if self._MachIsentropic is None:
+            rst1 = np.tile(self.PressureTotalRot[..., :1], [1, 1, self.n_1d]) / self.PressureStatic
+            rst1 = np.power(rst1, (self.kappa-1) / self.kappa) - 1
+            rst2 = self.Uaxis * self.Uaxis / self.kappa / self.Rg / self.TemperatureIsentropic
+
+            rst = np.sqrt(rst1 * 2 / (self.kappa -1 ) + rst2)
+            self._MachIsentropic = rst
+            return rst
+        else:
+            return self._MachIsentropic
+    def get_Load(self):
+        if self._Load is None:
+            rst = self.Cp * (1 - self.TemperatureRatioW) / self.Uaxis / self.Uaxis
+            rst = rst * np.tile(self.TemperatureTotalW[..., :1], [1, 1, self.n_1d])
+            self._Load = rst
+            return rst
+        else:
+            return self._Load
+
+
     PressureTotalV = property(get_PressureTotalV, set_PressureTotalV)
     TemperatureTotalV = property(get_TemperatureTotalV, set_TemperatureTotalV)
     PressureRatioV = property(get_PressureRatioV, set_PressureRatioV)
@@ -502,16 +595,25 @@ class Post_2d(object):
 
     PressureTotalW = property(get_PressureTotalW, set_PressureTotalW)
     TemperatureTotalW = property(get_TemperatureTotalW, set_TemperatureTotalW)
+
+    PressureTotalRot = property(get_PressureTotalRot, set_PressureTotalRot)
+    TemperatureTotalRot = property(get_TemperatureTotalRot, set_TemperatureTotalRot)
+    TemperatureIsentropic = property(get_TemperatureIsentropic, set_TemperatureIsentropic)
+
     PressureRatioW = property(get_PressureRatioW, set_PressureRatioW)
     TemperatureRatioW = property(get_TemperatureRatioW, set_TemperatureRatioW)
 
+
     Efficiency = property(get_Efficiency, set_Efficiency)
+    EfficiencyPoly = property(get_EfficiencyPoly, set_EfficiencyPoly)
     EfficiencyR = property(get_EfficiencyR, set_EfficiencyR)
     PressureLoss = property(get_PressureLoss, set_PressureLoss)
     PressureLossR = property(get_PressureLossR, set_PressureLossR)
     DFactor = property(get_DFactor, set_DFactor)
     DFactorR = property(get_DFactorR, set_DFactorR)
     EntropyStatic = property(get_EntropyStatic, set_EntropyStatic)
+    MachIsentropic = property(get_MachIsentropic, set_MachIsentropic)
+    Load = property(get_Load, set_Load)
 
 
 if __name__ == "__main__":
