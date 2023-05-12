@@ -50,7 +50,7 @@ if __name__ == "__main__":
                 else:
                     Net_model, inference = rebuild_model(work_path, Device, name=nameReal)
             Net_model.eval()
-            
+
             if Net_model is not None:
                 # load data
                 train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(nameReal, 2500, 400, shuffled=True)

@@ -117,4 +117,14 @@ if __name__ == "__main__":
             # samdata = readCfviewRst(pathSave,positionZlist=temp)
             # np.save(os.path.join(pathCase,'sampleRst.npy'), samdata)
 
+            samdict = readCfviewRst(pathSave,
+                                    positionZlist=temp,
+                                    quanlitylist = ["Static Pressure","Static Temperature","Density",
+                                                    "Vxyz_X","Vxyz_Y","Vxyz_Z",
+                                                    'Relative Total Pressure','Relative Total Temperature',
+                                                    'Absolute Total Pressure', 'Absolute Total Temperature',
+                                                    'Entropy']
+                                    )
+            np.savez(os.path.join(pathCase,'sampleRstZip.npz'), **samdict)
+
 

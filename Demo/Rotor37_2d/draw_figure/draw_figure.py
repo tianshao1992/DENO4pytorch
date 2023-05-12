@@ -24,12 +24,12 @@ def load_Npz(npzFile, quanlityList=None):
 
     return fields
 
-def plot_span_curve(post, parameterList, save_path = None, fig_id = 0, label = None, type=None):
+def plot_span_curve(post, parameterList, save_path = None, work_path=None, fig_id = 0, label = None, type=''):
 # 绘制单个对象曲线
     if not isinstance(parameterList,list):
         parameterList = [parameterList]
 
-    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('unset')) # 不在此处设置名称
+    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('n')) # 不在此处设置名称
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
         value_span = getattr(post, parameter_Name)
@@ -43,6 +43,26 @@ def plot_span_curve(post, parameterList, save_path = None, fig_id = 0, label = N
         fig.savefig(jpg_path)
         plt.close(fig)
 
+def plot_field_2d(post_true, post_pred, parameterList, save_path = None, work_path=None, fig_id = 0, label = None, type='', grid=None):
+# 绘制单个对象曲线
+    if not isinstance(parameterList,list):
+        parameterList = [parameterList]
+
+    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('n')) # 不在此处设置名称
+    for parameter_Name in parameterList:
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
+        value_field_true = getattr(post_true, parameter_Name)
+        value_field_pred = getattr(post_pred, parameter_Name)
+
+        fmin_max = None
+        if 'Efficiency' in parameter_Name:
+            fmin_max = [[0], [1]] #因为函数默认有多个输入，这里是二维数组
+
+        Visual.plot_fields_ms(fig, axs, value_field_true[0,:,:,np.newaxis], value_field_pred[0,:,:,np.newaxis], grid, fmin_max=fmin_max)
+        if save_path is None:
+            jpg_path = os.path.join(work_path, type + parameter_Name + "_Field_" + str(fig_id) + '.jpg')
+        fig.savefig(jpg_path)
+        plt.close(fig)
 
 def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None):
     # 绘制一组样本的mean-std分布
@@ -146,7 +166,7 @@ def a_case():
                         )
 
     fig_id = 0
-    parameterList = ["Efficiency", "EntropyStatic"]
+    parameterList = ["Efficiency", "EntropyStatic",""]
     plot_error(post_true, post_pred, parameterList, save_path=None, fig_id=0, label=None)
 
 
@@ -158,7 +178,7 @@ if __name__ == "__main__":
     output_dim = 5
     work_load_path = os.path.join("..", "work_train_2")
     workList = os.listdir(work_load_path)
-    for name in workList:
+    for name in ["FNO_0"]:#workList:
         work_path = os.path.join(work_load_path, name)
         work = WorkPrj(work_path)
 
@@ -220,15 +240,28 @@ if __name__ == "__main__":
                                 inputDict=input_para,
                                 )
 
-            parameterList = ["PressureLossR", "EntropyStatic"]
-            plot_error(post_true, post_pred, parameterList,
-                       save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
+            # parameterList = ["PressureLossR", "EntropyStatic"]
+            parameterList = ["EfficiencyR", "PressureRatioW", "TemperatureRatioW"]
+
+            # plot_error(post_true, post_pred, parameterList,
+            #            save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
             for ii in range(5):
-                post_compare = Post_2d(np.concatenate((true[ii:ii+1,:],pred[ii:ii+1,:]), axis=0), grid,
-                                inputDict=input_para,
-                                )
-                plot_span_curve(post_compare, parameterList,
-                                save_path=None, fig_id=ii, label=None, type=type)
+                Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
+                fig, axs = plt.subplots(5, 3, figsize=(18, 20), num=2)
+
+                Visual.plot_fields_ms(fig, axs, true[ii], pred[ii],grid)
+                fig.savefig(os.path.join(work_path, type + '_solution_' + str(ii) + '.jpg'))
+                plt.close(fig)
+
+            # for ii in range(5):
+            #     post_compare = Post_2d(np.concatenate((true[ii:ii+1,:],pred[ii:ii+1,:]), axis=0), grid,
+            #                     inputDict=input_para,
+            #                     )
+            #     plot_span_curve(post_compare, parameterList,
+            #                     save_path=None, fig_id=ii, label=None, type=type)
+
+
+
 
 
 

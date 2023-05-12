@@ -82,16 +82,15 @@ def get_origin_6field(realpath=None):
 
     return design, fields
 
-def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFlow",
-                                # "Vxyz_X", "Vxyz_Y", "Vxyz_Z",
-                                'Relative Total Pressure', 'Relative Total Temperature',
-                                # 'Entropy'
-                               ],
+def get_origin(quanlityList=None,
                 realpath=None,
                 existcheck=True,
                 shuffled=False,
-                getridbad=True
-                ):
+                getridbad=True):
+
+    if quanlityList is None:
+        quanlityList = ["Static Pressure", "Static Temperature",
+                        'V2', 'W2', "DensityFlow"]
     if realpath is None:
         sample_files = [os.path.join("data", "sampleRstZip_1500"),
                         os.path.join("data", "sampleRstZip_500"),
@@ -120,9 +119,15 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
         reader = MatLoader(file, to_torch=False)
         design.append(reader.read_field('design'))
         output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
+        Cp = 1004
         for jj, quanlity in enumerate(quanlityList):
             if quanlity=="DensityFlow": #设置一个需要计算获得的数据
-                output[:, :, :, jj] = (reader.read_field("Density")*reader.read_field("Vxyz_X")).copy()
+                Vm = np.sqrt(np.power(reader.read_field("Vxyz_X"), 2) + np.power(reader.read_field("Vxyz_Y"), 2))
+                output[:, :, :, jj] = (reader.read_field("Density") * Vm).copy()
+            elif quanlity == "W2": #设置一个需要计算获得的数据
+                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Relative Total Temperature") - reader.read_field("Static Temperature")).copy()
+            elif quanlity == "V2":  # 设置一个需要计算获得的数据
+                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Absolute Total Temperature") - reader.read_field("Static Temperature")).copy()
             else:
                 output[:, :, :, jj] = reader.read_field(quanlity).copy()
         fields.append(output)
