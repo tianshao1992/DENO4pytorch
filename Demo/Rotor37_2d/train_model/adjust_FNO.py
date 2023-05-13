@@ -42,7 +42,7 @@ if __name__ == "__main__":
     worklist = work_construct(dict)
 
     for id, config_dict in enumerate(worklist):
-        work = WorkPrj(os.path.join("..", "work_train_FNO2", name + "_" + str(id)))
+        work = WorkPrj(os.path.join("..", "work_train_FNO", name + "_" + str(id)))
         change_yml(name, yml_path=work.yml, **config_dict)
         add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
         train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)

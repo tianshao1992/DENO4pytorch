@@ -1,6 +1,9 @@
-import torch
 import os
-import numpy as np
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+import torch
+torch.cuda.set_device(0)
+# print(torch.cuda.device_count())
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from post_process.post_data import Post_2d
 from run_FNO import feature_transform
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid
@@ -24,32 +27,34 @@ def work_construct(para_list_dict):
 
 
 if __name__ == "__main__":
-    name = "FNO"
-    # batch_size = 32
+    name = "MLP"
+    batch_size = 32
+    start_id = 0
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
-    # train_num = 2500
-    # valid_num = 400
-    dict = {
-    'modes': [4, 8, 12],
-    'width': [64, 128, 256],
-    'depth': [4, 8, 10],
-    'activation': 'relu'
-    }
+    train_num = 2500
+    valid_num = 400
+    dict_model = {
+                "n_hidden": [256, 512],
+                "num_layers": [8, 10, 12],
+                }
 
-    worklist = work_construct(dict)
+    model_list = work_construct(dict_model)
 
-    for id, config_dict in enumerate(worklist):
-        work = WorkPrj(os.path.join("..", "work_train_1", name + "_" + str(id)))
+    for id, config_dict in enumerate(model_list):
+        work = WorkPrj(os.path.join("..", "work_train_MLP", name + "_" + str(id + start_id)))
+
         change_yml(name, yml_path=work.yml, **config_dict)
-        add_yml(["Optimizer_config", "Scheduler_config", "Basic_config"], yml_path=work.yml)
-        train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, **work.config("Basic"))
+        add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
+
+        # change_yml("Optimizer", yml_path=work.yml, **config_dict)
+        # add_yml([name + "_config", "Scheduler_config"], yml_path=work.yml)
+
+        train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)
         x_normalizer.save(work.x_norm)
         y_normalizer.save(work.y_norm)
         DL_model = DLModelWhole(Device, name=name, work=work)
         DL_model.set_los()
         DL_model.train_epochs(train_loader, valid_loader)
-
-

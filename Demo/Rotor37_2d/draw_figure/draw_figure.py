@@ -176,9 +176,9 @@ if __name__ == "__main__":
     # name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_2")
+    work_load_path = os.path.join("..", "work_train_deepONet")
     workList = os.listdir(work_load_path)
-    for name in ["FNO_0"]:#workList:
+    for name in workList:
         work_path = os.path.join(work_load_path, name)
         work = WorkPrj(work_path)
 
@@ -208,7 +208,7 @@ if __name__ == "__main__":
                 Net_model.load_state_dict(checkpoint['net_model'])
         else:
             Net_model, inference = rebuild_model(work_path, Device, name=nameReal)
-        train_loader, valid_loader, _, _ = loaddata(nameReal, 2500, 400,shuffled=True)
+        train_loader, valid_loader, _, _ = loaddata(nameReal, 2500, 400, shuffled=True)
 
 
         for type in ["valid", "train"]:
@@ -225,9 +225,9 @@ if __name__ == "__main__":
             input_para = {
                 "PressureStatic": 0,
                 "TemperatureStatic": 1,
-                "DensityFlow": 2,
-                "PressureTotalW": 3,
-                "TemperatureTotalW": 4,
+                "V2": 2,
+                "W2": 3,
+                "DensityFlow": 4,
             }
 
             grid = get_grid(real_path=os.path.join("..", "data"))
@@ -240,25 +240,28 @@ if __name__ == "__main__":
                                 inputDict=input_para,
                                 )
 
-            # parameterList = ["PressureLossR", "EntropyStatic"]
-            parameterList = ["EfficiencyR", "PressureRatioW", "TemperatureRatioW"]
+            # parameterList = []
+            parameterList = ["Efficiency", "EfficiencyPoly", "PressureRatioW", "TemperatureRatioW",
+                             "PressureLossR", "EntropyStatic", "MachIsentropic", "Load"]
 
-            # plot_error(post_true, post_pred, parameterList,
-            #            save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
-            for ii in range(5):
-                Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
-                fig, axs = plt.subplots(5, 3, figsize=(18, 20), num=2)
+            plot_error(post_true, post_pred, parameterList,
+                       save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
 
-                Visual.plot_fields_ms(fig, axs, true[ii], pred[ii],grid)
-                fig.savefig(os.path.join(work_path, type + '_solution_' + str(ii) + '.jpg'))
-                plt.close(fig)
+            plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
+            # for ii in range(3):
+            #     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
+            #     fig, axs = plt.subplots(5, 3, figsize=(18, 20), num=2)
+            #
+            #     Visual.plot_fields_ms(fig, axs, true[ii], pred[ii],grid)
+            #     fig.savefig(os.path.join(work_path, type + '_solution_' + str(ii) + '.jpg'))
+            #     plt.close(fig)
 
-            # for ii in range(5):
-            #     post_compare = Post_2d(np.concatenate((true[ii:ii+1,:],pred[ii:ii+1,:]), axis=0), grid,
-            #                     inputDict=input_para,
-            #                     )
-            #     plot_span_curve(post_compare, parameterList,
-            #                     save_path=None, fig_id=ii, label=None, type=type)
+            for ii in range(3):
+                post_compare = Post_2d(np.concatenate((true[ii:ii+1,:],pred[ii:ii+1,:]), axis=0), grid,
+                                inputDict=input_para,
+                                )
+                plot_span_curve(post_compare, parameterList,
+                                save_path=None, fig_id=ii, label=None, type=type, work_path=work_path)
 
 
 

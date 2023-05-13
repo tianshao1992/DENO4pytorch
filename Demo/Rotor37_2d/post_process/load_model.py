@@ -49,7 +49,7 @@ def loaddata(name,
         train_y = train_y.reshape([train_y.shape[0], -1])
         valid_y = valid_y.reshape([valid_y.shape[0], -1])
 
-    if noise_scale is not None: # 向数据中增加噪声
+    if noise_scale is not None and noise_scale > 0: # 向数据中增加噪声
         noise_train = get_noise(train_y.shape, noise_scale)
         train_y = train_y + noise_train
 
@@ -72,6 +72,8 @@ def loaddata(name,
         # grid_trans = grid_trans.reshape([1, -1, 2])
         train_grid = train_grid.reshape([train_x.shape[0], -1, 2])
         valid_grid = valid_grid.reshape([valid_x.shape[0], -1, 2])
+        train_y = train_y.reshape([train_y.shape[0], -1, 5])
+        valid_y = valid_y.reshape([valid_y.shape[0], -1, 5])
 
         train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_grid, train_y),
                                                    batch_size=batch_size, shuffle=True, drop_last=True)
@@ -178,13 +180,22 @@ def get_true_pred(loader, Net_model, inference, Device,
                   name=None, out_dim=5, iters=0):
     true_list = []
     pred_list = []
-    for ii, (data_x, data_y) in enumerate(loader):
+    for ii, data_box in enumerate(loader):
         if ii > iters:
             break
-        sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_y),
-                                                 batch_size=loader.batch_size,
-                                                 shuffle=False,
-                                                 drop_last=True)
+        if name in ("deepONet"):
+            (data_x, data_f, data_y) = data_box
+            sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_f, data_y),
+                                                     batch_size=loader.batch_size,
+                                                     shuffle=False,
+                                                     drop_last=True)
+        else:
+            (data_x, data_y) = data_box
+
+            sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_y),
+                                                     batch_size=loader.batch_size,
+                                                     shuffle=False,
+                                                     drop_last=True)
     # for ii in range(iters):
         if name in ('MLP'):
             _, true, pred = inference(sub_loader, Net_model, Device)

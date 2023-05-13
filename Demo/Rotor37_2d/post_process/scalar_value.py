@@ -12,7 +12,7 @@ if __name__ == "__main__":
     if not isCreated: os.mkdir(work_path)
 
     grid = get_grid(real_path=os.path.join("..", "data"))
-    design, field = get_origin(realpath=os.path.join("..", "data"), getridbad=False,
+    design, field = get_origin(realpath=os.path.join("..", "data"),
                                quanlityList=["Static Pressure", "Static Temperature",
                                              'Absolute Total Temperature',  # 'Absolute Total Pressure',
                                              'Relative Total Temperature',  # 'Relative Total Pressure',
@@ -43,6 +43,12 @@ if __name__ == "__main__":
         value_span = getattr(post_true, parameter)
         scalar = post_true.span_density_average(value_span[:, :, -1])
         all_dict.update({parameter: scalar})
+
+
+    hub_out = 0.1948
+    shroud_out = 0.2370
+    MassFlow = post_true.span_space_average(post_true.DensityFlow[:, :, -1])*(shroud_out**2-hub_out**2)*np.pi
+    all_dict.update({"MassFlow": MassFlow})
 
     #保存数据
     np.savez(os.path.join(work_path, 'scalar_value.npz'), **all_dict)

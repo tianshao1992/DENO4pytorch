@@ -126,7 +126,7 @@ class DLModelWhole(object):
             print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
                   format(epoch, self.Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1],
                          time.time() - star_time))
-            print(os.environ['CUDA_VISIBLE_DEVICES'])
+            # print(os.environ['CUDA_VISIBLE_DEVICES'])
             star_time = time.time()
 
             if epoch > 0 and epoch % 5 == 0:

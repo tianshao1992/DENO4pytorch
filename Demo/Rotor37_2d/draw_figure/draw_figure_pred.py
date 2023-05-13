@@ -49,7 +49,7 @@ if __name__ == "__main__":
     name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_1")
+    work_load_path = os.path.join("..", "work_train_FNO")
     work_path = os.path.join(work_load_path, name)
     work = WorkPrj(work_path)
 
@@ -101,9 +101,9 @@ if __name__ == "__main__":
         input_para = {
             "PressureStatic": 0,
             "TemperatureStatic": 1,
-            "DensityFlow": 2,
-            "PressureTotalW": 3,
-            "TemperatureTotalW": 4,
+            "V2": 2,
+            "W2": 3,
+            "DensityFlow": 4,
         }
         grid = get_grid(real_path=os.path.join("..", "data"))
         post_pred = Post_2d(pred.detach().cpu().numpy(), grid,
@@ -112,6 +112,6 @@ if __name__ == "__main__":
 
         fig_id = 0
 
-        parameterList = ["PressureLossR"]
+        parameterList = ["Efficiency"]
         plot_span_std(post_pred, parameterList, work_path=work_path, fig_id=ii)
 
