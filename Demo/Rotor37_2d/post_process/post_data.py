@@ -615,6 +615,13 @@ class Post_2d(object):
     MachIsentropic = property(get_MachIsentropic, set_MachIsentropic)
     Load = property(get_Load, set_Load)
 
+    def get_MassFlow(self):
+        hub_out = 0.1948
+        shroud_out = 0.2370
+        MassFlow = self.span_space_average(self.DensityFlow[:, :, -1]) * (
+                    shroud_out ** 2 - hub_out ** 2) * np.pi
+        return MassFlow
+
 
 if __name__ == "__main__":
     grid = np.random.rand(64,64,2)
