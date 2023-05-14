@@ -93,20 +93,29 @@ def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, wor
 
 
 def plot_error(post_true, post_pred, parameterList,
-               save_path=None, fig_id=0, label=None, work_path=None, type=None):
+               save_path = None, fig_id = 0, label=None, work_path=None, type=None, paraNameList = None):
     """
     针对某个对象0维性能参数，绘制预测误差表示图
     """
     if not isinstance(parameterList, list):
         parameterList = [parameterList]
-
-    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('unset'))  # 不在此处设置名称
+    Err_all = []
+    if paraNameList is None:
+        paraNameList = ('n')
+    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=paraNameList) # 不在此处设置名称
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 1, figsize=(10, 10), num=1)
-        value_span_true = getattr(post_true, parameter_Name)  # shape[num, 64, 64]
-        value_span_true = post_true.span_density_average(value_span_true[:, :, -1])  # shape[num, 1]
-        value_span_pred = getattr(post_pred, parameter_Name)
-        value_span_pred = post_true.span_density_average(value_span_pred[:, :, -1])
+
+        if parameter_Name in ("MassFlow"):
+            value_span_true = post_true.get_MassFlow()
+            value_span_pred = post_pred.get_MassFlow()
+
+
+        else:
+            value_span_true = getattr(post_true, parameter_Name) #shape[num, 64, 64]
+            value_span_true = post_true.span_density_average(value_span_true[:, :, -1]) # shape[num, 1]
+            value_span_pred = getattr(post_pred, parameter_Name)
+            value_span_pred = post_true.span_density_average(value_span_pred[:, :, -1])
 
         Visual.plot_regression(fig, axs, value_span_true.squeeze(), value_span_pred.squeeze(),
                                title=parameter_Name)
@@ -116,6 +125,16 @@ def plot_error(post_true, post_pred, parameterList,
         fig.savefig(jpg_path)
         plt.close(fig)
 
+        Err = np.abs((value_span_pred - value_span_true) / value_span_true)
+        Err_all.append(Err)
+
+    Err_all = np.concatenate(Err_all, axis=1)
+    fig, axs = plt.subplots(1, 1, figsize=(10, 10), num=1)
+    Visual.plot_box(fig, axs, Err_all, xticks=Visual.field_name)
+
+    jpg_path = os.path.join(work_path, type + "_error-box.jpg")
+    fig.savefig(jpg_path)
+    plt.close(fig)
 
 def plot_error_box(true, pred, save_path=None, type=None):
     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
@@ -247,18 +266,18 @@ if __name__ == "__main__":
             # parameterList = []
             parameterList = ["Efficiency", "EfficiencyPoly", "PressureRatioW", "TemperatureRatioW",
                              "PressureLossR", "EntropyStatic", "MachIsentropic", "Load"]
+            parameterListN = [
+                "PR", "TR",
+                "Eff", "EffPoly",
+                "PLoss", "Entr",
+                "Mach", "Load",
+                "MF"]
 
-            plot_error(post_true, post_pred, parameterList,
+            plot_error(post_true, post_pred, parameterList + ["MassFlow"],
+                       paraNameList=parameterListN,
                        save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
 
             plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
-            # for ii in range(3):
-            #     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
-            #     fig, axs = plt.subplots(5, 3, figsize=(18, 20), num=2)
-            #
-            #     Visual.plot_fields_ms(fig, axs, true[ii], pred[ii],grid)
-            #     fig.savefig(os.path.join(work_path, type + '_solution_' + str(ii) + '.jpg'))
-            #     plt.close(fig)
 
             for ii in range(3):
                 post_compare = Post_2d(np.concatenate((true[ii:ii + 1, :], pred[ii:ii + 1, :]), axis=0), grid,
