@@ -148,12 +148,12 @@ if __name__ == "__main__":
         nvalid = 200
 
         # modes = (10, 10)
-        modes = (mode, mode)
-        width = 64
+        modes = (4, 4)
+        width = 128
         depth = 4
         steps = 1
         padding = 8
-        dropout = 0.0
+        dropout = 0.5
 
         batch_size = 32
         epochs = 1001
