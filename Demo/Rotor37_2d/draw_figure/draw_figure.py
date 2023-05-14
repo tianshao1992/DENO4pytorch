@@ -265,8 +265,15 @@ if __name__ == "__main__":
             # parameterList = []
             parameterList = ["Efficiency", "EfficiencyPoly", "PressureRatioW", "TemperatureRatioW",
                              "PressureLossR", "EntropyStatic", "MachIsentropic", "Load"]
+            parameterListN = [
+                "PR", "TR",
+                "Eff", "EffPoly",
+                "PLoss", "Entr",
+                "Mach", "Load",
+                "MF"]
 
-            plot_error(post_true, post_pred, parameterList,
+            plot_error(post_true, post_pred, parameterList + ["MassFlow"],
+                       paraNameList=parameterListN,
                        save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
 
             plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
