@@ -21,6 +21,7 @@ def work_construct(para_list_dict):
 
     return work_list
 
+
 def work_construct_togethor(para_list_dict):
     work_list = []
     num = 1
@@ -35,9 +36,6 @@ def work_construct_togethor(para_list_dict):
 
         work_list.append(dict_new)
 
-    return work_list
-
-
 if __name__ == "__main__":
     name = "FNO"
     batch_size = 32
@@ -48,16 +46,16 @@ if __name__ == "__main__":
     train_num = 2500
     valid_num = 400
     dict = {
-    'modes': [4, 8, 12],
-    'width': [64, 128, 256],
-    'depth': [4, 8, 10],
+    'modes': [4],
+    'width': [128],
+    'depth': [4],
     'activation': ['relu']
     }
 
     worklist = work_construct_togethor(dict)
 
     for id, config_dict in enumerate(worklist):
-        work = WorkPrj(os.path.join("..", "work_train_FNO", name + "_" + str(id)))
+        work = WorkPrj(os.path.join("..", "work_train_FNO1", name + "_" + str(id)))
         change_yml(name, yml_path=work.yml, **config_dict)
         add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
         train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)

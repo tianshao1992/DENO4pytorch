@@ -38,22 +38,15 @@ if __name__ == "__main__":
                 'num_encoder_layers': [3, 5, 6],
                 'n_hidden': [64, 128, 256],
                 'dropout': [0.5],
-                }
-    dict_optimizer = {
-        'learning_rate': [0.1, 0.08, 0.06, 0.05]
     }
 
     model_list = work_construct(dict_model)
-    opt_list = work_construct(dict_optimizer)
 
-    for id, config_dict in enumerate(opt_list):
-        work = WorkPrj(os.path.join("..", "work_train_1", name + "_" + str(id + start_id)))
+    for id, config_dict in enumerate(model_list):
+        work = WorkPrj(os.path.join("..", "work_train_Trans", name + "_" + str(id + start_id)))
 
-        # change_yml(name, yml_path=work.yml, **config_dict)
-        # add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
-
-        change_yml("Optimizer", yml_path=work.yml, **config_dict)
-        add_yml([name + "_config", "Scheduler_config"], yml_path=work.yml)
+        change_yml(name, yml_path=work.yml, **config_dict)
+        add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
 
         train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)
         x_normalizer.save(work.x_norm)

@@ -49,6 +49,8 @@ if __name__ == "__main__":
     shroud_out = 0.2370
     MassFlow = post_true.span_space_average(post_true.DensityFlow[:, :, -1])*(shroud_out**2-hub_out**2)*np.pi
     all_dict.update({"MassFlow": MassFlow})
+    all_dict.update({"Design": design})
+
 
     #保存数据
     np.savez(os.path.join(work_path, 'scalar_value.npz'), **all_dict)

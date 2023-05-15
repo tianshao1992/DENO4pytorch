@@ -13,6 +13,7 @@ from post_process.load_model import loaddata, rebuild_model, get_true_pred, buil
 from train_model.model_whole_life import WorkPrj
 from Utilizes.loss_metrics import FieldsLpLoss
 
+
 def load_Npz(npzFile, quanlityList=None):
     loaded_dict = np.load(npzFile)
     if quanlityList is None:
@@ -20,7 +21,7 @@ def load_Npz(npzFile, quanlityList=None):
     fields = np.zeros([64, 64, len(quanlityList)])
     for ii, quanlity in enumerate(quanlityList):
         if quanlity in loaded_dict.files:
-            fields[:,:,ii] = loaded_dict[quanlity]
+            fields[:, :, ii] = loaded_dict[quanlity]
 
     return fields
 
@@ -43,18 +44,18 @@ def plot_flow_curve(post, parameterList, save_path = None, work_path=None, fig_i
         fig.savefig(jpg_path)
         plt.close(fig)
 
-def plot_span_curve(post, parameterList, save_path = None, work_path=None, fig_id = 0, label = None, type=''):
-# 绘制单个对象曲线
-    if not isinstance(parameterList,list):
+def plot_span_curve(post, parameterList, save_path=None, work_path=None, fig_id=0, label=None, type=''):
+    # 绘制单个对象曲线
+    if not isinstance(parameterList, list):
         parameterList = [parameterList]
 
-    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('n')) # 不在此处设置名称
+    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('n'))  # 不在此处设置名称
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
         value_span = getattr(post, parameter_Name)
 
         for ii in range(post.num):
-            Visual.plot_value(fig, axs, value_span[ii, :, -1], np.linspace(0,1,post.n_1d), label=label,
+            Visual.plot_value(fig, axs, value_span[ii, :, -1], np.linspace(0, 1, post.n_1d), label=label,
                               title=parameter_Name, xylabels=(parameter_Name, "span"))
 
         if save_path is None:
@@ -62,12 +63,14 @@ def plot_span_curve(post, parameterList, save_path = None, work_path=None, fig_i
         fig.savefig(jpg_path)
         plt.close(fig)
 
-def plot_field_2d(post_true, post_pred, parameterList, save_path = None, work_path=None, fig_id = 0, label = None, type='', grid=None):
-# 绘制单个对象曲线
-    if not isinstance(parameterList,list):
+
+def plot_field_2d(post_true, post_pred, parameterList, save_path=None, work_path=None, fig_id=0, label=None, type='',
+                  grid=None):
+    # 绘制单个对象曲线
+    if not isinstance(parameterList, list):
         parameterList = [parameterList]
 
-    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('n')) # 不在此处设置名称
+    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('n'))  # 不在此处设置名称
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
         value_field_true = getattr(post_true, parameter_Name)
@@ -75,29 +78,31 @@ def plot_field_2d(post_true, post_pred, parameterList, save_path = None, work_pa
 
         fmin_max = None
         if 'Efficiency' in parameter_Name:
-            fmin_max = [[0], [1]] #因为函数默认有多个输入，这里是二维数组
+            fmin_max = [[0], [1]]  # 因为函数默认有多个输入，这里是二维数组
 
-        Visual.plot_fields_ms(fig, axs, value_field_true[0,:,:,np.newaxis], value_field_pred[0,:,:,np.newaxis], grid, fmin_max=fmin_max)
+        Visual.plot_fields_ms(fig, axs, value_field_true[0, :, :, np.newaxis], value_field_pred[0, :, :, np.newaxis],
+                              grid, fmin_max=fmin_max)
         if save_path is None:
             jpg_path = os.path.join(work_path, type + parameter_Name + "_Field_" + str(fig_id) + '.jpg')
         fig.savefig(jpg_path)
         plt.close(fig)
 
+
 def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None):
     # 绘制一组样本的mean-std分布
-    if not isinstance(parameterList,list):
+    if not isinstance(parameterList, list):
         parameterList = [parameterList]
 
-    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('unset')) # 不在此处设置名称
+    Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('unset'))  # 不在此处设置名称
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
-        value_span = getattr(post, parameter_Name) # shape = [num, 64, 64]
+        value_span = getattr(post, parameter_Name)  # shape = [num, 64, 64]
 
-        normalizer = DataNormer(value_span, method='mean-std', axis=(0, )) #这里对网格上的具体数据进行平均
+        normalizer = DataNormer(value_span, method='mean-std', axis=(0,))  # 这里对网格上的具体数据进行平均
 
-        Visual.plot_value_std(fig, axs, normalizer.mean[:, -1], np.linspace(0,1,post.n_1d), label=label,
-                          std=normalizer.std[:,-1], rangeIndex=1e2, stdaxis=0,
-                          title=parameter_Name, xylabels=(parameter_Name, "span"))
+        Visual.plot_value_std(fig, axs, normalizer.mean[:, -1], np.linspace(0, 1, post.n_1d), label=label,
+                              std=normalizer.std[:, -1], rangeIndex=1e2, stdaxis=0,
+                              title=parameter_Name, xylabels=(parameter_Name, "span"))
 
         if save_path is None:
             jpg_path = os.path.join(work_path, parameter_Name + "_std_" + str(fig_id) + '.jpg')
@@ -154,7 +159,7 @@ def plot_error(post_true, post_pred, parameterList,
             value_span_pred = post_true.span_density_average(value_span_pred[:, :, -1])
 
         Visual.plot_regression(fig, axs, value_span_true.squeeze(), value_span_pred.squeeze(),
-                          title=parameter_Name)
+                               title=parameter_Name)
 
         if save_path is None:
             jpg_path = os.path.join(work_path, type + parameter_Name + "_error_" + str(fig_id) + '.jpg')
@@ -171,8 +176,6 @@ def plot_error(post_true, post_pred, parameterList,
     jpg_path = os.path.join(work_path, type + "_error-box.jpg")
     fig.savefig(jpg_path)
     plt.close(fig)
-
-
 
 def plot_error_box(true, pred, save_path=None, type=None):
     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
@@ -198,6 +201,7 @@ def plot_saliency_map():
     """
     对于28个变量的贡献度进行分析
     """
+
 
 def a_case():
     work_path = os.path.join("..", "data_collect")
@@ -230,9 +234,8 @@ def a_case():
                         )
 
     fig_id = 0
-    parameterList = ["Efficiency", "EntropyStatic",""]
+    parameterList = ["Efficiency", "EntropyStatic", ""]
     plot_error(post_true, post_pred, parameterList, save_path=None, fig_id=0, label=None)
-
 
 
 if __name__ == "__main__":
@@ -240,7 +243,7 @@ if __name__ == "__main__":
     # name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_deepONet")
+    work_load_path = os.path.join("..", "work_train_FNO2")
     workList = os.listdir(work_load_path)
     for name in workList:
         work_path = os.path.join(work_load_path, name)
@@ -255,7 +258,6 @@ if __name__ == "__main__":
             Device = torch.device('cuda')
         else:
             Device = torch.device('cpu')
-
 
         norm_save_x = work.x_norm
         norm_save_y = work.y_norm
@@ -274,17 +276,15 @@ if __name__ == "__main__":
             Net_model, inference = rebuild_model(work_path, Device, name=nameReal)
         train_loader, valid_loader, _, _ = loaddata(nameReal, 2500, 400, shuffled=True)
 
-
         for type in ["valid", "train"]:
-            if type=="valid":
+            if type == "valid":
                 true, pred = get_true_pred(valid_loader, Net_model, inference, Device,
-                                                       name=nameReal, iters=10)
-            elif type=="train":
+                                           name=nameReal, iters=10)
+            elif type == "train":
                 true, pred = get_true_pred(train_loader, Net_model, inference, Device,
-                                                       name=nameReal, iters=10)
+                                           name=nameReal, iters=10)
             true = y_normalizer.back(true)
             pred = y_normalizer.back(pred)
-
 
             input_para = {
                 "PressureStatic": 0,
@@ -321,15 +321,8 @@ if __name__ == "__main__":
             plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
 
             for ii in range(3):
-                post_compare = Post_2d(np.concatenate((true[ii:ii+1,:],pred[ii:ii+1,:]), axis=0), grid,
-                                inputDict=input_para,
-                                )
+                post_compare = Post_2d(np.concatenate((true[ii:ii + 1, :], pred[ii:ii + 1, :]), axis=0), grid,
+                                       inputDict=input_para,
+                                       )
                 plot_span_curve(post_compare, parameterList,
                                 save_path=None, fig_id=ii, label=None, type=type, work_path=work_path)
-
-
-
-
-
-
-
