@@ -172,7 +172,7 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_value_std(self, fig, axs, x, y, label, std = None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1):
+    def plot_value_std(self, fig, axs, x, y, label, std = None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1e2):
         """
         stdaxis 表示std所在的坐标维度 x-0, y-1
         """

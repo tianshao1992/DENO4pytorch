@@ -51,12 +51,19 @@ class DLModelPost(object):
 
         pred_2d = self.predicter_2d(input, input_norm=input_norm)
         if input_para is None:
+            # input_para = {
+            #     "PressureStatic": 0,
+            #     "TemperatureStatic": 1,
+            #     "Density": 2,
+            #     "PressureTotalW": 3,
+            #     "TemperatureTotalW": 4,
+            # }
             input_para = {
                 "PressureStatic": 0,
                 "TemperatureStatic": 1,
-                "Density": 2,
-                "PressureTotalW": 3,
-                "TemperatureTotalW": 4,
+                "V2": 2,
+                "W2": 3,
+                "DensityFlow": 4,
             }
 
         grid = get_grid(real_path=os.path.join("..", "data"))

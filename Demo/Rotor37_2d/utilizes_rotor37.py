@@ -190,70 +190,27 @@ def get_value(data_2d, input_para=None, parameterList=None):
     return np.concatenate(Rst, axis=1)
 
 
-class Rotor37WeightLoss(object):
-    def __init__(self, d=2, p=2, reduction=True, size_average=False):
+class Rotor37WeightLoss(torch.nn.Module):
+    def __init__(self):
         super(Rotor37WeightLoss, self).__init__()
 
-        # Dimension and Lp-norm type are postive
-        assert d > 0 and p > 0
+    def forward(self, predicted, target):
+        # 自定义损失计算逻辑
+        if len(target.shape)==2:
+            predicted = predicted.unsqueeze(0) #加一个维度
 
-        self.d = d
-        self.p = p
-        self.reduction = reduction
-        self.size_average = size_average
+        grid_size_1 = target.shape[1]
+        grid_size_2 = target.shape[2]
+        weighted_lines = 2
+        weighted_cof = 10
 
-    def abs(self, x, y):
+        temp1 = torch.ones((grid_size_1, weighted_lines)) * weighted_cof
+        temp2 = torch.ones((grid_size_1, grid_size_2 - weighted_lines * 2))
+        weighted_mat = torch.cat((temp1, temp2, temp1), dim=1)
+        weighted_mat = weighted_mat.unsqueeze(0).expand(target.shape[0], -1, -1)
 
-        # Assume uniform mesh
-        # h = 1.0 / (x.size()[1] - 1.0) (h ** (self.d / self.p)) *
-
-        if torch.is_tensor(x):
-
-            all_norms = torch.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
-
-            if self.reduction:
-                if self.size_average:
-                    return torch.mean(all_norms)
-                else:
-                    return all_norms
-        else:
-            all_norms = np.linalg.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]),
-                                   self.p, 1)
-
-            if self.reduction:
-                if self.size_average:
-                    return np.mean(all_norms)
-                else:
-                    return all_norms
-
-        return all_norms
-
-    def rel(self, x, y):
-
-        if torch.is_tensor(x):
-            diff_norms = torch.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
-            y_norms = torch.norm(y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
-
-            if self.reduction:
-                if self.size_average:
-                    return torch.mean(diff_norms / y_norms)
-                else:
-                    return diff_norms / y_norms
-        else:
-            diff_norms = np.linalg.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]),
-                                    self.p, 1)
-            y_norms = np.linalg.norm(y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
-
-            if self.reduction:
-                if self.size_average:
-                    return np.mean(diff_norms / (y_norms+1e-20))
-                else:
-                    return diff_norms / (y_norms+1e-20)
-
-        return diff_norms / (y_norms+1e-20)
-
-    def __call__(self, x, y):
-        return self.rel(x, y)
+        loss = torch.nn.MSELoss(predicted * weighted_mat, target * weighted_mat)
+        return loss
 
 if __name__ == "__main__":
     design, field = get_origin()

@@ -36,11 +36,11 @@ def plot_flow_curve(post, parameterList, save_path = None, work_path=None, fig_i
         value_flow = post.field_density_average(parameter_Name, location="whole")
 
         for ii in range(post.num):
-            Visual.plot_value(fig, axs, np.linspace(0,1,post.n_2d), value_flow.squeeze(), label=label,
+            Visual.plot_value(fig, axs, np.linspace(0,1,post.n_2d), value_flow[ii], label=label,
                               title=parameter_Name, xylabels=(parameter_Name, "z-axis"))
 
         if save_path is None:
-            jpg_path = os.path.join(work_path, type + parameter_Name + "_" + str(fig_id) + '.jpg')
+            jpg_path = os.path.join(work_path, type + parameter_Name + "_flow_" + str(fig_id) + '.jpg')
         fig.savefig(jpg_path)
         plt.close(fig)
 
@@ -88,7 +88,7 @@ def plot_field_2d(post_true, post_pred, parameterList, save_path=None, work_path
         plt.close(fig)
 
 
-def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None):
+def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None, rangeIndex=1e2):
     # 绘制一组样本的mean-std分布
     if not isinstance(parameterList, list):
         parameterList = [parameterList]
@@ -96,12 +96,13 @@ def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, wor
     Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('unset'))  # 不在此处设置名称
     for parameter_Name in parameterList:
         fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
+
         value_span = getattr(post, parameter_Name)  # shape = [num, 64, 64]
+        value_span = np.mean(value_span[:, :, -10:], axis=2) # shape = [num, 64]
+        normalizer = DataNormer(value_span, method='mean-std', axis=0)  # 这里对网格上的具体数据进行平均
 
-        normalizer = DataNormer(value_span, method='mean-std', axis=(0,))  # 这里对网格上的具体数据进行平均
-
-        Visual.plot_value_std(fig, axs, normalizer.mean[:, -1], np.linspace(0, 1, post.n_1d), label=label,
-                              std=normalizer.std[:, -1], rangeIndex=1e2, stdaxis=0,
+        Visual.plot_value_std(fig, axs, normalizer.mean, np.linspace(0, 1, post.n_1d), label=label,
+                              std=normalizer.std, rangeIndex=rangeIndex, stdaxis=0,
                               title=parameter_Name, xylabels=(parameter_Name, "span"))
 
         if save_path is None:
@@ -109,25 +110,25 @@ def plot_span_std(post, parameterList, save_path=None, fig_id=0, label=None, wor
         fig.savefig(jpg_path)
         plt.close(fig)
 
-def plot_flow_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None):
+def plot_flow_std(post, parameterList, save_path=None, fig_id=0, label=None, work_path=None, rangeIndex=1e2):
     # 绘制一组样本的mean-std分布
     if not isinstance(parameterList,list):
         parameterList = [parameterList]
 
     Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=('unset')) # 不在此处设置名称
     for parameter_Name in parameterList:
-        fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
-        value_span = getattr(post, parameter_Name) # shape = [num, 64, 64]
+        fig, axs = plt.subplots(1, 1, figsize=(6, 3), num=1)
+        # value_span = getattr(post, parameter_Name) # shape = [num, 64, 64]
         value_flow = post.field_density_average(parameter_Name, location="whole")
 
-        normalizer = DataNormer(value_span, method='mean-std', axis=(0, )) #这里对网格上的具体数据进行平均
+        normalizer = DataNormer(value_flow, method='mean-std', axis=(0, )) #这里对网格上的具体数据进行平均
 
-        Visual.plot_value_std(fig, axs, normalizer.mean[:, -1], np.linspace(0,1,post.n_1d), label=label,
-                          std=normalizer.std[:,-1], rangeIndex=1e2, stdaxis=1,
+        Visual.plot_value_std(fig, axs, np.linspace(0,1,post.n_1d), normalizer.mean, label=label,
+                          std=normalizer.std, stdaxis=1, rangeIndex=rangeIndex,
                           title=parameter_Name, xylabels=(parameter_Name, "span"))
 
         if save_path is None:
-            jpg_path = os.path.join(work_path, parameter_Name + "_std_" + str(fig_id) + '.jpg')
+            jpg_path = os.path.join(work_path, parameter_Name + "_flow_std_" + str(fig_id) + '.jpg')
         fig.savefig(jpg_path)
         plt.close(fig)
 
