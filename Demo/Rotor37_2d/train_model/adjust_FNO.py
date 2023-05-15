@@ -1,15 +1,6 @@
 import torch
 import os
-import numpy as np
-from post_process.post_data import Post_2d
-from run_FNO import feature_transform
-from Demo.Rotor37_2d.utilizes_rotor37 import get_grid
 from post_process.load_model import build_model_yml, loaddata
-from post_process.model_predict import DLModelPost
-from Utilizes.visual_data import MatplotlibVision
-import matplotlib.pyplot as plt
-import yaml
-import time
 from model_whole_life import WorkPrj, DLModelWhole, change_yml, add_yml
 
 def work_construct(para_list_dict):
@@ -21,15 +12,20 @@ def work_construct(para_list_dict):
 
     return work_list
 
-def work_adjust(para_list_dict):
-    # 获得调参参数
-    n_arges=0
-    for key in para_list_dict.keys():
-        n_arges = len(para_list_dict[key])
-    # work list
+def work_construct_togethor(para_list_dict):
     work_list = []
-    for i in range(n_arges):
-        work_list.append({key: para_list_dict[key][i]for key in para_list_dict})
+    num = 1
+    for key in para_list_dict.keys():
+        num = num * len(para_list_dict[key])
+
+    for ii in range(num):
+        dict_new = {}
+        for key in para_list_dict.keys():
+            idx = ii % len(para_list_dict[key])
+            dict_new.update({key:para_list_dict[key][idx]})
+
+        work_list.append(dict_new)
+
     return work_list
 
 
@@ -42,6 +38,7 @@ if __name__ == "__main__":
         Device = torch.device('cpu')
     train_num = 2500
     valid_num = 400
+    start_id = 9
     dict = {
     'modes': [4],
     'width': [128],
@@ -49,7 +46,7 @@ if __name__ == "__main__":
     'activation': ['relu']
     }
 
-    worklist = work_adjust(dict)
+    worklist = work_construct_togethor(dict)
 
     for id, config_dict in enumerate(worklist):
         work = WorkPrj(os.path.join("..", "work_train_FNO1", name + "_" + str(id)))

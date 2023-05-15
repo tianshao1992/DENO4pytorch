@@ -620,7 +620,7 @@ class Post_2d(object):
         shroud_out = 0.2370
         MassFlow = self.span_space_average(self.DensityFlow[:, :, -1]) * (
                     shroud_out ** 2 - hub_out ** 2) * np.pi
-        return MassFlow
+        return MassFlow[:,np.newaxis]
 
 
 if __name__ == "__main__":
