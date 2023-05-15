@@ -23,9 +23,7 @@ def work_construct_togethor(para_list_dict):
         for key in para_list_dict.keys():
             idx = ii % len(para_list_dict[key])
             dict_new.update({key:para_list_dict[key][idx]})
-
         work_list.append(dict_new)
-
     return work_list
 
 

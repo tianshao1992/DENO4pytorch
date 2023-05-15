@@ -112,6 +112,36 @@ class Post_2d(object):
         self.n_1d = self.data_2d.shape[1]
         self.n_2d = self.data_2d.shape[2]
 
+    def field_density_average(self, parameter_Name, shape_index=None, location="outlet"):
+        data = getattr(self, parameter_Name) # 整个二维空间的取值
+
+        # shape check
+        if shape_index is None:
+            shape = slice(0, None)
+            if location=="outlet":
+                shape = slice(-1, None)
+            elif location=="near_outlet":
+                shape = slice(-5, None)
+            elif location=="whole":
+                shape = slice(None)
+        else:
+            shape = slice(shape_index[0], shape_index[1])
+
+        data = data[..., shape]
+
+        if self.DensityFlow is not None:
+            density_aver = np.mean(self.DensityFlow[..., shape], axis=1, keepdims=True)
+            if len(density_aver.shape)==2:
+                density_aver = density_aver[..., None]
+            density_norm = self.DensityFlow[..., shape]\
+                           /np.tile(density_aver, (1, self.n_2d, 1))
+
+            return np.mean(data * density_norm, axis=1)
+        else:
+            print("The parameter DensityFlow is not exist, CHECK PLEASE!")
+            return self.span_space_average(data)
+
+
     def span_density_average(self, data, shape_index=None, location="outlet"): #输入为2维ndarry
         # data check
         if len(data.shape)<2:

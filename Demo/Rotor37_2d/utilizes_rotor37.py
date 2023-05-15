@@ -1,5 +1,6 @@
 import numpy as np
 import yaml
+import torch
 from Utilizes.process_data import DataNormer, MatLoader
 from post_process.post_data import Post_2d
 import os
@@ -187,6 +188,72 @@ def get_value(data_2d, input_para=None, parameterList=None):
         Rst.append(value)
 
     return np.concatenate(Rst, axis=1)
+
+
+class Rotor37WeightLoss(object):
+    def __init__(self, d=2, p=2, reduction=True, size_average=False):
+        super(Rotor37WeightLoss, self).__init__()
+
+        # Dimension and Lp-norm type are postive
+        assert d > 0 and p > 0
+
+        self.d = d
+        self.p = p
+        self.reduction = reduction
+        self.size_average = size_average
+
+    def abs(self, x, y):
+
+        # Assume uniform mesh
+        # h = 1.0 / (x.size()[1] - 1.0) (h ** (self.d / self.p)) *
+
+        if torch.is_tensor(x):
+
+            all_norms = torch.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
+
+            if self.reduction:
+                if self.size_average:
+                    return torch.mean(all_norms)
+                else:
+                    return all_norms
+        else:
+            all_norms = np.linalg.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]),
+                                   self.p, 1)
+
+            if self.reduction:
+                if self.size_average:
+                    return np.mean(all_norms)
+                else:
+                    return all_norms
+
+        return all_norms
+
+    def rel(self, x, y):
+
+        if torch.is_tensor(x):
+            diff_norms = torch.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
+            y_norms = torch.norm(y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
+
+            if self.reduction:
+                if self.size_average:
+                    return torch.mean(diff_norms / y_norms)
+                else:
+                    return diff_norms / y_norms
+        else:
+            diff_norms = np.linalg.norm(x.reshape(x.shape[0], -1, x.shape[-1]) - y.reshape(x.shape[0], -1, x.shape[-1]),
+                                    self.p, 1)
+            y_norms = np.linalg.norm(y.reshape(x.shape[0], -1, x.shape[-1]), self.p, 1)
+
+            if self.reduction:
+                if self.size_average:
+                    return np.mean(diff_norms / (y_norms+1e-20))
+                else:
+                    return diff_norms / (y_norms+1e-20)
+
+        return diff_norms / (y_norms+1e-20)
+
+    def __call__(self, x, y):
+        return self.rel(x, y)
 
 if __name__ == "__main__":
     design, field = get_origin()

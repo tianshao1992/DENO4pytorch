@@ -5,7 +5,7 @@ import torch
 from post_process.load_model import loaddata, rebuild_model, build_model_yml
 from Utilizes.process_data import DataNormer, MatLoader, SquareMeshGenerator
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
-from draw_figure import plot_span_std, plot_span_curve, plot_field_2d
+from draw_figure import plot_span_std, plot_span_curve, plot_field_2d, plot_flow_curve
 from Utilizes.visual_data import MatplotlibVision
 import matplotlib.pyplot as plt
 from post_process.post_data import Post_2d
@@ -47,9 +47,11 @@ if __name__ == "__main__":
                      "Efficiency", "EfficiencyPoly",
                      "PressureLossR", "EntropyStatic",
                      "MachIsentropic", "Load"]
+
     hub_out = 0.1948
     shroud_out = 0.2370
     # print(post_true.span_space_average(post_true.DensityFlow[:, :, -1])*(shroud_out**2-hub_out**2)*np.pi)
-    plot_span_curve(post_true, parameterList, work_path=work_path)
+    # plot_span_curve(post_true, parameterList, work_path=work_path)
+    plot_flow_curve(post_true, parameterList, work_path=work_path)
     # grid = get_grid(real_path=os.path.join("..", "data"))
     # plot_field_2d(post_true, post_pred, parameterList, grid=grid, work_path=work_path)
