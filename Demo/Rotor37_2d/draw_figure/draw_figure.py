@@ -139,6 +139,7 @@ def plot_error(post_true, post_pred, parameterList,
     """
     针对某个对象0维性能参数，绘制预测误差表示图
     """
+    dict_save = {}
     if not isinstance(parameterList, list):
         parameterList = [parameterList]
     Err_all = []
@@ -167,6 +168,7 @@ def plot_error(post_true, post_pred, parameterList,
         fig.savefig(jpg_path)
         plt.close(fig)
 
+        dict_save.update({parameter_Name : value_span_pred})
         Err = np.abs((value_span_pred - value_span_true) / value_span_true)
         Err_all.append(Err)
 
@@ -177,6 +179,8 @@ def plot_error(post_true, post_pred, parameterList,
     jpg_path = os.path.join(work_path, type + "_error-box.jpg")
     fig.savefig(jpg_path)
     plt.close(fig)
+
+    return dict_save
 
 def plot_error_box(true, pred, save_path=None, type=None):
     Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('Ps', 'Ts', 'rhoV', 'Pt', 'Tt'))
@@ -244,16 +248,21 @@ if __name__ == "__main__":
     # name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_FNO2")
+    work_load_path = os.path.join("..", "work_train_Trans")
     workList = os.listdir(work_load_path)
     for name in workList:
         work_path = os.path.join(work_load_path, name)
         work = WorkPrj(work_path)
 
-        nameReal = name.split("_")[0]
-        id = None
-        if len(name.split("_")) == 2:
-            id = int(name.split("_")[1])
+        if name=='FNO_multi':
+            nameReal = 'FNO'
+        else:
+            nameReal = name.split("_")[0]
+            id = None
+            if len(name.split("_")) == 2:
+                id = int(name.split("_")[1])
+
+
 
         if torch.cuda.is_available():
             Device = torch.device('cuda')
@@ -306,7 +315,7 @@ if __name__ == "__main__":
                                 )
 
             # parameterList = []
-            parameterList = ["Efficiency", "EfficiencyPoly", "PressureRatioW", "TemperatureRatioW",
+            parameterList = ["Efficiency", "EfficiencyPoly", "PressureRatioV", "TemperatureRatioV",
                              "PressureLossR", "EntropyStatic", "MachIsentropic", "Load"]
             parameterListN = [
                 "PR", "TR",
@@ -315,15 +324,17 @@ if __name__ == "__main__":
                 "Mach", "Load",
                 "MF"]
 
-            plot_error(post_true, post_pred, parameterList + ["MassFlow"],
+            dict = plot_error(post_true, post_pred, parameterList + ["MassFlow"],
                        paraNameList=parameterListN,
                        save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
 
-            plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
+            # np.savez(os.path.join("..", "data", "FNM.npz"), **dict)
 
-            for ii in range(3):
-                post_compare = Post_2d(np.concatenate((true[ii:ii + 1, :], pred[ii:ii + 1, :]), axis=0), grid,
-                                       inputDict=input_para,
-                                       )
-                plot_span_curve(post_compare, parameterList,
-                                save_path=None, fig_id=ii, label=None, type=type, work_path=work_path)
+            # plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
+            #
+            # for ii in range(3):
+            #     post_compare = Post_2d(np.concatenate((true[ii:ii + 1, :], pred[ii:ii + 1, :]), axis=0), grid,
+            #                            inputDict=input_para,
+            #                            )
+            #     plot_span_curve(post_compare, parameterList,
+            #                     save_path=None, fig_id=ii, label=None, type=type, work_path=work_path)

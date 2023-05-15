@@ -22,7 +22,6 @@ if __name__ == "__main__":
 
     for filename in filenameList:
         work_load_path = os.path.join("..", filename)
-        workList = os.listdir(work_load_path)
         out_dim = 5
         for name in ['FNO_0']:#workList:#['MLP','deepONet','FNO','UNet','Transformer']:
             nameReal = name.split("_")[0]

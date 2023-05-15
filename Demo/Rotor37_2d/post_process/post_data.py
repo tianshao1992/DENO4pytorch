@@ -9,11 +9,11 @@ class Post_2d(object):
 
         if inputDict is None:
             self.inputDict = {
-            "PressureStatic" : 0,
-            "TemperatureStatic" : 1,
-            "Density" : 2,
-            "VelocityX" : 3,
-            "VelocityY" : 4
+                "PressureStatic": 0,
+                "TemperatureStatic": 1,
+                "V2": 2,
+                "W2": 3,
+                "DensityFlow": 4,
             }
         else:
             self.inputDict = inputDict
@@ -650,7 +650,7 @@ class Post_2d(object):
         shroud_out = 0.2370
         MassFlow = self.span_space_average(self.DensityFlow[:, :, -1]) * (
                     shroud_out ** 2 - hub_out ** 2) * np.pi
-        return MassFlow
+        return MassFlow[:,np.newaxis]
 
 
 if __name__ == "__main__":
