@@ -133,6 +133,89 @@ class FNO2d(nn.Module):
         return x
 
 
+class FNO2dMultChannel(nn.Module):
+    """
+        2维FNO网络,多通道
+    """
+    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2,
+                 activation='gelu', dropout=0.0): # 构造函数输入保持不变
+        super(FNO2d, self).__init__()
+
+        """
+        The overall network. It contains 4 layers of the Fourier layer.
+        1. Lift the input to the desire channel dimension by self.fc0 .
+        2. 4 layers of the integral operators u' = (W + K)(u).
+            W defined by self.w; K defined by self.conv .
+        3. Project from the channel space to the output space by self.fc1 and self.fc2 .
+
+        input: the solution of the previous 10 timesteps + 2 locations (u(t-10, x, y), ..., u(t-1, x, y),  x, y)
+        input shape: (batchsize, x, y, c)
+        output: the solution of the next timestep
+        output shape: (batchsize, x, y, c)
+        """
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.modes = modes
+        self.width = width
+        self.depth = depth
+        self.steps = steps
+        self.padding = padding  # pad the domain if input is non-periodic
+        self.activation = activation
+        self.dropout = dropout
+        self.fc0 = nn.Linear(steps * in_dim + 2, self.width)
+        # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
+
+        self.convs = nn.ModuleList()
+        for _ in range(self.out_dim):
+            conv = nn.ModuleList()
+            for i in range(self.depth):
+                conv.append(
+                    SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, dropout=self.dropout,
+                                   norm=None))
+            self.convs.append(conv)
+
+        self.fc1s = nn.ModuleList()
+        for _ in range(self.out_dim):
+            fc1 =nn.Linear(self.width, 128)
+            self.fc1s.append(fc1)
+
+        self.fc2s = nn.ModuleList()
+        for _ in range(self.out_dim):
+            fc2 = nn.Linear(128, out_dim)
+            self.fc2s.append(fc2)
+
+    def forward(self, x, grid):
+        """
+        forward computation
+        """
+        # x dim = [b, x1, x2, t*v]
+        x = torch.cat((x, grid), dim=-1) #连接坐标和输入值
+        x = self.fc0(x) # 输入层
+        x = x.permute(0, 3, 1, 2) #调整四个通道的顺序
+
+        if self.padding != 0:
+            x = F.pad(x, [0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
+            # 对张量x进行填充操作
+
+        xList = [x] * self.out_dim
+        for channel in range(self.out_dim):
+            x_cur = xList[channel]
+            for i in range(self.depth):
+                x_cur = self.convs[channel][i](x_cur)
+            if self.padding != 0:
+                x_cur = x_cur[..., :-self.padding, :-self.padding]
+
+            x_cur = x_cur.permute(0, 2, 3, 1)  # pad the domain if input is non-periodic #把四个通道的顺序调整回来
+            x_cur = self.fc1s[channel](x_cur)
+            x_cur = F.gelu(x_cur)
+            x_cur = self.fc2s[channel](x_cur)
+
+            xList[channel] = x_cur
+
+        x = torch.cat(xList, dim=-1)  # 将输出沿着最后一个维度连接
+        
+        return x
+
 class FNO3d(nn.Module):
     """
         3维FNO网络

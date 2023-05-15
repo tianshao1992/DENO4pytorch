@@ -21,6 +21,21 @@ def work_construct(para_list_dict):
 
     return work_list
 
+def work_construct_togethor(para_list_dict):
+    work_list = []
+    num = 1
+    for key in para_list_dict.keys():
+        num = num * len(para_list_dict[key])
+
+    for ii in range(num):
+        dict_new = {}
+        for key in para_list_dict.keys():
+            idx = ii % len(para_list_dict[key])
+            dict_new.update({key:para_list_dict[key][idx]})
+
+        work_list.append(dict_new)
+
+    return work_list
 
 
 if __name__ == "__main__":
@@ -39,7 +54,7 @@ if __name__ == "__main__":
     'activation': ['relu']
     }
 
-    worklist = work_construct(dict)
+    worklist = work_construct_togethor(dict)
 
     for id, config_dict in enumerate(worklist):
         work = WorkPrj(os.path.join("..", "work_train_FNO", name + "_" + str(id)))
