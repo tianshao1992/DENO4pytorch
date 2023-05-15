@@ -21,16 +21,9 @@ if __name__ == "__main__":
                                              ])
     true = field
     pred = true + np.random.rand(*true.shape) * 0.5 - 1
-    input_para = {
-        "PressureStatic": 0,
-        "TemperatureStatic": 1,
-        "TemperatureTotalV": 2,
-        "TemperatureTotalW": 3,
-        "DensityFlow": 4,
-    }
     ii = 0
     post_true = Post_2d(true, grid,
-                        inputDict=input_para,
+                        inputDict=None,
                         )
     parameterList = [
         "PressureRatioV", "TemperatureRatioV",

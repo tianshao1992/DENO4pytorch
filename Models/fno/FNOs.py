@@ -139,7 +139,7 @@ class FNO2dMultChannel(nn.Module):
     """
     def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2,
                  activation='gelu', dropout=0.0): # 构造函数输入保持不变
-        super(FNO2d, self).__init__()
+        super(FNO2dMultChannel, self).__init__()
 
         """
         The overall network. It contains 4 layers of the Fourier layer.
@@ -181,7 +181,7 @@ class FNO2dMultChannel(nn.Module):
 
         self.fc2s = nn.ModuleList()
         for _ in range(self.out_dim):
-            fc2 = nn.Linear(128, out_dim)
+            fc2 = nn.Linear(128, 1)
             self.fc2s.append(fc2)
 
     def forward(self, x, grid):

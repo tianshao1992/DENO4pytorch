@@ -22,7 +22,7 @@ def loaddata(name,
              batch_size=32):
 
     design, fields = get_origin(realpath=os.path.join("..", "data"), shuffled=shuffled)  # 获取原始数据
-    if name in ("FNO", "UNet", "Transformer"):
+    if name in ("FNO", "FNM", "UNet", "Transformer"):
         input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     else:
         input = design
@@ -149,6 +149,10 @@ def import_model_by_name(name):
         from fno.FNOs import FNO2d
         from run_FNO import inference, train, valid
         model_func = FNO2d
+    elif 'FNM' in name:
+        from fno.FNOs import FNO2dMultChannel
+        from run_FNO_multi import inference, train, valid
+        model_func = FNO2dMultChannel
     elif 'UNet' in name:
         from cnn.ConvNets import UNet2d
         from run_UNet import inference, train, valid

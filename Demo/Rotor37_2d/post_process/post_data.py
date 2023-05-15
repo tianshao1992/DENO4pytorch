@@ -9,11 +9,11 @@ class Post_2d(object):
 
         if inputDict is None:
             self.inputDict = {
-            "PressureStatic" : 0,
-            "TemperatureStatic" : 1,
-            "Density" : 2,
-            "VelocityX" : 3,
-            "VelocityY" : 4
+                "PressureStatic": 0,
+                "TemperatureStatic": 1,
+                "V2": 2,
+                "W2": 3,
+                "DensityFlow": 4,
             }
         else:
             self.inputDict = inputDict

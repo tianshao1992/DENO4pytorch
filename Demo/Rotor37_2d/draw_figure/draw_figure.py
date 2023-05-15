@@ -247,16 +247,21 @@ if __name__ == "__main__":
     # name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_FNO")
+    work_load_path = os.path.join("..", "work_train_Trans")
     workList = os.listdir(work_load_path)
     for name in workList:
         work_path = os.path.join(work_load_path, name)
         work = WorkPrj(work_path)
 
-        nameReal = name.split("_")[0]
-        id = None
-        if len(name.split("_")) == 2:
-            id = int(name.split("_")[1])
+        if name=='FNO_multi':
+            nameReal = 'FNO'
+        else:
+            nameReal = name.split("_")[0]
+            id = None
+            if len(name.split("_")) == 2:
+                id = int(name.split("_")[1])
+
+
 
         if torch.cuda.is_available():
             Device = torch.device('cuda')
@@ -322,7 +327,7 @@ if __name__ == "__main__":
                        paraNameList=parameterListN,
                        save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
 
-            # np.savez(os.path.join("..", "data", "FNO.npz"), **dict)
+            # np.savez(os.path.join("..", "data", "FNM.npz"), **dict)
 
             # plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
             #

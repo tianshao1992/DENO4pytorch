@@ -16,9 +16,7 @@ from torch.utils.data import DataLoader
 from torchinfo import summary
 from fno.FNOs import FNO2d, FNO2dMultChannel
 from cnn.ConvNets import UNet2d
-
 from Utilizes.visual_data import MatplotlibVision
-
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.process_data import DataNormer
 
@@ -136,17 +134,14 @@ if __name__ == "__main__":
         Device = torch.device('cpu')
 
     # design, fields = get_origin()
-    design, fields = get_origin(quanlityList=["Static Pressure", "Static Temperature",
-                                              "DensityFlow",
-                                              'Relative Total Pressure', 'Relative Total Temperature'
-                                              ])  # 获取原始数据
+    design, fields = get_origin(shuffled=True)  # 获取原始数据
 
     in_dim = 28
     out_dim = 5
-    ntrain = 2700
-    nvalid = 200
+    ntrain = 2500
+    nvalid = 400
 
-    modes = (10, 10)
+    modes = (4, 4)
     width = 64
     depth = 4
     steps = 1
@@ -183,10 +178,12 @@ if __name__ == "__main__":
     valid_y = output[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
 
     x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
+    x_normalizer.save(os.path.join(work_path, 'x_norm.pkl'))  # 将normalizer保存下来
     train_x = x_normalizer.norm(train_x)
     valid_x = x_normalizer.norm(valid_x)
 
     y_normalizer = DataNormer(train_y.numpy(), method='mean-std')
+    y_normalizer.save(os.path.join(work_path, 'y_norm.pkl'))  # 将normalizer保存下来
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
@@ -213,7 +210,7 @@ if __name__ == "__main__":
     # 损失函数
     Loss_func = nn.MSELoss()
     # Loss_func = nn.SmoothL1Loss()
-    Loss_func = FieldsLpLoss(size_average=False)
+    # Loss_func = FieldsLpLoss(size_average=False)
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)

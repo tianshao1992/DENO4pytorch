@@ -167,15 +167,6 @@ def get_value(data_2d, input_para=None, parameterList=None):
     if not isinstance(parameterList, list):
         parameterList = [parameterList]
 
-    if input_para is None:
-        input_para = {
-            "PressureStatic": 0,
-            "TemperatureStatic": 1,
-            "DensityFlow": 2,
-            "PressureTotalW": 3,
-            "TemperatureTotalW": 4,
-        }
-
     grid = get_grid()
     post_pred = Post_2d(data_2d, grid,
                         inputDict=input_para,
@@ -256,9 +247,15 @@ class Rotor37WeightLoss(object):
         return self.rel(x, y)
 
 if __name__ == "__main__":
-    design, field = get_origin()
+    design, field = get_origin(shuffled=False, getridbad=False)
     grid = get_grid()
-    Rst = get_value(field, parameterList="EntropyStatic")
+    Rst = get_value(field, parameterList="PressureRatioW")
+
+    sort_idx = np.argsort(Rst.squeeze())
+    sort_value = Rst[sort_idx]
+
+    print(0)
+
     # np.savetxt(os.path.join("Rst.txt"), Rst)
     # file_path = os.path.join("data", "sus_bad_data.yml")
     # import yaml
