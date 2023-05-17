@@ -45,7 +45,7 @@ class DLModelPost(object):
 
         return pred.detach().cpu().numpy()
 
-    def predictor_value(self, input, input_para=None, parameterList=None, input_norm=False):
+    def predictor_value(self, input, input_para=None, parameterList=None, input_norm=False, setOpt=True):
         if not isinstance(parameterList, list):
             parameterList = [parameterList]
 
@@ -73,8 +73,31 @@ class DLModelPost(object):
 
         Rst = []
         for parameter_Name in parameterList:
-            value = getattr(post_pred, parameter_Name)
-            value = post_pred.span_density_average(value[..., -1])
-            Rst.append(value)
+            if parameter_Name=="MassFlow":
+                value = post_pred.get_MassFlow()
+            else:
+                value = getattr(post_pred, parameter_Name)
+                value = post_pred.span_density_average(value[..., -1])
+
+            if setOpt: #如果默认输出最优值
+                Rst.append(value * self.MaxOrMIn(parameter_Name))
+            else:
+                Rst.append(value)
 
         return np.concatenate(Rst, axis=1)
+    @staticmethod
+    def MaxOrMIn(parameter):
+
+        dict = {
+        "Efficiency": -1, #越大越好
+        "EfficiencyPoly": -1,
+        "PressureRatioV": -1,
+        "TemperatureRatioV": -1,
+        "PressureLossR":  1,
+        "EntropyStatic":  1,
+        "MachIsentropic": 1,
+        "Load": 1,
+        "MassFlow": 1,
+        }
+
+        return dict[parameter]

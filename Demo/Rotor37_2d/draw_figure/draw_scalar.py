@@ -47,14 +47,14 @@ if __name__ == "__main__":
                 value_pred = data_pred[parameter][:, 0]
                 value_pred = value_pred[:352].squeeze()
                 # 绘制ture-pred图
-
-                fig, axs = plt.subplots(1, 1, figsize=(10, 10), num=1)
-                title = AlgoName + '_' + parameter + '_' + str(n_train)
-                Visual.plot_regression(fig, axs, value_true.squeeze(), value_pred.squeeze(),
-                                       title= title)
-                jpg_path = os.path.join(work_path, title + '.jpg')
-                fig.savefig(jpg_path)
-                plt.close(fig)
+                #
+                # fig, axs = plt.subplots(1, 1, figsize=(10, 10), num=1)
+                # title = AlgoName + '_' + parameter + '_' + str(n_train)
+                # Visual.plot_regression(fig, axs, value_true.squeeze(), value_pred.squeeze(),
+                #                        title= title)
+                # jpg_path = os.path.join(work_path, title + '.jpg')
+                # fig.savefig(jpg_path)
+                # plt.close(fig)
 
                 Err = np.abs((value_pred - value_true)/value_true)
                 # Err_all.append(Err)
