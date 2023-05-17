@@ -528,8 +528,16 @@ class Post_2d(object):
 
     def get_Efficiency(self):
         if self._Efficiency is None:
-            rst = np.abs(np.power(self.PressureRatioV, (self.kappa - 1) / self.kappa) - 1) + 1e-5
-            rst = rst / (np.abs(self.TemperatureRatioV - 1) + 1e-5)
+            temp1 = np.abs(np.power(self.PressureRatioV, (self.kappa - 1) / self.kappa) - 1)
+            temp2 = np.abs(self.TemperatureRatioV - 1)
+            delta = 1e-3
+            idx1 = temp1 < delta
+            temp1[idx1] = delta
+            idx2 = temp2 < delta
+            temp2[idx2] = delta
+
+            rst = temp1/temp2
+
             self._Efficiency = rst
             return rst
         else:
@@ -537,7 +545,14 @@ class Post_2d(object):
 
     def get_EfficiencyPoly(self):
         if self._EfficiencyPoly is None:
-            rst = np.log(self.PressureRatioV) / (np.log(self.TemperatureRatioV) + 1e-5)
+            # rst = np.log(self.PressureRatioV) / (np.log(self.TemperatureRatioV) + 1e-5)
+            temp1 = np.log(self.PressureTotalV) - np.log(np.tile(self.PressureTotalV[..., :1], [1, 1, self.n_1d]))
+            temp2 = np.log(self.TemperatureTotalV) - np.log(np.tile(self.TemperatureTotalV[..., :1], [1, 1, self.n_1d]))
+            delta = 1e-4
+            idx = temp2 < delta
+            temp1[idx] = delta / self.Rg * self.Cp
+            temp2[idx] = delta
+            rst = temp1/temp2
             rst = rst * self.Rg / self.Cp
             self._EfficiencyPoly = rst
             return rst
@@ -610,8 +625,8 @@ class Post_2d(object):
             return self._MachIsentropic
     def get_Load(self):
         if self._Load is None:
-            rst = self.Cp * (1 - self.TemperatureRatioW) / self.Uaxis / self.Uaxis
-            rst = rst * np.tile(self.TemperatureTotalW[..., :1], [1, 1, self.n_1d])
+            rst = self.Cp * (np.tile(self.TemperatureTotalW[..., :1], [1, 1, self.n_1d])
+                             - self.TemperatureTotalW) / self.Uaxis / self.Uaxis
             self._Load = rst
             return rst
         else:

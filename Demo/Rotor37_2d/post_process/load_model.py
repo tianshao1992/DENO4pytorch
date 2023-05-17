@@ -181,9 +181,19 @@ def build_model_yml(yml_path, device, name=None):
 
 
 def get_true_pred(loader, Net_model, inference, Device,
-                  name=None, out_dim=5, iters=0):
+                  name=None, out_dim=5, iters=0, alldata=False):
     true_list = []
     pred_list = []
+    if alldata:
+        num = len(loader.dataset)
+        iters = (num + loader.batch_size -1)//loader.batch_size
+
+        new_loader = torch.utils.data.DataLoader(loader.dataset,
+                                                 batch_size=loader.batch_size,
+                                                 shuffle=False,
+                                                 drop_last=False)
+        loader = new_loader
+
     for ii, data_box in enumerate(loader):
         if ii > iters:
             break
@@ -192,14 +202,13 @@ def get_true_pred(loader, Net_model, inference, Device,
             sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_f, data_y),
                                                      batch_size=loader.batch_size,
                                                      shuffle=False,
-                                                     drop_last=True)
+                                                     drop_last=False)
         else:
             (data_x, data_y) = data_box
-
             sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_y),
                                                      batch_size=loader.batch_size,
                                                      shuffle=False,
-                                                     drop_last=True)
+                                                     drop_last=False)
     # for ii in range(iters):
         if name in ('MLP'):
             _, true, pred = inference(sub_loader, Net_model, Device)

@@ -72,10 +72,10 @@ def SquareMeshdesign(slice_dim, space=None, mesh_size=None):
 
 
 if __name__ == "__main__":
-    name = 'FNO'
+    name = 'FNO_1'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work")
+    work_load_path = os.path.join("..", "work_train_FNO2")
     work_path = os.path.join(work_load_path, name)
     work = WorkPrj(work_path)
 
@@ -113,6 +113,8 @@ if __name__ == "__main__":
 
     # var_group = list(range(28))
     # var_group = [[x] for x in var_group]
+
+    #按叶高分组
     # var_group = [
     #             [0, 1, 2],
     #             [3, 4, 5, 6, 7],
@@ -122,15 +124,17 @@ if __name__ == "__main__":
     #             [23, 24, 25, 26, 27]
     #             ]
 
-    var_group = [
-        [0, 1, 2],
-        [3, 8, 13, 18, 23],
-        [4, 9, 14, 19, 24],
-        [5, 10, 15, 20, 25],
-        [6, 11, 16, 21, 26],
-        [7, 12, 17, 22, 27],
-    ]
+    #按流向位置分组
+    # var_group = [
+    #     [0, 1, 2],
+    #     [3, 8, 13, 18, 23],
+    #     [4, 9, 14, 19, 24],
+    #     [5, 10, 15, 20, 25],
+    #     [6, 11, 16, 21, 26],
+    #     [7, 12, 17, 22, 27],
+    # ]
 
+    # 按叶高分组-只有前缘
     # var_group = [
     #             [0, 1, 2],
     #             [3,4],
@@ -140,6 +144,7 @@ if __name__ == "__main__":
     #             [23,24]
     #             ]
 
+    # 按叶高分组-只有中间
     # var_group = [
     #             [0, 1, 2],
     #             [5],
@@ -149,17 +154,18 @@ if __name__ == "__main__":
     #             [25]
     #             ]
 
-    # var_group = [
-    #             [0, 1, 2],
-    #             [6, 7],
-    #             [11, 12],
-    #             [16, 17],
-    #             [21, 22],
-    #             [26, 27]
-    #             ]
+    # 按叶高分组-只有尾缘
+    var_group = [
+                [0, 1, 2],
+                [6, 7],
+                [11, 12],
+                [16, 17],
+                [21, 22],
+                [26, 27]
+                ]
 
     for idx, var_list in enumerate(var_group):
-        sample_grid = mesh_sliced(input_dim, var_list, sample_num=100)
+        sample_grid = mesh_sliced(input_dim, var_list, sample_num=len(var_list)*31)
         sample_grid = x_normlizer.norm(sample_grid)
 
         pred = predicter(Net_model, sample_grid, Device, name=nameReal) # 获得预测值
@@ -193,7 +199,7 @@ if __name__ == "__main__":
         isExist = os.path.exists(save_path)
         if not isExist:
             os.mkdir(save_path)
-        # plot_span_std(post_pred, parameterList, work_path=save_path, fig_id=idx)
+        plot_span_std(post_pred, parameterList, work_path=save_path, fig_id=idx, rangeIndex=10)
         # plot_span_curve(post_pred, parameterList, work_path=save_path, fig_id=idx)
         plot_flow_std(post_pred, parameterList, work_path=save_path, fig_id=idx, rangeIndex=10)
         # plot_flow_curve(post_pred, parameterList, work_path=save_path, fig_id=idx)

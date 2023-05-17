@@ -187,8 +187,12 @@ class Rotor37WeightLoss(torch.nn.Module):
 
     def forward(self, predicted, target):
         # 自定义损失计算逻辑
+        device = target.device
+
+        if len(target.shape)==3:
+            predicted = predicted.unsqueeze(0)
         if len(target.shape)==2:
-            predicted = predicted.unsqueeze(0) #加一个维度
+            predicted = predicted.unsqueeze(0).unsqueeze(-1) #加一个维度
 
         grid_size_1 = target.shape[1]
         grid_size_2 = target.shape[2]
@@ -198,9 +202,11 @@ class Rotor37WeightLoss(torch.nn.Module):
         temp1 = torch.ones((grid_size_1, weighted_lines)) * weighted_cof
         temp2 = torch.ones((grid_size_1, grid_size_2 - weighted_lines * 2))
         weighted_mat = torch.cat((temp1, temp2, temp1), dim=1)
-        weighted_mat = weighted_mat.unsqueeze(0).expand(target.shape[0], -1, -1)
-
-        loss = torch.nn.MSELoss(predicted * weighted_mat, target * weighted_mat)
+        weighted_mat = weighted_mat.unsqueeze(0).unsqueeze(-1).expand_as(target)
+        weighted_mat = weighted_mat * grid_size_2 /(weighted_cof * weighted_lines * 2 + grid_size_2 - weighted_lines * 2)
+        weighted_mat = weighted_mat.to(device)
+        lossfunc = torch.nn.MSELoss()
+        loss = lossfunc(predicted * weighted_mat, target * weighted_mat)
         return loss
 
 if __name__ == "__main__":
