@@ -54,9 +54,14 @@ def plot_span_curve(post, parameterList, save_path=None, work_path=None, fig_id=
         fig, axs = plt.subplots(1, 1, figsize=(3, 6), num=1)
         value_span = getattr(post, parameter_Name)
 
-        for ii in range(post.num):
-            Visual.plot_value(fig, axs, value_span[ii, :, -1], np.linspace(0, 1, post.n_1d), label=label,
-                              title=parameter_Name, xylabels=(parameter_Name, "span"))
+        # for ii in range(post.num):
+        #     Visual.plot_value(fig, axs, value_span[ii, :, -1], np.linspace(0, 1, post.n_1d), label=label,
+        #                       title=parameter_Name, xylabels=(parameter_Name, "span"))
+
+        Visual.plot_curve_scatter(fig, axs, value_span[:, :, -1],
+                          np.tile(np.linspace(0, 1, post.n_1d), (value_span.shape[0], 1)), label=label,
+                          colorList = ['red', 'b'], markerList=['-', '*'],
+                          title=parameter_Name, xylabels=(parameter_Name, "span"))
 
         if save_path is None:
             jpg_path = os.path.join(work_path, type + parameter_Name + "_" + str(fig_id) + '.jpg')
@@ -248,14 +253,14 @@ if __name__ == "__main__":
     # name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_Trans")
+    work_load_path = os.path.join("..", "work_train_Trans1")
     workList = os.listdir(work_load_path)
     for name in workList:
         work_path = os.path.join(work_load_path, name)
         work = WorkPrj(work_path)
 
         if name=='FNO_multi':
-            nameReal = 'FNO'
+            nameReal = 'FNM'
         else:
             nameReal = name.split("_")[0]
             id = None
@@ -289,10 +294,10 @@ if __name__ == "__main__":
         for type in ["valid", "train"]:
             if type == "valid":
                 true, pred = get_true_pred(valid_loader, Net_model, inference, Device,
-                                           name=nameReal, iters=10)
+                                           name=nameReal, iters=10, alldata=True)
             elif type == "train":
                 true, pred = get_true_pred(train_loader, Net_model, inference, Device,
-                                           name=nameReal, iters=10)
+                                           name=nameReal, iters=10, alldata=True)
             true = y_normalizer.back(true)
             pred = y_normalizer.back(pred)
 
@@ -315,8 +320,13 @@ if __name__ == "__main__":
                                 )
 
             # parameterList = []
-            parameterList = ["Efficiency", "EfficiencyPoly", "PressureRatioV", "TemperatureRatioV",
-                             "PressureLossR", "EntropyStatic", "MachIsentropic", "Load"]
+            parameterList = [
+                             "Efficiency", "EfficiencyPoly",
+                             "PressureRatioV", "TemperatureRatioV",
+                             "PressureLossR", "EntropyStatic",
+                             "MachIsentropic",
+                             "Load",
+                             ]
             parameterListN = [
                 "PR", "TR",
                 "Eff", "EffPoly",
@@ -327,14 +337,14 @@ if __name__ == "__main__":
             dict = plot_error(post_true, post_pred, parameterList + ["MassFlow"],
                        paraNameList=parameterListN,
                        save_path=None, fig_id=0, label=None, work_path=work_path, type=type)
-
-            # np.savez(os.path.join("..", "data", "FNM.npz"), **dict)
-
+            #
+            # # np.savez(os.path.join(work_path, "valid_pred.npz"), **dict)
+            # #
             # plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
             #
-            # for ii in range(3):
-            #     post_compare = Post_2d(np.concatenate((true[ii:ii + 1, :], pred[ii:ii + 1, :]), axis=0), grid,
-            #                            inputDict=input_para,
-            #                            )
-            #     plot_span_curve(post_compare, parameterList,
-            #                     save_path=None, fig_id=ii, label=None, type=type, work_path=work_path)
+            for ii in range(3):
+                post_compare = Post_2d(np.concatenate((true[ii:ii + 1, :], pred[ii:ii + 1, :]), axis=0), grid,
+                                       inputDict=input_para,
+                                       )
+                plot_span_curve(post_compare, parameterList,
+                                save_path=None, fig_id=ii, label=None, type=type, work_path=work_path)

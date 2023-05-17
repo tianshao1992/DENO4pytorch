@@ -4,6 +4,7 @@ import numpy as np
 from post_process.post_data import Post_2d
 from run_FNO import feature_transform
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid
+from utilizes_rotor37 import Rotor37WeightLoss
 from post_process.load_model import build_model_yml, loaddata
 from post_process.model_predict import DLModelPost
 from Utilizes.visual_data import MatplotlibVision
@@ -38,9 +39,9 @@ def change_yml(name, yml_path=None, **kwargs):
         yaml.dump(data, f)
 
 def add_yml(key_set_list, yml_path=None):
-    # 加载config模板
     template_path = os.path.join("..", "data", "config_template.yml")
     with open(template_path) as f:
+    # 加载config模板
         config_all = yaml.full_load(f)
     for key_set in key_set_list:
         config_para = config_all[key_set]
@@ -105,7 +106,8 @@ class DLModelWhole(object):
         with open(self.work.yml) as f:
             config = yaml.full_load(f)
         # 损失函数
-        self.Loss_func = torch.nn.MSELoss()
+        # self.Loss_func = torch.nn.MSELoss()
+        self.Loss_func = Rotor37WeightLoss()
         # 优化算法
         temp = config["Optimizer_config"]
         temp['betas'] = tuple(float(x) for x in temp['betas'][0].split())

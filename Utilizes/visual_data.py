@@ -172,6 +172,35 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
+    def plot_curve_scatter(self, fig, axs, x, y, label,
+                           title=None, xylabels=('x', 'y'),
+                           colorList=None, markerList=None
+                           ):
+        # sbn.set_style('ticks')
+        sbn.set(color_codes=True)
+        # check
+        if len(x.shape) == 1:
+            x.unsqueeze(0)
+        if len(y.shape) == 1:
+            y.unsqueeze(0)
+        if colorList is not None:
+            assert (len(colorList)==x.shape[0])
+        if markerList is not None:
+            assert (len(markerList)==x.shape[0])
+        markers = ['.', 'o', '+', 'x', 's', 'd', 'v', '^', '<', '>', 'p', 'h', '*', '2', '3', '4']
+        for ii, (marker, color) in enumerate(zip(markerList, colorList)):
+            if marker in markers:
+                axs.scatter(x[ii], y[ii], label=label, color=color, marker=marker)
+            else:
+                axs.plot(x[ii], y[ii], label=label, color=color)
+        axs.grid(True)  # 添加网格
+        axs.legend(loc="best", prop=self.font)
+        axs.set_xlabel(xylabels[0], fontdict=self.font)
+        axs.set_ylabel(xylabels[1], fontdict=self.font)
+        axs.tick_params('both', labelsize=self.font["size"], )
+        axs.set_title(title, fontdict=self.font)
+
+
     def plot_value_std(self, fig, axs, x, y, label, std = None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1e2):
         """
         stdaxis 表示std所在的坐标维度 x-0, y-1

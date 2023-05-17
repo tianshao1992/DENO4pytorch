@@ -1,15 +1,10 @@
-import torch
 import os
-import numpy as np
-from post_process.post_data import Post_2d
-from run_FNO import feature_transform
-from Demo.Rotor37_2d.utilizes_rotor37 import get_grid
+os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
+import torch
+print(torch.cuda.device_count())
+torch.cuda.set_device(1)
+
 from post_process.load_model import build_model_yml, loaddata
-from post_process.model_predict import DLModelPost
-from Utilizes.visual_data import MatplotlibVision
-import matplotlib.pyplot as plt
-import yaml
-import time
 from model_whole_life import WorkPrj, DLModelWhole, change_yml, add_yml
 
 def work_construct(para_list_dict):
@@ -25,26 +20,22 @@ def work_construct(para_list_dict):
 
 if __name__ == "__main__":
     name = "FNO"
-    # batch_size = 32
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
-    # train_num = 2500
-    # valid_num = 400
+
     dict = {
-    'modes': [4, 8, 12],
-    'width': [64, 128, 256],
-    'depth': [4, 8, 10],
-    'activation': 'relu'
+        'ntrain': [500, 1000, 1500, 2000],
+        'noise_scale': [0.005, 0.01, 0.05, 0.1],
     }
 
     worklist = work_construct(dict)
 
     for id, config_dict in enumerate(worklist):
-        work = WorkPrj(os.path.join("..", "work_train_1", name + "_" + str(id)))
-        change_yml(name, yml_path=work.yml, **config_dict)
-        add_yml(["Optimizer_config", "Scheduler_config", "Basic_config"], yml_path=work.yml)
+        work = WorkPrj(os.path.join("..", "work_noise_FNO", name + "_" + str(id)))
+        change_yml("Basic", yml_path=work.yml, **config_dict)
+        add_yml(["Optimizer_config", "Scheduler_config", name+"_config"], yml_path=work.yml)
         train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, **work.config("Basic"))
         x_normalizer.save(work.x_norm)
         y_normalizer.save(work.y_norm)
