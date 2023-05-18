@@ -86,7 +86,7 @@ def get_origin_6field(realpath=None):
 def get_origin(quanlityList=None,
                 realpath=None,
                 existcheck=True,
-                shuffled=False,
+                shuffled=True,
                 getridbad=True):
 
     if quanlityList is None:
@@ -97,7 +97,6 @@ def get_origin(quanlityList=None,
                         os.path.join("data", "sampleRstZip_500"),
                         os.path.join("data", "sampleRstZip_970")
                         ]
-
     else:
         sample_files = [os.path.join(realpath, "sampleRstZip_1500"),
                         os.path.join(realpath, "sampleRstZip_500"),
@@ -113,28 +112,7 @@ def get_origin(quanlityList=None,
 
         sample_files = sample_files_exists
 
-
-    design = []
-    fields = []
-    for ii, file in enumerate(sample_files):
-        reader = MatLoader(file, to_torch=False)
-        design.append(reader.read_field('design'))
-        output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
-        Cp = 1004
-        for jj, quanlity in enumerate(quanlityList):
-            if quanlity=="DensityFlow": #设置一个需要计算获得的数据
-                Vm = np.sqrt(np.power(reader.read_field("Vxyz_X"), 2) + np.power(reader.read_field("Vxyz_Y"), 2))
-                output[:, :, :, jj] = (reader.read_field("Density") * Vm).copy()
-            elif quanlity == "W2": #设置一个需要计算获得的数据
-                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Relative Total Temperature") - reader.read_field("Static Temperature")).copy()
-            elif quanlity == "V2":  # 设置一个需要计算获得的数据
-                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Absolute Total Temperature") - reader.read_field("Static Temperature")).copy()
-            else:
-                output[:, :, :, jj] = reader.read_field(quanlity).copy()
-        fields.append(output)
-
-    design = np.concatenate(design, axis=0)
-    fields = np.concatenate(fields, axis=0)
+    design, fields = get_quanlity_from_mat(sample_files, quanlityList)
 
     if getridbad:
         if realpath is None:
@@ -158,6 +136,35 @@ def get_origin(quanlityList=None,
         # print(idx[:10])
         design = design[idx]
         fields = fields[idx]
+
+    return design, fields
+
+def get_quanlity_from_mat(sample_files, quanlityList):
+    design = []
+    fields = []
+    if not isinstance(sample_files, list):
+        sample_files = [sample_files]
+    for ii, file in enumerate(sample_files):
+        reader = MatLoader(file, to_torch=False)
+        design.append(reader.read_field('design'))
+        output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
+        Cp = 1004
+        for jj, quanlity in enumerate(quanlityList):
+            if quanlity == "DensityFlow":  # 设置一个需要计算获得的数据
+                Vm = np.sqrt(np.power(reader.read_field("Vxyz_X"), 2) + np.power(reader.read_field("Vxyz_Y"), 2))
+                output[:, :, :, jj] = (reader.read_field("Density") * Vm).copy()
+            elif quanlity == "W2":  # 设置一个需要计算获得的数据
+                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Relative Total Temperature") - reader.read_field(
+                    "Static Temperature")).copy()
+            elif quanlity == "V2":  # 设置一个需要计算获得的数据
+                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Absolute Total Temperature") - reader.read_field(
+                    "Static Temperature")).copy()
+            else:
+                output[:, :, :, jj] = reader.read_field(quanlity).copy()
+        fields.append(output)
+
+    design = np.concatenate(design, axis=0)
+    fields = np.concatenate(fields, axis=0)
 
     return design, fields
 
@@ -188,6 +195,9 @@ class Rotor37WeightLoss(torch.nn.Module):
     def forward(self, predicted, target):
         # 自定义损失计算逻辑
         device = target.device
+        if target.shape[1] > 10000:
+            target = torch.reshape(target, (target.shape[0], 64, 64, -1))
+            predicted = torch.reshape(predicted, (target.shape[0], 64, 64, -1))
 
         if len(target.shape)==3:
             predicted = predicted.unsqueeze(0)

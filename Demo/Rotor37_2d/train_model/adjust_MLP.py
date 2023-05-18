@@ -24,21 +24,33 @@ def work_construct(para_list_dict):
 
     return work_list
 
+def work_construct_togethor(para_list_dict):
+    work_list = []
+    num = 1
+    for key in para_list_dict.keys():
+        num = num * len(para_list_dict[key])
+
+    for ii in range(num):
+        dict_new = {}
+        for key in para_list_dict.keys():
+            idx = ii % len(para_list_dict[key])
+            dict_new.update({key:para_list_dict[key][idx]})
+        work_list.append(dict_new)
+    return work_list
+
 
 
 if __name__ == "__main__":
     name = "MLP"
-    batch_size = 32
     start_id = 0
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
-    train_num = 2500
-    valid_num = 400
     dict_model = {
                 "n_hidden": [256, 512],
-                "num_layers": [8, 10, 12],
+                "num_layers": [8, 12, 14],
+                "is_BatchNorm": [True, False]
                 }
 
     model_list = work_construct(dict_model)
@@ -47,12 +59,9 @@ if __name__ == "__main__":
         work = WorkPrj(os.path.join("..", "work_train_MLP", name + "_" + str(id + start_id)))
 
         change_yml(name, yml_path=work.yml, **config_dict)
-        add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
+        add_yml(["Optimizer_config", "Scheduler_config", "Basic_config"], yml_path=work.yml)
 
-        # change_yml("Optimizer", yml_path=work.yml, **config_dict)
-        # add_yml([name + "_config", "Scheduler_config"], yml_path=work.yml)
-
-        train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)
+        train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, **work.config("Basic"))
         x_normalizer.save(work.x_norm)
         y_normalizer.save(work.y_norm)
         DL_model = DLModelWhole(Device, name=name, work=work)

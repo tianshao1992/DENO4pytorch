@@ -7,18 +7,12 @@ from post_process.post_data import Post_2d
 
 if __name__ == "__main__":
 # 数据读入
-    work_path = os.path.join("..", "data")
+    work_path = os.path.join("..", "data", "surrogate_data")
     isCreated = os.path.exists(work_path)
     if not isCreated: os.mkdir(work_path)
 
     grid = get_grid(real_path=os.path.join("..", "data"))
-    design, field = get_origin(realpath=os.path.join("..", "data"),
-                               quanlityList=["Static Pressure", "Static Temperature",
-                                             'Absolute Total Temperature',  # 'Absolute Total Pressure',
-                                             'Relative Total Temperature',  # 'Relative Total Pressure',
-                                             "DensityFlow",
-                                             # "Vxyz_X", "Vxyz_Y",
-                                             ])
+    design, field = get_origin(realpath=os.path.join("..", "data"), shuffled=True)
     true = field
     pred = true + np.random.rand(*true.shape) * 0.5 - 1
     ii = 0
@@ -27,6 +21,7 @@ if __name__ == "__main__":
                         )
     parameterList = [
         "PressureRatioV", "TemperatureRatioV",
+        "PressureRatioW", "TemperatureRatioW",
         "Efficiency", "EfficiencyPoly",
         "PressureLossR", "EntropyStatic",
         "MachIsentropic", "Load"]
@@ -37,10 +32,7 @@ if __name__ == "__main__":
         scalar = post_true.span_density_average(value_span[:, :, -1])
         all_dict.update({parameter: scalar})
 
-
-    hub_out = 0.1948
-    shroud_out = 0.2370
-    MassFlow = post_true.span_space_average(post_true.DensityFlow[:, :, -1])*(shroud_out**2-hub_out**2)*np.pi
+    MassFlow = post_true.get_MassFlow()
     all_dict.update({"MassFlow": MassFlow})
     all_dict.update({"Design": design})
 

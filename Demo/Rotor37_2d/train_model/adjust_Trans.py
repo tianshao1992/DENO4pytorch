@@ -32,7 +32,7 @@ def work_construct_togethor(para_list_dict):
 
 if __name__ == "__main__":
     name = "Transformer"
-    start_id = 1
+    start_id = 3
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
@@ -43,7 +43,7 @@ if __name__ == "__main__":
                 'dropout': [0.5],
                 # 'encoder_dropout': [0.5],
                 # 'decoder_dropout': [0.5],
-                'n_head': [1,2,3,4,5,6,7,8],
+                'n_head': [3,4,5,6,7,8],
     }
 
     model_list = work_construct_togethor(dict_model)
