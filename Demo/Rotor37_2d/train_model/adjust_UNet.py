@@ -1,61 +1,44 @@
 import os
-import numpy as np
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
-from post_process.post_data import Post_2d
-from run_FNO import feature_transform
-from Demo.Rotor37_2d.utilizes_rotor37 import get_grid
+print(torch.cuda.device_count())
 from post_process.load_model import build_model_yml, loaddata
-from post_process.model_predict import DLModelPost
-from Utilizes.visual_data import MatplotlibVision
-import matplotlib.pyplot as plt
-import yaml
-import time
 from model_whole_life import WorkPrj, DLModelWhole, change_yml, add_yml
-
-def work_construct(para_list_dict):
-    work_list = []
-    for key in para_list_dict.keys():
-        num = len(para_list_dict[key])
-        for ii in range(num):
-            work_list.append({key:para_list_dict[key][ii]})
-
-    return work_list
-
+from adjust_FNO import work_construct, work_construct_togethor
 
 
 if __name__ == "__main__":
-    name = "Transformer"
-    batch_size = 32
-    start_id = 0
+    name = "UNet"
+    start_id = 1
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
-    train_num = 2500
-    valid_num = 400
-    dict_model = {
-                'num_encoder_layers': [3, 5, 6],
-                'n_hidden': [64, 128, 256],
-                'dropout': [0.5],
-                }
-    dict_optimizer = {
-        'learning_rate': [0.1, 0.08, 0.06, 0.05]
+
+    dict1 = {
+        'width': [128],
+        'depth': [4],
+        'activation': ['gelu', 'relu'],
+        'dropout' : [0, 0.5]
     }
 
-    model_list = work_construct(dict_model)
-    opt_list = work_construct(dict_optimizer)
 
-    for id, config_dict in enumerate(opt_list):
-        work = WorkPrj(os.path.join("..", "work_train_1", name + "_" + str(id + start_id)))
+    dict2 = {
+        'width': [64],
+        'depth': [4, 6, 8],
+        'dropout' : [0, 0.5]
+    }
 
-        # change_yml(name, yml_path=work.yml, **config_dict)
-        # add_yml(["Optimizer_config", "Scheduler_config"], yml_path=work.yml)
+    model_list1 = work_construct_togethor(dict1)
+    model_list2 = work_construct_togethor(dict2)
 
-        change_yml("Optimizer", yml_path=work.yml, **config_dict)
-        add_yml([name + "_config", "Scheduler_config"], yml_path=work.yml)
+    for id, config_dict in enumerate(model_list1[1:] + model_list2):
+        work = WorkPrj(os.path.join("..", "work_train_UNet", name + "_" + str(id + start_id)))
 
-        train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, train_num, valid_num, shuffled=True)
+        change_yml(name, yml_path=work.yml, **config_dict)
+        add_yml(["Optimizer_config", "Scheduler_config", "Basic_config"], yml_path=work.yml)
+        train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, **work.config("Basic"))
+
         x_normalizer.save(work.x_norm)
         y_normalizer.save(work.y_norm)
         DL_model = DLModelWhole(Device, name=name, work=work)

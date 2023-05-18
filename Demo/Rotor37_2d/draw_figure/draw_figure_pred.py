@@ -116,8 +116,16 @@ if __name__ == "__main__":
 
     Net_model.eval()
 
-    # var_group = list(range(28))
-    # var_group = [[x] for x in var_group]
+    parameterList = [
+        "Efficiency",
+        # "EfficiencyPoly",
+        # "PressureRatioV", "TemperatureRatioV",
+        # "PressureLossR", "EntropyStatic",
+        # "MachIsentropic", "Load",
+    ]
+
+    var_group = list(range(28))
+    var_group = [[x] for x in var_group]
 
     # 按叶高分组
     # var_group = [
@@ -130,14 +138,14 @@ if __name__ == "__main__":
     #             ]
 
     #按流向位置分组
-    var_group = [
-        [0, 1, 2],
-        [3, 8, 13, 18, 23],
-        [4, 9, 14, 19, 24],
-        [5, 10, 15, 20, 25],
-        [6, 11, 16, 21, 26],
-        [7, 12, 17, 22, 27],
-    ]
+    # var_group = [
+    #     [0, 1, 2],
+    #     [3, 8, 13, 18, 23],
+    #     [4, 9, 14, 19, 24],
+    #     [5, 10, 15, 20, 25],
+    #     [6, 11, 16, 21, 26],
+    #     [7, 12, 17, 22, 27],
+    # ]
 
     # 按叶高分组-只有前缘
     # var_group = [
@@ -168,6 +176,12 @@ if __name__ == "__main__":
     #             [21, 22],
     #             [26, 27]
     #             ]
+    dict_fig = {}
+    dict_axs = {}
+    for parameter in parameterList:
+        fig, axs = plt.subplots(5, 5, figsize=(15, 30), num=1)
+        dict_fig.update({parameter : fig})
+        dict_axs.update({parameter: axs})
 
     for idx, var_list in enumerate(var_group):
         sample_grid = mesh_sliced(input_dim, var_list, sample_num=201)
@@ -193,14 +207,9 @@ if __name__ == "__main__":
 
         fig_id = 0
 
-        parameterList = [
-                         "Efficiency", "EfficiencyPoly",
-                         "PressureRatioV", "TemperatureRatioV",
-                         "PressureLossR", "EntropyStatic",
-                         "MachIsentropic", "Load",
-                         ]
 
-        save_path = os.path.join(work_path,"sensitive_6_zAxis_all")
+
+        save_path = os.path.join(work_path,"sensitive_test")
 
         MkdirCheck(save_path)
 
@@ -208,20 +217,37 @@ if __name__ == "__main__":
         plot_span_std(post_pred, parameterList,
                       work_path=os.path.join(save_path, "span_std"),
                       fig_id=idx, rangeIndex=50, singlefile=True)
+        dict_axs_sub = {}
+        x1 = int((idx-3)/5)
+        x2 = (idx-3)%5
 
-        MkdirCheck(os.path.join(save_path, "span_curve"))
-        plot_span_curve(post_pred, parameterList,
-                        work_path=os.path.join(save_path, "span_curve"),
-                        fig_id=idx, singlefile=True)
+        for parameter in parameterList:
+            dict_axs_sub.update({parameter : dict_axs[parameter][x1][x2]})
 
-        MkdirCheck(os.path.join(save_path, "flow_std"))
-        plot_flow_std(post_pred, parameterList,
-                      work_path=os.path.join(save_path, "flow_std"),
-                      fig_id=idx, rangeIndex=50, singlefile=True)
+        plot_span_std(post_pred, parameterList,
+                      work_path=os.path.join(save_path, "span_std"),
+                      fig_id=idx, rangeIndex=50, singlefile=True,
+                      singlefigure=True, fig_dict=dict_fig, axs_dict=dict_axs_sub)
 
-        MkdirCheck(os.path.join(save_path, "flow_curve"))
-        plot_flow_curve(post_pred, parameterList,
-                        work_path=os.path.join(save_path, "flow_curve"),
-                        fig_id=idx, singlefile=True)
+        # MkdirCheck(os.path.join(save_path, "span_curve"))
+        # plot_span_curve(post_pred, parameterList,
+        #                 work_path=os.path.join(save_path, "span_curve"),
+        #                 fig_id=idx, singlefile=True)
+        #
+        # MkdirCheck(os.path.join(save_path, "flow_std"))
+        # plot_flow_std(post_pred, parameterList,
+        #               work_path=os.path.join(save_path, "flow_std"),
+        #               fig_id=idx, rangeIndex=50, singlefile=True)
+        #
+        # MkdirCheck(os.path.join(save_path, "flow_curve"))
+        # plot_flow_curve(post_pred, parameterList,
+        #                 work_path=os.path.join(save_path, "flow_curve"),
+        #                 fig_id=idx, singlefile=True)
         pred = None
+
+    for parameter in parameterList:
+        fig = dict_fig[parameter]
+        jpg_path = os.path.join(save_path, parameter + "_" + "all_" + '.jpg')
+        fig.savefig(jpg_path)
+        plt.close(fig)
 

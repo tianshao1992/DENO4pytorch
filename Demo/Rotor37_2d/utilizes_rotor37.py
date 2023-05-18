@@ -195,7 +195,7 @@ class Rotor37WeightLoss(torch.nn.Module):
     def forward(self, predicted, target):
         # 自定义损失计算逻辑
         device = target.device
-        if target.shape[1] > 10000:
+        if target.shape[1] > 4000:
             target = torch.reshape(target, (target.shape[0], 64, 64, -1))
             predicted = torch.reshape(predicted, (target.shape[0], 64, 64, -1))
 
