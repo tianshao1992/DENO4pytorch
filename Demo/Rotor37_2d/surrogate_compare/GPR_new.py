@@ -48,6 +48,12 @@ def get_pred(npz_path, n_train, n_noise, parameter):
         loss = -1 * mll(output, train_y)
         # loss = sum(loss)
         loss.backward()
+        if i % 10 == 9:
+            print('Iter %d/%d - Loss: %.3f   lengthscale: %.3f   noise: %.3f' % (
+                i + 1, training_iter, loss.item(),
+                model.covar_module.base_kernel.lengthscale.item(),
+                model.likelihood.noise.item()
+            ))
         optimizer.step()
 
     model.eval()
@@ -85,16 +91,19 @@ if __name__ == "__main__":
             pred = get_pred(npz_path, n_train, 0, parameter)
             data_box_num[:, ii] = pred.copy()
         dict_num.update({parameter: data_box_num})
+        pred = None
 
         data_box_noise = np.zeros([400, 5])
         for ii, n_noise in enumerate(n_noiseList):
             pred = get_pred(npz_path, 2500, n_noise, parameter)
             data_box_noise[:, ii] = pred.copy()
         dict_noise.update({parameter: data_box_noise})
+        pred = None
 
-    np.savez(os.path.join("..", "data", "surrogate_data", "GPR_num.npz"), **dict_num)
-    np.savez(os.path.join("..", "data", "surrogate_data", "GPR_noise.npz"), **dict_noise)
+        np.savez(os.path.join("..", "data", "surrogate_data", "GPR_num.npz"), **dict_num)
+        np.savez(os.path.join("..", "data", "surrogate_data", "GPR_noise.npz"), **dict_noise)
 
+    # np.savez(os.path.join("data", "GPR.npz"), **dict_all)
 
 
 
