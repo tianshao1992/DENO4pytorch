@@ -2,7 +2,6 @@ import numpy as np
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.algorithms.soo.nonconvex.de import DE
-from pymoo.problems import get_problem
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 from pymoo.visualization.scatter import Scatter
@@ -25,16 +24,23 @@ class Rotor37Predictor(Problem):
         super().__init__(n_var=28, n_obj=len(parameterList), n_ieq_constr=0, xl=0.0, xu=1.0)
 
     def _evaluate(self, x, out, *args, **kwargs):
-        out["F"] = self.model.predictor_value(x, parameterList=self.parameterList, setOpt=False)
+        out["F"] = self.model.predictor_value(x, parameterList=self.parameterList, setOpt=False) * -1
+        #注意 这里修改过了。
 
 
 def predictor_establish(name, work_load_path):
+
+    nameReal = name.split("_")[0]
+    id = None
+    if len(name.split("_")) == 2:
+        id = int(name.split("_")[1])
+
     work_path = os.path.join(work_load_path, name)
     work = WorkPrj(work_path)
-    if torch.cuda.is_available():
-        Device = torch.device('cuda')
-    else:
-        Device = torch.device('cpu')
+    # if torch.cuda.is_available():
+    #     Device = torch.device('cuda')
+    # else:
+    Device = torch.device('cpu') #优化就在CPU
 
     if os.path.exists(work.x_norm):
         norm_save_x = work.x_norm
@@ -49,15 +55,15 @@ def predictor_establish(name, work_load_path):
     y_normlizer.load(norm_save_y)
 
     if os.path.exists(work.yml):
-        Net_model, inference, _, _ = build_model_yml(work.yml, Device, name=name)
+        Net_model, inference, _, _ = build_model_yml(work.yml, Device, name=nameReal)
         isExist = os.path.exists(work.pth)
         if isExist:
             checkpoint = torch.load(work.pth, map_location=Device)
             Net_model.load_state_dict(checkpoint['net_model'])
     else:
-        Net_model, inference = rebuild_model(work_path, Device, name=name)
+        Net_model, inference = rebuild_model(work_path, Device, name=nameReal)
     model_all = DLModelPost(Net_model, Device,
-                        name=name,
+                        name=nameReal,
                         in_norm=x_normlizer,
                         out_norm=y_normlizer,
                         )
@@ -101,10 +107,10 @@ def calculate_hypervolume(front, reference_point):
 
 if __name__ == "__main__":
     # 设置需要优化的函数
-    name = 'FNO'
+    name = 'FNO_1'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work")
+    work_load_path = os.path.join("..", "work_train_FNO2")
 
     model_all = predictor_establish(name, work_load_path)
 
@@ -123,6 +129,7 @@ if __name__ == "__main__":
     ]
 
     # 单个对象优化
+    dict = {}
     for parameter in parameterList:
         # 创建问题对象
         problem = Rotor37Predictor(model_all, parameterList=[parameter])
@@ -132,7 +139,7 @@ if __name__ == "__main__":
         # 进行优化
         res = minimize(problem,
                        algorithm,
-                       termination=('n_gen', 500),
+                       termination=('n_gen', 200),
                        verbose=True,
                        save_history=True
                        )# 打印最优解
@@ -141,12 +148,14 @@ if __name__ == "__main__":
         # print("最优目标函数值：", res.F)
 
         # 保存到文件中
-        dict = {}
+
         dict[parameter+"_sample"] = res.X
         dict[parameter + "_value"] = res.F
 
+        # np.savez(os.path.join("..", "data", "opt_data", 'sin_obj_minimize.npz'), **dict)
+
     # 保存数据
-    np.savez(os.path.join("..", "data", "opt_data", 'sin_obj_minimize.npz'), **dict)
+    np.savez(os.path.join("..", "data", "opt_data", 'sin_obj_maximize.npz'), **dict)
 
 
 

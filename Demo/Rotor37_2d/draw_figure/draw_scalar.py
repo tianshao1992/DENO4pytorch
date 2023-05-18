@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
-    AlgoNameList = ["FNO", "FNM", "ploynomial", "MLP", "SVR", "XGBoost", "GPR"]
+    AlgoNameList = ["FNO", "ploynomial", "ANN", "SVR", "XGB", "GPR"]
     n_trainList = [500, 1000, 1500, 2000, 2500]
     npz_path = os.path.join("..", "data", "surrogate_data", "scalar_value.npz")
     data_true = np.load(npz_path)
 
     parameterList = [
-        # "PressureRatioV", "TemperatureRatioV",
+        "PressureRatioV", "TemperatureRatioV",
         "Efficiency", "EfficiencyPoly",
         "PressureLossR", "EntropyStatic",
         "MachIsentropic", "Load",
@@ -25,7 +25,11 @@ if __name__ == "__main__":
         "Mach", "Load",
         "MF"]
 
-    work_path = os.path.join("..", "data", "data_collect", "surrogate_error")
+    work_path = os.path.join("..", "data", "surrogate_pic")
+    isExist = os.path.exists(work_path)
+    if not isExist:
+        os.mkdir(work_path)
+
     # Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=parameterListN)  # 不在此处设置名称
     Visual = MatplotlibVision(work_path, input_name=('Z', 'R'), field_name=AlgoNameList)  # 不在此处设置名称
     fig_id = 0
@@ -33,19 +37,17 @@ if __name__ == "__main__":
         for parameter in parameterList:
             Err_all = []
             for AlgoName in AlgoNameList:
-                npz_path = os.path.join("..", "data", "surrogate_data", AlgoName + ".npz")
+                npz_path = os.path.join("..", "data", "surrogate_data", AlgoName + "_num.npz")
                 data_pred = np.load(npz_path)
 
                 value_true = data_true[parameter]
-                value_true = value_true[-400:]
-                value_true = value_true[:352].squeeze()
+                value_true = value_true[-400:].squeeze()
 
                 if AlgoName in ("FNO", "FNM"):
                     idx = 0
                 else:
                     idx = 4
-                value_pred = data_pred[parameter][:, 0]
-                value_pred = value_pred[:352].squeeze()
+                value_pred = data_pred[parameter][:, 0].squeeze()
                 # 绘制ture-pred图
                 #
                 # fig, axs = plt.subplots(1, 1, figsize=(10, 10), num=1)

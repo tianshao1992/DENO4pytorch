@@ -16,7 +16,7 @@ import time
 def change_yml(name, yml_path=None, **kwargs):
     # 加载config模板
     template_path = os.path.join("..", "data", "config_template.yml")
-    with open(template_path) as f:
+    with open(template_path, 'r', encoding="utf-8") as f:
         config_all = yaml.full_load(f)
         config_para = config_all[name + '_config']
     # 修改参数
@@ -28,19 +28,19 @@ def change_yml(name, yml_path=None, **kwargs):
     # 保存到新的文件
     isExist = os.path.exists(yml_path)
     if not isExist:
-        with open(yml_path, 'w') as f:
+        with open(yml_path, 'w', encoding="utf-8") as f:
             pass
-    with open(yml_path, 'r') as f:
+    with open(yml_path, 'r', encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
     if data is None:
         data = {}
     data[name + '_config'] = config_para
-    with open(yml_path, 'w') as f:
+    with open(yml_path, 'w', encoding="utf-8") as f:
         yaml.dump(data, f)
 
 def add_yml(key_set_list, yml_path=None):
     template_path = os.path.join("..", "data", "config_template.yml")
-    with open(template_path) as f:
+    with open(template_path, 'r', encoding="utf-8") as f:
     # 加载config模板
         config_all = yaml.full_load(f)
     for key_set in key_set_list:

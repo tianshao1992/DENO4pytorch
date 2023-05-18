@@ -30,14 +30,16 @@ class DLModelPost(object):
         if not input_norm:  # 如果没有归一化，需要将输入归一化
             input = self.in_norm.norm(input)
         input = torch.tensor(input, dtype=torch.float)
-        input = input.to(self.Device)
+
         self.netmodel.eval()
 
         if self.name in ("FNO", "UNet", "Transformer"):
             input = torch.tensor(np.tile(input[:, None, None, :], (1, self.grid_size, self.grid_size, 1)), dtype=torch.float)
+            input = input.to(self.Device)
             grid = feature_transform(input)
             pred = self.netmodel(input, grid)
         else:
+            input = input.to(self.Device)
             pred = self.netmodel(input)
 
         pred = pred.reshape([pred.shape[0], self.grid_size, self.grid_size, -1])

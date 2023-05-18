@@ -8,8 +8,8 @@ from Utilizes.process_data import DataNormer
 import yaml
 
 def get_noise(shape, scale):
-    random_array = np.random.randn(np.prod(shape))
-    random_array = (random_array-1)*2
+    random_array = np.random.randn(np.prod(shape)) #  randn生成的是标准正态分布
+    # random_array = (random_array-1)*2
     random_array = random_array.reshape(shape)
 
     return random_array * scale
@@ -226,17 +226,7 @@ def get_true_pred(loader, Net_model, inference, Device,
     return true, pred
 
 if __name__ == "__main__":
-    #建立模型并读入参数
-    name = 'MLP'
-    work_path = os.path.join('work', name)
-
-    in_dim = 28
-    out_dim = 5
-
-    # layer_mat = [in_dim, 256, 256, 256, 256, 256, 256, 256, 256, out_dim * 64 * 64]
-    # Net_model = MLP(layer_mat, is_BatchNorm=False)
-    #
-    # checkpoint = torch.load(os.path.join(work_path, 'latest_model.pth'))
-    # Net_model.load_state_dict(checkpoint['net_model'])
+    noi = get_noise([3,3], 0.1)
+    print(noi)
 
     #输出预测结果
