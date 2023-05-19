@@ -5,7 +5,7 @@ from Utilizes.process_data import DataNormer, MatLoader
 from post_process.post_data import Post_2d
 import os
 
-def get_grid(real_path = None):
+def get_grid(real_path=None):
     xx = np.linspace(-0.127, 0.126, 64)
     xx = np.tile(xx, [64,1])
 

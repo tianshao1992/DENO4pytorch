@@ -15,14 +15,14 @@ if __name__ == "__main__":
         "PressureRatioV", "TemperatureRatioV",
         "Efficiency", "EfficiencyPoly",
         "PressureLossR", "EntropyStatic",
-        "MachIsentropic", "Load",
+        # "MachIsentropic", "Load",
         "MassFlow"]
 
     parameterListN = [
         "PR", "TR",
         "Eff", "EffPoly",
         "PLoss", "Entr",
-        "Mach", "Load",
+        # "Mach", "Load",
         "MF"]
 
     work_path = os.path.join("..", "data", "surrogate_pic")
@@ -43,10 +43,10 @@ if __name__ == "__main__":
                 value_true = data_true[parameter]
                 value_true = value_true[-400:].squeeze()
 
-                if AlgoName in ("FNO", "FNM"):
-                    idx = 0
-                else:
-                    idx = 4
+                # if AlgoName in ("FNO", "FNM"):
+                #     idx = 0
+                # else:
+                idx = 4
                 value_pred = data_pred[parameter][:, 0].squeeze()
                 # 绘制ture-pred图
                 #
@@ -58,7 +58,8 @@ if __name__ == "__main__":
                 # fig.savefig(jpg_path)
                 # plt.close(fig)
 
-                Err = np.abs((value_pred - value_true)/value_true)
+                # Err = np.abs((value_pred - value_true)/value_true)
+                Err = (value_pred - value_true) / value_true
                 # Err_all.append(Err)
                 Err_all.append(Err[:, np.newaxis])
 

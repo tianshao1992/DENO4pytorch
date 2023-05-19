@@ -19,7 +19,7 @@ def work_construct(para_list_dict):
 
 
 if __name__ == "__main__":
-    name = "Transformer"
+    name = "deepONet"
     start_id = 0
     if torch.cuda.is_available():
         Device = torch.device('cuda')
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     worklist = work_construct(dict)
 
     for id, config_dict in enumerate(worklist):
-        work = WorkPrj(os.path.join("..", "work_noise_Transc", name + "_" + str(id + start_id)))
+        work = WorkPrj(os.path.join("..", "work_noise_deepONet", name + "_" + str(id + start_id)))
         change_yml("Basic", yml_path=work.yml, **config_dict)
         add_yml(["Optimizer_config", "Scheduler_config", name+"_config"], yml_path=work.yml)
         train_loader, valid_loader, x_normalizer, y_normalizer = loaddata(name, **work.config("Basic"))

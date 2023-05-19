@@ -211,7 +211,7 @@ def plot_error(post_true, post_pred, parameterList,
 
         if save_path is None:
             jpg_path = os.path.join(work_path, type + parameter_Name + "_error_" + str(fig_id) + '.jpg')
-        fig.savefig(jpg_path)
+        # fig.savefig(jpg_path) # 暂时修改
         plt.close(fig)
 
         dict_save.update({parameter_Name : value_span_pred})

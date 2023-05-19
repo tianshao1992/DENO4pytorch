@@ -70,6 +70,7 @@ class Post_2d(object):
         self._EntropyStatic = None
         self._MachIsentropic = None
         self._Load = None
+        self._LoadR = None
 
 
     def set_basic_const(self,
@@ -420,6 +421,8 @@ class Post_2d(object):
         self.MachIsentropic = x
     def set_Load(self, x):
         self.Load = x
+    def set_LoadR(self, x):
+        self.LoadR = x
 
 
 
@@ -604,8 +607,8 @@ class Post_2d(object):
             return self._DFactorR
     def get_EntropyStatic(self):
         if self._EntropyStatic is None:
-            rst = (1-self.kappa) / self.kappa * np.log2(self.PressureStatic / 101325)
-            rst = rst + np.log2(self.TemperatureStatic / 288.15)
+            rst = (1-self.kappa) / self.kappa * (np.log2(self.PressureStatic) - np.log2(101325))
+            rst = rst + np.log2(self.TemperatureStatic) - np.log2(288.15)
             rst = self.Cp * rst
             self._EntropyStatic = rst
             return rst
@@ -625,12 +628,21 @@ class Post_2d(object):
             return self._MachIsentropic
     def get_Load(self):
         if self._Load is None:
-            rst = self.Cp * (np.tile(self.TemperatureTotalW[..., :1], [1, 1, self.n_1d])
-                             - self.TemperatureTotalW) / self.Uaxis / self.Uaxis
+            rst = -self.Cp * (np.tile(self.TemperatureTotalV[..., :1], [1, 1, self.n_1d])
+                             - self.TemperatureTotalV) / self.Uaxis / self.Uaxis
             self._Load = rst
             return rst
         else:
             return self._Load
+
+    def get_LoadR(self):
+        if self._LoadR is None:
+            rst = -self.Cp * (np.tile(self.TemperatureTotalW[..., :1], [1, 1, self.n_1d])
+                             - self.TemperatureTotalW) / self.Uaxis / self.Uaxis
+            self._LoadR = rst
+            return rst
+        else:
+            return self._LoadR
 
 
     PressureTotalV = property(get_PressureTotalV, set_PressureTotalV)
@@ -659,6 +671,7 @@ class Post_2d(object):
     EntropyStatic = property(get_EntropyStatic, set_EntropyStatic)
     MachIsentropic = property(get_MachIsentropic, set_MachIsentropic)
     Load = property(get_Load, set_Load)
+    LoadR = property(get_LoadR, set_LoadR)
 
     def get_MassFlow(self):
         hub_out = 0.1948

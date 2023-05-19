@@ -71,6 +71,6 @@ task_7:
     - PressureRatioV
   hardConstrList:
     - MassFlow
-  hardConstrIneqList:
+  hardConstrIneqList: []
 
 

@@ -6,7 +6,7 @@ if __name__ == "__main__":
     # name = 'FNO_0'
     input_dim = 28
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_deepONet")
+    work_load_path = os.path.join("..", "work_train_UNet")
     workList = os.listdir(work_load_path)
     for name in workList:
         work_path = os.path.join(work_load_path, name)

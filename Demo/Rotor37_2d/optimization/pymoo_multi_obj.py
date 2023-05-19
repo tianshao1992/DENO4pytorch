@@ -21,11 +21,11 @@ def generate_tasks():
 
 if __name__ == "__main__":
     # 设置需要优化的函数
-    name = 'FNO'
+    name = 'FNO_1'
     input_dim = 28
     output_dim = 5
-    # work_load_path = os.path.join("..", "work_train_FNO2")
-    work_load_path = os.path.join("..", "work")
+    work_load_path = os.path.join("..", "work_train_FNO2")
+    # work_load_path = os.path.join("..", "work")
 
     model_all = predictor_establish(name, work_load_path)
 
@@ -43,15 +43,15 @@ if __name__ == "__main__":
     ]
     for ii, parameter in enumerate(parameterList):
         for task_id in range(8):
-            config["task_" + str(task_id)][0] = parameter
-            problem = Rotor37Predictor(model_all, **config["task_" + str(task_id + ii*8)])
+            config["task_" + str(task_id)]['parameterList'][0] = parameter
+            problem = Rotor37Predictor(model_all, **config["task_" + str(task_id)])
             # 定义优化算法
-            algorithm = NSGA2(pop_size=10)
+            algorithm = NSGA2(pop_size=30)
             # algorithm = GA(pop_size=20)
             # 进行优化
             res = minimize(problem,
                            algorithm,
-                           termination=('n_gen', 20),
+                           termination=('n_gen', 200),
                            verbose=True,
                            save_history=True
                            )# 打印最优解
