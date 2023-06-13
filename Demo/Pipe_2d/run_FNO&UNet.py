@@ -188,9 +188,9 @@ if __name__ == "__main__":
 
     # 训练参数
     batch_size = 32
-    epochs = 500
+    epochs = 1000
     learning_rate = 0.001
-    scheduler_step = 400
+    scheduler_step = 800
     scheduler_gamma = 0.1
 
     Logger.info('Total epochs: {:d}, learning_rate: {:e}, scheduler_step: {:d}, scheduler_gamma: {:e}'

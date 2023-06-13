@@ -16,7 +16,7 @@ class FNO1d(nn.Module):
         1维FNO网络
     """
 
-    def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, steps=1, padding=2, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, hidden=128, steps=1, padding=2, activation='gelu'):
         super(FNO1d, self).__init__()
         """
         The overall network. It contains /depth/ layers of the Fourier layer.
@@ -35,6 +35,7 @@ class FNO1d(nn.Module):
         self.modes = modes
         self.width = width
         self.depth = depth
+        self.hidden = hidden
         self.steps = steps
         self.activation = activation
         self.padding = padding  # pad the domain if input is non-periodic
@@ -44,8 +45,8 @@ class FNO1d(nn.Module):
         for i in range(self.depth):
             self.convs.append(SpectralConv1d(self.width, self.width, self.modes, activation=self.activation, norm=None))
 
-        self.fc1 = nn.Linear(self.width, 128)
-        self.fc2 = nn.Linear(128, out_dim)
+        self.fc1 = nn.Linear(self.width, self.hidden)
+        self.fc2 = nn.Linear(self.hidden, out_dim)
 
     def forward(self, x, grid):
         """
@@ -56,12 +57,15 @@ class FNO1d(nn.Module):
         x = self.fc0(x)
         x = x.permute(0, 2, 1)
 
-        x = F.pad(x, [0, self.padding])  # pad the domain if input is non-periodic
+        if self.padding != 0:
+            x = F.pad(x, [0, self.padding])  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
-        x = x[..., :-self.padding]
+        if self.padding != 0:
+            x = x[..., :-self.padding]
+
         x = x.permute(0, 2, 1)
         x = self.fc1(x)
         x = F.gelu(x)
@@ -74,7 +78,7 @@ class FNO2d(nn.Module):
         2维FNO网络
     """
 
-    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, steps=1, padding=2,
+    def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, hidden=128, steps=1, padding=2,
                  activation='gelu', dropout=0.0):
         super(FNO2d, self).__init__()
 
@@ -95,6 +99,7 @@ class FNO2d(nn.Module):
         self.modes = modes
         self.width = width
         self.depth = depth
+        self.hidden = hidden
         self.steps = steps
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
@@ -104,10 +109,12 @@ class FNO2d(nn.Module):
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, dropout=self.dropout, norm=None))
+            self.convs.append(
+                SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, dropout=self.dropout,
+                               norm=None))
 
-        self.fc1 = nn.Linear(self.width, 128)
-        self.fc2 = nn.Linear(128, out_dim)
+        self.fc1 = nn.Linear(self.width, self.hidden)
+        self.fc2 = nn.Linear(self.hidden, out_dim)
 
     def forward(self, x, grid):
         """
@@ -138,7 +145,8 @@ class FNO3d(nn.Module):
         3维FNO网络
     """
 
-    def __init__(self, in_dim, out_dim, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=(8, 8, 8), width=32, depth=4, hidden=128,
+                 steps=1, padding=6, activation='gelu'):
         super(FNO3d, self).__init__()
 
         """
@@ -159,6 +167,7 @@ class FNO3d(nn.Module):
         self.width = width
         self.depth = depth
         self.steps = steps
+        self.hidden = hidden
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
         self.fc0 = nn.Linear(steps * in_dim + 3, self.width)
@@ -168,8 +177,8 @@ class FNO3d(nn.Module):
         for i in range(self.depth):
             self.convs.append(SpectralConv3d(self.width, self.width, self.modes, activation=self.activation, norm=None))
 
-        self.fc1 = nn.Linear(self.width, 128)
-        self.fc2 = nn.Linear(128, out_dim)
+        self.fc1 = nn.Linear(self.width, self.hidden)
+        self.fc2 = nn.Linear(self.hidden, out_dim)
 
     def forward(self, x, grid):
         """
@@ -180,13 +189,16 @@ class FNO3d(nn.Module):
         x = self.fc0(x)
         x = x.permute(0, 4, 1, 2, 3)
 
-        x = F.pad(x, [0, self.padding, 0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
+        if self.padding != 0:
+            x = F.pad(x, [0, self.padding, 0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
-        x = x[..., :-self.padding, :-self.padding, :-self.padding]
-        x = x.permute(0, 2, 3, 4, 1)  # pad the domain if input is non-periodic
+        if self.padding != 0:
+            x = x[..., :-self.padding, :-self.padding, :-self.padding]  # pad the domain if input is non-periodic
+
+        x = x.permute(0, 2, 3, 4, 1)
         x = self.fc1(x)
         x = F.gelu(x)
         x = self.fc2(x)

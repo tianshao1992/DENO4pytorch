@@ -237,11 +237,11 @@ class SpectralRegressor(nn.Module):
                  dropout=0.1,
                  debug=False):
         super(SpectralRegressor, self).__init__()
-        if spacial_dim == 1:
+        if spacial_dim == 1:  # 1d, function + x
             spectral_conv = SpectralConv1d
         elif spacial_dim == 2:  # 2d, function + (x,y)
             spectral_conv = SpectralConv2d
-        elif spacial_dim == 3:  # 1d, function + x
+        elif spacial_dim == 3:  # 3d, function + (x,y,z)
             spectral_conv = SpectralConv3d
         else:
             raise NotImplementedError("3D not implemented.")
@@ -280,9 +280,12 @@ class SpectralRegressor(nn.Module):
 
     def forward(self, x, edge=None, pos=None, grid=None):
         '''
+        3D:
+            Input: (-1, n, m, l, in_features)
+            Output: (-1, n, m, l, n_targets)
         2D:
-            Input: (-1, n, n, in_features)
-            Output: (-1, n, n, n_targets)
+            Input: (-1, n, m, in_features)
+            Output: (-1, n, m, n_targets)
         1D:
             Input: (-1, n, in_features)
             Output: (-1, n, n_targets)
@@ -295,8 +298,12 @@ class SpectralRegressor(nn.Module):
             x = self.fc(x)
         if len(x.shape) == 3:
             x = x.permute(0, 2, 1)
-        else:
+        elif len(x.shape) == 4:
             x = x.permute(0, 3, 1, 2)
+        elif len(x.shape) == 5:
+            x = x.permute(0, 4, 1, 2, 3)
+        else:
+            raise TypeError
 
         for layer in self.spectral_conv:
             if self.return_freq:
@@ -312,6 +319,10 @@ class SpectralRegressor(nn.Module):
             x = x.permute(0, 2, 1)
         elif len(x.shape) == 4:
             x = x.permute(0, 2, 3, 1)
+        elif len(x.shape) == 5:
+            x = x.permute(0, 2, 3, 4, 1)
+        else:
+            raise TypeError
 
         x = self.regressor(x)
 
@@ -614,12 +625,13 @@ class FourierTransformer2D(nn.Module):
 
     def forward(self, node, pos, edge, grid, weight=None, boundary_value=None):
         '''
-        - node: (batch_size, n, n, node_feats)
-        - pos: (batch_size, n_s*n_s, pos_dim)
-        - edge: (batch_size, n_s*n_s, n_s*n_s, edge_feats)
-        - weight: (batch_size, n_s*n_s, n_s*n_s): mass matrix prefered
-            or (batch_size, n_s*n_s) when mass matrices are not provided (lumped mass)
-        - grid: (batch_size, n-2, n-2, 2) excluding boundary
+        Args:
+            - node: (batch_size, n, n, node_feats)
+            - pos: (batch_size, n_s*n_s, pos_dim)
+            - edge: (batch_size, n_s*n_s, n_s*n_s, edge_feats)
+            - weight: (batch_size, n_s*n_s, n_s*n_s): mass matrix prefered
+                or (batch_size, n_s*n_s) when mass matrices are not provided (lumped mass)
+            - grid: (batch_size, n-2, n-2, 2) excluding boundary
         '''
         bsz = node.size(0)
         n_s = int(pos.size(1))
@@ -650,7 +662,12 @@ class FourierTransformer2D(nn.Module):
             if self.return_latent:
                 x_latent.append(x.contiguous())
 
-        x = x.view(bsz, n_s, n_s, self.n_hidden)
+        if self.spacial_dim == 3:
+            x = x.view(bsz, n_s, n_s, n_s, self.n_hidden)
+        elif self.spacial_dim == 2:
+            x = x.view(bsz, n_s, n_s, self.n_hidden)
+        else:
+            x = x.view(bsz, n_s, self.n_hidden)
         x = self.upscaler(x)
 
         if self.return_latent:
