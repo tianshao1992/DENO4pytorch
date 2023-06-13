@@ -48,7 +48,7 @@ def feature_transform(x):
     return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device), edge.to(x.device)
 
 
-def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
+def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, scheduler):
     """
     Args:
         data_loader: output fields at last time step
@@ -59,6 +59,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     """
     train_loss = 0
     total_size = 0
+    train_metric = 0
     for batch, (xx, yy) in enumerate(dataloader):
         input_sizes = list(xx.shape)
         xx = xx.reshape(input_sizes[:-2] + [-1, ])
@@ -68,19 +69,21 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
 
         pred = netmodel(xx, grid, edge, grid)['preds']
         loss = lossfunc(pred, yy)
+        metric = lossmetric(pred, yy)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         train_loss += loss.item()
+        train_metric += metric.mean(dim=-1).sum(dim=0).item()
         total_size += input_sizes[0]
 
     scheduler.step()
-    return train_loss / total_size
+    return train_loss / total_size, train_metric / total_size
 
 
-def valid(dataloader, netmodel, device, lossfunc):
+def valid(dataloader, netmodel, device, lossfunc, lossmetric):
     """
     Args:
         data_loader: input coordinates
@@ -89,6 +92,7 @@ def valid(dataloader, netmodel, device, lossfunc):
     """
     valid_loss = 0
     total_size = 0
+    valid_metric = 0
     with torch.no_grad():
         for batch, (xx, yy) in enumerate(dataloader):
             input_sizes = list(xx.shape)
@@ -99,10 +103,13 @@ def valid(dataloader, netmodel, device, lossfunc):
 
             pred = netmodel(xx, grid, edge, grid)['preds']
             loss = lossfunc(pred, yy)
+            metric = lossmetric(pred, yy)
+
             valid_loss += loss.item()
+            valid_metric += metric.mean(dim=-1).sum(dim=0).item()
             total_size += input_sizes[0]
 
-    return valid_loss / total_size
+    return valid_loss / total_size, valid_metric / total_size
 
 
 def inference(dataloader, netmodel, device):  # 这个是？？
@@ -171,7 +178,7 @@ if __name__ == "__main__":
     nvalid = 5
     steps = 5
 
-    batch_size = 20
+    batch_size = 25
     epochs = 501
     learning_rate = 0.001
     scheduler_step = 400
@@ -230,7 +237,7 @@ if __name__ == "__main__":
     # 损失函数
     Loss_func = nn.MSELoss()
     # L1loss = nn.SmoothL1Loss()
-    Metircs = FieldsLpLoss(d=2, p=2, reduction=True, size_average=True)
+    Loss_metirc = FieldsLpLoss(d=2, p=2, reduction=True, size_average=False)
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
     # 下降策略
@@ -248,20 +255,32 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Optimizer, Scheduler))
+        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Loss_metirc, Optimizer, Scheduler))
 
         Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func))
-        Logger.info('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
-                    format(epoch, Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1],
+        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func, Loss_metirc))
+        Logger.info('epoch: {:5d}, lr: {:.3e}, '
+                    'train_step_loss: {:.3e}, valid_step_loss: {:.3e}, '
+                    'train_step_loss: {:.3f}, valid_step_loss: {:.3f}, '
+                    'cost: {:.2f}'.
+                    format(epoch, Optimizer.param_groups[0]['lr'],
+                           log_loss[0][-1][0], log_loss[1][-1][0],
+                           log_loss[0][-1][1], log_loss[1][-1][1],
                            time.time() - star_time))
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 5 == 0:
+        if epoch > 0 and epoch % 1 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :, 0], 'train_step')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :, 0], 'valid_step')
             fig.suptitle('training loss')
             fig.savefig(os.path.join(work_path, 'log_loss.svg'))
+            plt.close(fig)
+
+            fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=2)
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :, 1], 'train_step')
+            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :, 1], 'valid_step')
+            fig.suptitle('training metrics')
+            fig.savefig(os.path.join(work_path, 'log_metric.svg'))
             plt.close(fig)

@@ -20,7 +20,7 @@ Turbulence_3d+t:
   return_latent: False
   decoder_type: ifft2
   last_activation: True
-  freq_dim: 16
+  freq_dim: 32
   num_regressor_layers: 2
   fourier_modes: 10
   spacial_dim: 3
