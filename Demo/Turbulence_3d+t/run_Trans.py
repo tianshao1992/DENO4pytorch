@@ -75,7 +75,7 @@ def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, schedul
         loss.backward()
         optimizer.step()
 
-        train_loss += loss.item()
+        train_loss += loss.item() * input_sizes[0]
         train_metric += metric.mean(dim=-1).sum(dim=0).item()
         total_size += input_sizes[0]
 
@@ -105,7 +105,7 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
             loss = lossfunc(pred, yy)
             metric = lossmetric(pred, yy)
 
-            valid_loss += loss.item()
+            valid_loss += loss.item() * input_sizes[0]
             valid_metric += metric.mean(dim=-1).sum(dim=0).item()
             total_size += input_sizes[0]
 
