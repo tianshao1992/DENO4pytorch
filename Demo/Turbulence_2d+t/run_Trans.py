@@ -211,7 +211,7 @@ if __name__ == "__main__":
     config = config['Turbulence_2d+t']
 
     # 建立网络
-    Net_model = FourierTransformer2D(**config).to(Device)
+    Net_model = FourierTransformer(**config).to(Device)
     # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
     # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
 
