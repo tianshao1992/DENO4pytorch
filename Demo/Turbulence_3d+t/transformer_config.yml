@@ -18,17 +18,18 @@ Turbulence_3d+t:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: ifft2
+  decoder_type: ifft
   last_activation: True
   freq_dim: 32
   num_regressor_layers: 2
-  fourier_modes: 10
+  regressor_activation: gelu
+  fourier_modes: 16
   spacial_dim: 3
   spacial_fc: True
   dropout: 0.0
   encoder_dropout: 0.0
   decoder_dropout: 0.0
-  ffn_dropout: 0.05
+  ffn_dropout: 0.0
   debug: False
   upsample_mode: interp
   downsample_mode: interp

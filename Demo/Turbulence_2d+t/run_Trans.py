@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import MatLoader
-from transformer.Transformers import FourierTransformer2D
+from transformer.Transformers import FourierTransformer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt

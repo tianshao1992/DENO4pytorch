@@ -16,8 +16,6 @@ from torchinfo import summary
 from fno.FNOs import FNO3d
 from cnn.ConvNets import UNet2d
 
-from Utilizes.visual_data import MatplotlibVision
-
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.process_data import DataNormer
 from Utilizes.loss_metrics import FieldsLpLoss
@@ -57,6 +55,7 @@ def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, schedul
     train_loss = 0
     total_size = 0
     train_metric = 0
+    all_metric = []
     for batch, (xx, yy) in enumerate(dataloader):
         input_sizes = list(xx.shape)
         xx = xx.reshape(input_sizes[:-2] + [-1, ])
@@ -66,18 +65,19 @@ def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, schedul
 
         pred = netmodel(xx, gd)
         loss = lossfunc(pred, yy)
-        metric = lossmetric(pred, yy)
+        metric = lossmetric(pred.reshape(input_sizes[0], -1, 1), yy.reshape(input_sizes[0], -1, 1))
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         train_loss += loss.item() * input_sizes[0]
-        train_metric += metric.mean(dim=-1).sum(dim=0).item()
+        train_metric += metric.squeeze().sum(dim=0).item()
+        all_metric.append(metric.squeeze().detach())
         total_size += input_sizes[0]
 
     scheduler.step()
-    return train_loss / total_size, train_metric / total_size
+    return train_loss / total_size, train_metric / total_size, torch.cat(all_metric, dim=0).cpu().numpy()
 
 
 def valid(dataloader, netmodel, device, lossfunc, lossmetric):
@@ -90,6 +90,7 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
     valid_loss = 0
     total_size = 0
     valid_metric = 0
+    all_metric = []
     with torch.no_grad():
         for batch, (xx, yy) in enumerate(dataloader):
             input_sizes = list(xx.shape)
@@ -100,13 +101,14 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
 
             pred = netmodel(xx, gd)
             loss = lossfunc(pred, yy)
-            metric = lossmetric(pred, yy)
+            metric = lossmetric(pred.reshape(input_sizes[0], -1, 1), yy.reshape(input_sizes[0], -1, 1))
 
             valid_loss += loss.item() * input_sizes[0]
-            valid_metric += metric.mean(dim=-1).sum(dim=0).item()
+            valid_metric += metric.squeeze().sum(dim=0).item()
+            all_metric.append(metric.squeeze())
             total_size += input_sizes[0]
 
-        return valid_loss / total_size, valid_metric / total_size
+        return valid_loss / total_size, valid_metric / total_size, torch.cat(all_metric, dim=0).cpu().numpy()
 
 
 def inference(dataloader, netmodel, device):  # 这个是？？
@@ -174,8 +176,8 @@ if __name__ == "__main__":
 
     in_dim = 3
     out_dim = 3
-    ntrain = 45
-    nvalid = 5
+    ntrain = 40
+    nvalid = 10
 
     mode = 16
     modes = (mode, mode, mode)
@@ -185,10 +187,10 @@ if __name__ == "__main__":
     padding = 0
     dropout = 0.0
 
-    batch_size = 64
-    epochs = 201
+    batch_size = 16
+    epochs = 151
     learning_rate = 0.001
-    scheduler_step = 151
+    scheduler_step = 121
     scheduler_gamma = 0.1
 
     Logger.info('Total epochs: {:d}, learning_rate: {:e}, scheduler_step: {:d}, scheduler_gamma: {:e}'
@@ -221,12 +223,9 @@ if __name__ == "__main__":
     ################################################################
 
     # 建立网络
-    if 'FNO' in name:
-        Net_model = FNO3d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
-                          padding=padding, activation='gelu').to(Device)
-    elif name == 'UNet':
-        Net_model = UNet2d(in_sizes=(32, 32, 32, 5 * 3), out_sizes=(32, 32, 32, 3), width=width,
-                           depth=depth, steps=steps, activation='gelu', dropout=dropout).to(Device)
+
+    Net_model = FNO3d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
+                      padding=padding, activation='gelu').to(Device)
 
     input1 = torch.randn(batch_size, 32, 32, 32, 5 * 3).to(Device)
     input2 = torch.randn(batch_size, 32, 32, 32, 3).to(Device)
@@ -245,6 +244,7 @@ if __name__ == "__main__":
 
     star_time = time.time()
     log_loss = [[], []]
+    log_per = [[], []]
 
     ################################################################
     # train process
@@ -253,10 +253,17 @@ if __name__ == "__main__":
     for epoch in range(epochs):
 
         Net_model.train()
-        log_loss[0].append(train(train_loader, Net_model, Device, Loss_func, Loss_metirc, Optimizer, Scheduler))
+        train_loss, train_metric, train_per = \
+            train(train_loader, Net_model, Device, Loss_func, Loss_metirc, Optimizer, Scheduler)
+        log_loss[0].append([train_loss, train_metric])
+        log_per[0].append(train_per)
 
         Net_model.eval()
-        log_loss[1].append(valid(valid_loader, Net_model, Device, Loss_func, Loss_metirc))
+        valid_loss, valid_metric, valid_per = \
+            valid(valid_loader, Net_model, Device, Loss_func, Loss_metirc)
+        log_loss[1].append([valid_loss, valid_metric])
+        log_per[1].append(valid_per)
+
         Logger.info('epoch: {:5d}, lr: {:.3e}, '
                     'train_step_loss: {:.3e}, valid_step_loss: {:.3e}, '
                     'train_step_loss: {:.3f}, valid_step_loss: {:.3f}, '
@@ -268,7 +275,7 @@ if __name__ == "__main__":
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 1 == 0:
+        if epoch > 0 and epoch % 10 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :, 0], 'train_step')
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :, 0], 'valid_step')
@@ -282,3 +289,8 @@ if __name__ == "__main__":
             fig.suptitle('training metrics')
             fig.savefig(os.path.join(work_path, 'log_metric.svg'))
             plt.close(fig)
+
+        if epoch > 0 and epoch % 30 == 0:
+            torch.save({'log_loss': log_loss, 'log_per': log_per,
+                        'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
+                       os.path.join(work_path, 'epoch_' + str(epoch) + '.pth'))

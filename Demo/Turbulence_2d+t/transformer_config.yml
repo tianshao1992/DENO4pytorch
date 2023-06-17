@@ -18,7 +18,7 @@ Turbulence_2d+t:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: ifft2
+  decoder_type: ifft
   last_activation: True
   freq_dim: 32
   num_regressor_layers: 2

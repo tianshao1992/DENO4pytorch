@@ -18,7 +18,7 @@ Darcy_2d:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: ifft2
+  decoder_type: ifft
   spacial_dim: 2
   spacial_fc: True
   upsample_mode: interp
@@ -64,7 +64,7 @@ Darcy_2d_inverse:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: ifft2
+  decoder_type: ifft
   regressor_activation: silu
   spacial_dim: 2
   spacial_fc: True

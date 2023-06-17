@@ -615,9 +615,9 @@ class SimpleTransformer(nn.Module):
         return self.encoder_layers
 
 
-class FourierTransformer2D(nn.Module):
+class FourierTransformer(nn.Module):
     def __init__(self, **kwargs):
-        super(FourierTransformer2D, self).__init__()
+        super(FourierTransformer, self).__init__()
         self.config = defaultdict(lambda: None, **kwargs)
         self._get_setting()
         self._initialize()
@@ -844,7 +844,7 @@ class FourierTransformer2D(nn.Module):
                                                 dropout=self.decoder_dropout,
                                                 return_latent=self.return_latent,
                                                 debug=self.debug)
-        elif self.decoder_type == 'ifft2':
+        elif self.decoder_type == 'ifft':
             self.regressor = SpectralRegressor(in_dim=self.n_hidden,
                                                n_hidden=self.freq_dim,
                                                freq_dim=self.freq_dim,

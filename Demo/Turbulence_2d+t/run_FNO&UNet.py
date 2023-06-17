@@ -13,10 +13,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from Utilizes.process_data import MatLoader
-<<<<<<< HEAD
 from Utilizes.loss_metrics import FieldsLpLoss
-=======
->>>>>>> origin/master
+
 from fno.FNOs import FNO2d
 from cnn.ConvNets import UNet2d
 from Utilizes.visual_data import MatplotlibVision, TextLogger
@@ -140,17 +138,13 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-<<<<<<< HEAD
-    name = 'FNO-'
-=======
     name = 'FNO'
->>>>>>> origin/master
+
     if torch.cuda.is_available():
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
 
-<<<<<<< HEAD
     train_file = './data/ns_V1e-3_N5000_T50.mat'
     # train_file = './data/ns_V1e-5_N1200_T20.mat'
 
@@ -160,7 +154,7 @@ if __name__ == "__main__":
     nvalid = 1000
     # ntrain = 1000
     # nvalid = 200
-=======
+
     # train_file = './data/ns_V1e-3_N5000_T50.mat'
     train_file = './data/ns_V1e-5_N1200_T20.mat'
 
@@ -171,7 +165,6 @@ if __name__ == "__main__":
 
     ntrain = 400
     nvalid = 200
->>>>>>> origin/master
 
     work_path = os.path.join('work', name, 'train_size-' + str(ntrain))
     isCreated = os.path.exists(work_path)
@@ -189,15 +182,10 @@ if __name__ == "__main__":
     dropout = 0.0
 
     batch_size = 8
-<<<<<<< HEAD
     epochs = 400
     learning_rate = 0.001
     scheduler_step = 300
-=======
-    epochs = 500
-    learning_rate = 0.001
-    scheduler_step = 400
->>>>>>> origin/master
+
     scheduler_gamma = 0.1
 
     print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -206,11 +194,8 @@ if __name__ == "__main__":
     S = 64
     T_in = 10
     # T = 40
-<<<<<<< HEAD
-    T = 40
-=======
+
     T = 10
->>>>>>> origin/master
     step = 1
 
     ################################################################
@@ -250,10 +235,8 @@ if __name__ == "__main__":
 
     # 损失函数
     Loss_func = nn.MSELoss()
-<<<<<<< HEAD
     Loss_metric = FieldsLpLoss(size_average=False)
-=======
->>>>>>> origin/master
+
     # L1loss = nn.SmoothL1Loss()
     # 优化算法
     Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
@@ -302,11 +285,7 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'latest_model.pth'))
 
-<<<<<<< HEAD
             for tim_id in range(0, T, 1):
-=======
-            for tim_id in range(0, T, 4):
->>>>>>> origin/master
                 fig, axs = plt.subplots(1, 3, figsize=(18, 5), num=1)
                 Visual.plot_fields_ms(fig, axs, train_true[0, ..., tim_id, None],
                                       train_pred[0, ..., tim_id, None], train_grid[0])
