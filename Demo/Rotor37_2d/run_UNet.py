@@ -67,7 +67,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1) / batch_size
+    return train_loss / (batch + 1)
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -88,7 +88,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1) / batch_size
+    return valid_loss / (batch + 1)
 
 
 def inference(dataloader, netmodel, device): # 这个是？？

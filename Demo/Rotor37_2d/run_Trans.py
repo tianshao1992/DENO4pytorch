@@ -9,9 +9,8 @@
 """
 import os
 import numpy as np
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import torch
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
@@ -216,8 +215,7 @@ if __name__ == "__main__":
         # Loss_func = nn.SmoothL1Loss()
         # 优化算法
         Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
-        # 下降策略
-        Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
+
         # 可视化
         Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('p', 't', 'rho', 'alf', 'v'))
 

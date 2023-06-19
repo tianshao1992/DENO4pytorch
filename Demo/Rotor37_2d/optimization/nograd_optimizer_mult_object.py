@@ -63,8 +63,8 @@ if __name__ == "__main__":
     para = ng.p.Array(shape=(1, 28), lower=0, upper=1)
 
     #选择并设置优化器
-    # optimizer = ng.optimizers.NGOpt10(parametrization=para, budget=200, num_workers=10)
-    optimizer = ng.optimizers.LhsDE(parametrization=para, budget=200, num_workers=10)
+    optimizer = ng.optimizers.NSGA2(parametrization=para, budget=200, num_workers=10)
+    # optimizer = ng.optimizers.LhsDE(parametrization=para, budget=200)
 
     #获得优化结果
     recommendation = optimizer.minimize(targetFunc)
@@ -77,19 +77,19 @@ if __name__ == "__main__":
     #     optimizer.provide_recommendation()
     #     print(optimizer.current_bests["minimum"])
     #     # optimizer.watch(watch = "x", note = "iteration " + str(i))
-    loss_values = []
-    for _ in range(200):
-        # 提取当前参数
-        x = optimizer.ask()
-        # 计算损失函数值
-        loss = targetFunc(x.value)
-        # 将损失函数值添加到列表中
-        loss_values.append(loss)
-        # 提供损失函数值给优化器
-        optimizer.tell(x, loss)
-
-    # 绘制优化收敛曲线
-    plt.plot(np.arange(len(loss_values)), np.concatenate(loss_values, axis=0))
-    plt.xlabel('Iteration')
-    plt.ylabel('Loss')
-    plt.show()
+    # loss_values = []
+    # for _ in range(200):
+    #     # 提取当前参数
+    #     x = optimizer.ask()
+    #     # 计算损失函数值
+    #     loss = targetFunc(x.value)
+    #     # 将损失函数值添加到列表中
+    #     loss_values.append(loss)
+    #     # 提供损失函数值给优化器
+    #     optimizer.tell(x, loss)
+    #
+    # # 绘制优化收敛曲线
+    # plt.plot(np.arange(len(loss_values)), np.concatenate(loss_values, axis=0))
+    # plt.xlabel('Iteration')
+    # plt.ylabel('Loss')
+    # plt.show()

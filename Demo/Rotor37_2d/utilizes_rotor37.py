@@ -1,10 +1,11 @@
 import numpy as np
 import yaml
+import torch
 from Utilizes.process_data import DataNormer, MatLoader
 from post_process.post_data import Post_2d
 import os
 
-def get_grid(real_path = None):
+def get_grid(real_path=None):
     xx = np.linspace(-0.127, 0.126, 64)
     xx = np.tile(xx, [64,1])
 
@@ -82,22 +83,20 @@ def get_origin_6field(realpath=None):
 
     return design, fields
 
-def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFlow",
-                                # "Vxyz_X", "Vxyz_Y", "Vxyz_Z",
-                                'Relative Total Pressure', 'Relative Total Temperature',
-                                # 'Entropy'
-                               ],
+def get_origin(quanlityList=None,
                 realpath=None,
                 existcheck=True,
-                shuffled=False,
-                getridbad=True
-                ):
+                shuffled=True,
+                getridbad=True):
+
+    if quanlityList is None:
+        quanlityList = ["Static Pressure", "Static Temperature",
+                        'V2', 'W2', "DensityFlow"]
     if realpath is None:
         sample_files = [os.path.join("data", "sampleRstZip_1500"),
                         os.path.join("data", "sampleRstZip_500"),
                         os.path.join("data", "sampleRstZip_970")
                         ]
-
     else:
         sample_files = [os.path.join(realpath, "sampleRstZip_1500"),
                         os.path.join(realpath, "sampleRstZip_500"),
@@ -113,22 +112,7 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
 
         sample_files = sample_files_exists
 
-
-    design = []
-    fields = []
-    for ii, file in enumerate(sample_files):
-        reader = MatLoader(file)
-        design.append(reader.read_field('design'))
-        output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
-        for jj, quanlity in enumerate(quanlityList):
-            if quanlity=="DensityFlow": #设置一个需要计算获得的数据
-                output[:, :, :, jj] = (reader.read_field("Density")*reader.read_field("Vxyz_X")).clone()
-            else:
-                output[:, :, :, jj] = reader.read_field(quanlity).clone()
-        fields.append(output)
-
-    design = np.concatenate(design, axis=0)
-    fields = np.concatenate(fields, axis=0)
+    design, fields = get_quanlity_from_mat(sample_files, quanlityList)
 
     if getridbad:
         if realpath is None:
@@ -147,11 +131,40 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
         fields = np.delete(fields, sus_bad_idx, axis=0)
 
     if shuffled:
-        # np.random.seed(8905)
+        np.random.seed(8905)
         idx = np.random.permutation(design.shape[0])
-        print(idx[:10])
+        # print(idx[:10])
         design = design[idx]
         fields = fields[idx]
+
+    return design, fields
+
+def get_quanlity_from_mat(sample_files, quanlityList):
+    design = []
+    fields = []
+    if not isinstance(sample_files, list):
+        sample_files = [sample_files]
+    for ii, file in enumerate(sample_files):
+        reader = MatLoader(file, to_torch=False)
+        design.append(reader.read_field('design'))
+        output = np.zeros([design[ii].shape[0], 64, 64, len(quanlityList)])
+        Cp = 1004
+        for jj, quanlity in enumerate(quanlityList):
+            if quanlity == "DensityFlow":  # 设置一个需要计算获得的数据
+                Vm = np.sqrt(np.power(reader.read_field("Vxyz_X"), 2) + np.power(reader.read_field("Vxyz_Y"), 2))
+                output[:, :, :, jj] = (reader.read_field("Density") * Vm).copy()
+            elif quanlity == "W2":  # 设置一个需要计算获得的数据
+                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Relative Total Temperature") - reader.read_field(
+                    "Static Temperature")).copy()
+            elif quanlity == "V2":  # 设置一个需要计算获得的数据
+                output[:, :, :, jj] = 2 * Cp * (reader.read_field("Absolute Total Temperature") - reader.read_field(
+                    "Static Temperature")).copy()
+            else:
+                output[:, :, :, jj] = reader.read_field(quanlity).copy()
+        fields.append(output)
+
+    design = np.concatenate(design, axis=0)
+    fields = np.concatenate(fields, axis=0)
 
     return design, fields
 
@@ -160,15 +173,6 @@ def get_origin(quanlityList=["Static Pressure", "Static Temperature", "DensityFl
 def get_value(data_2d, input_para=None, parameterList=None):
     if not isinstance(parameterList, list):
         parameterList = [parameterList]
-
-    if input_para is None:
-        input_para = {
-            "PressureStatic": 0,
-            "TemperatureStatic": 1,
-            "DensityFlow": 2,
-            "PressureTotalW": 3,
-            "TemperatureTotalW": 4,
-        }
 
     grid = get_grid()
     post_pred = Post_2d(data_2d, grid,
@@ -183,10 +187,48 @@ def get_value(data_2d, input_para=None, parameterList=None):
 
     return np.concatenate(Rst, axis=1)
 
+
+class Rotor37WeightLoss(torch.nn.Module):
+    def __init__(self):
+        super(Rotor37WeightLoss, self).__init__()
+
+    def forward(self, predicted, target):
+        # 自定义损失计算逻辑
+        device = target.device
+        if target.shape[1] > 4000:
+            target = torch.reshape(target, (target.shape[0], 64, 64, -1))
+            predicted = torch.reshape(predicted, (target.shape[0], 64, 64, -1))
+
+        if len(target.shape)==3:
+            predicted = predicted.unsqueeze(0)
+        if len(target.shape)==2:
+            predicted = predicted.unsqueeze(0).unsqueeze(-1) #加一个维度
+
+        grid_size_1 = target.shape[1]
+        grid_size_2 = target.shape[2]
+        weighted_lines = 2
+        weighted_cof = 10
+
+        temp1 = torch.ones((grid_size_1, weighted_lines)) * weighted_cof
+        temp2 = torch.ones((grid_size_1, grid_size_2 - weighted_lines * 2))
+        weighted_mat = torch.cat((temp1, temp2, temp1), dim=1)
+        weighted_mat = weighted_mat.unsqueeze(0).unsqueeze(-1).expand_as(target)
+        weighted_mat = weighted_mat * grid_size_2 /(weighted_cof * weighted_lines * 2 + grid_size_2 - weighted_lines * 2)
+        weighted_mat = weighted_mat.to(device)
+        lossfunc = torch.nn.MSELoss()
+        loss = lossfunc(predicted * weighted_mat, target * weighted_mat)
+        return loss
+
 if __name__ == "__main__":
-    design, field = get_origin()
+    design, field = get_origin(shuffled=False, getridbad=False)
     grid = get_grid()
-    Rst = get_value(field, parameterList="EntropyStatic")
+    Rst = get_value(field, parameterList="PressureRatioW")
+
+    sort_idx = np.argsort(Rst.squeeze())
+    sort_value = Rst[sort_idx]
+
+    print(0)
+
     # np.savetxt(os.path.join("Rst.txt"), Rst)
     # file_path = os.path.join("data", "sus_bad_data.yml")
     # import yaml

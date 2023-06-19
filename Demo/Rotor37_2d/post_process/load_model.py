@@ -1,17 +1,28 @@
 import torch
 import os
 import numpy as np
-
+from torch.utils.data import DataLoader
 from post_process.post_data import Post_2d
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
 from Utilizes.process_data import DataNormer
 import yaml
 
+def get_noise(shape, scale):
+    random_array = np.random.randn(np.prod(shape)) #  randn生成的是标准正态分布
+    # random_array = (random_array-1)*2
+    random_array = random_array.reshape(shape)
 
-def loaddata(name, ntrain, nvalid, shuffled=False):
-    batch_size = 32
+    return random_array * scale
+
+def loaddata(name,
+             ntrain=2500,
+             nvalid=400,
+             shuffled=False,
+             noise_scale=None,
+             batch_size=32):
+
     design, fields = get_origin(realpath=os.path.join("..", "data"), shuffled=shuffled)  # 获取原始数据
-    if name in ("FNO", "UNet", "Transformer"):
+    if name in ("FNO", "FNM", "UNet", "Transformer"):
         input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     else:
         input = design
@@ -34,16 +45,19 @@ def loaddata(name, ntrain, nvalid, shuffled=False):
     train_y = y_normalizer.norm(train_y)
     valid_y = y_normalizer.norm(valid_y)
 
-    train_y = train_y.reshape([train_y.shape[0], -1])
-    valid_y = valid_y.reshape([valid_y.shape[0], -1])
+    if name in ("MLP"):
+        train_y = train_y.reshape([train_y.shape[0], -1])
+        valid_y = valid_y.reshape([valid_y.shape[0], -1])
+
+    if noise_scale is not None and noise_scale > 0: # 向数据中增加噪声
+        noise_train = get_noise(train_y.shape, noise_scale)
+        train_y = train_y + noise_train
 
     # 完成了归一化后再转换数据
     train_x = torch.tensor(train_x, dtype=torch.float)
     train_y = torch.tensor(train_y, dtype=torch.float)
     valid_x = torch.tensor(valid_x, dtype=torch.float)
     valid_y = torch.tensor(valid_y, dtype=torch.float)
-
-
 
     if name in ("deepONet"):
         grid = get_grid(real_path=os.path.join("..", "data"))
@@ -58,6 +72,8 @@ def loaddata(name, ntrain, nvalid, shuffled=False):
         # grid_trans = grid_trans.reshape([1, -1, 2])
         train_grid = train_grid.reshape([train_x.shape[0], -1, 2])
         valid_grid = valid_grid.reshape([valid_x.shape[0], -1, 2])
+        train_y = train_y.reshape([train_y.shape[0], -1, 5])
+        valid_y = valid_y.reshape([valid_y.shape[0], -1, 5])
 
         train_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(train_x, train_grid, train_y),
                                                    batch_size=batch_size, shuffle=True, drop_last=True)
@@ -94,7 +110,7 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
     elif 'UNet' in name:
         from cnn.ConvNets import UNet2d
         from run_UNet import inference
-        Net_model = UNet2d(in_sizes=[64, 64, 28], out_sizes=[64, 64, 5], width=64,
+        Net_model = UNet2d(in_sizes=(64, 64, 28), out_sizes=(64, 64, 5), width=64,
                            depth=4, steps=1, activation='gelu', dropout=0).to(Device)
     elif 'Transformer' in name:
         from transformer.Transformers import FourierTransformer2D
@@ -114,6 +130,7 @@ def rebuild_model(work_path, Device, in_dim=28, out_dim=5, name=None, mode=10):
     else:
         print("The pth file is not exist, CHECK PLEASE!")
         return None, None
+
 def import_model_by_name(name):
     model_func = None
     inference = None
@@ -132,6 +149,10 @@ def import_model_by_name(name):
         from fno.FNOs import FNO2d
         from run_FNO import inference, train, valid
         model_func = FNO2d
+    elif 'FNM' in name:
+        from fno.FNOs import FNO2dMultChannel
+        from run_FNO_multi import inference, train, valid
+        model_func = FNO2dMultChannel
     elif 'UNet' in name:
         from cnn.ConvNets import UNet2d
         from run_UNet import inference, train, valid
@@ -160,28 +181,52 @@ def build_model_yml(yml_path, device, name=None):
 
 
 def get_true_pred(loader, Net_model, inference, Device,
-                  name=None, out_dim=5):
-    if name in ('MLP'):
-        grid, true, pred = inference(loader, Net_model, Device)
-    else:
-        coord, grid, true, pred = inference(loader, Net_model, Device)
-    true = true.reshape([true.shape[0], 64, 64, out_dim])
-    pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
+                  name=None, out_dim=5, iters=0, alldata=False):
+    true_list = []
+    pred_list = []
+    if alldata:
+        num = len(loader.dataset)
+        iters = (num + loader.batch_size -1)//loader.batch_size
+
+        new_loader = torch.utils.data.DataLoader(loader.dataset,
+                                                 batch_size=loader.batch_size,
+                                                 shuffle=False,
+                                                 drop_last=False)
+        loader = new_loader
+
+    for ii, data_box in enumerate(loader):
+        if ii > iters:
+            break
+        if name in ("deepONet"):
+            (data_x, data_f, data_y) = data_box
+            sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_f, data_y),
+                                                     batch_size=loader.batch_size,
+                                                     shuffle=False,
+                                                     drop_last=False)
+        else:
+            (data_x, data_y) = data_box
+            sub_loader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(data_x, data_y),
+                                                     batch_size=loader.batch_size,
+                                                     shuffle=False,
+                                                     drop_last=False)
+    # for ii in range(iters):
+        if name in ('MLP'):
+            _, true, pred = inference(sub_loader, Net_model, Device)
+        else:
+            _, _, true, pred = inference(sub_loader, Net_model, Device)
+        true = true.reshape([true.shape[0], 64, 64, out_dim])
+        pred = pred.reshape([pred.shape[0], 64, 64, out_dim])
+
+        true_list.append(true)
+        pred_list.append(pred)
+
+    true = np.concatenate(true_list, axis=0)
+    pred = np.concatenate(pred_list, axis=0)
 
     return true, pred
 
 if __name__ == "__main__":
-    #建立模型并读入参数
-    name = 'MLP'
-    work_path = os.path.join('work', name)
-
-    in_dim = 28
-    out_dim = 5
-
-    layer_mat = [in_dim, 256, 256, 256, 256, 256, 256, 256, 256, out_dim * 64 * 64]
-    Net_model = MLP(layer_mat, is_BatchNorm=False)
-
-    checkpoint = torch.load(os.path.join(work_path, 'latest_model.pth'))
-    Net_model.load_state_dict(checkpoint['net_model'])
+    noi = get_noise([3,3], 0.1)
+    print(noi)
 
     #输出预测结果
