@@ -14,7 +14,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
 from Utilizes.process_data import DataNormer, MatLoader
-from transformer.Transformers import SimpleTransformer, FourierTransformer2D
+from transformer.Transformers import SimpleTransformer, FourierTransformer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -207,7 +207,7 @@ if __name__ == "__main__":
         config = config['Darcy_2d']
 
     # 建立网络
-    Net_model = FourierTransformer2D(**config).to(Device)
+    Net_model = FourierTransformer(**config).to(Device)
 
     # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
     # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)

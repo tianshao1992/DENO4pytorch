@@ -95,7 +95,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
     # 模型名称
-    name = 'BasicPointNet_no_stn'
+    name = 'BasicPointNet'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     # 建立网络
     if 'BasicPointNet' in name:
         Net_model = BasicPointNet(input_dim=in_dim, output_dim=out_dim, scaling=1.0, activation='gelu',
-                                  input_transform=False, feature_transform=False).to(Device)
+                                  input_transform=True, feature_transform=True).to(Device)
 
     input = torch.randn(batch_size, train_x.shape[1], train_x.shape[2]).to(Device)
     model_statistics = summary(Net_model, input_data=input, device=Device, )
@@ -262,7 +262,7 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(t) + '_graph.jpg'))
                 plt.close(fig)
 
-                triang = tri.Triangulation(train_coord[t][:, 0], train_coord[t][:, 1])
+                triang = tri.Triangulation(valid_coord[t][:, 0], valid_coord[t][:, 1])
 
                 fig, axs = plt.subplots(out_dim, 3, figsize=(15, 5), num=1, layout='constrained')
                 Visual.plot_fields_tr(fig, axs, valid_true[t], valid_pred[t], valid_coord[t],
