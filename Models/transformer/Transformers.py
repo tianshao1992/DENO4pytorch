@@ -402,7 +402,7 @@ class SimpleTransformer(nn.Module):
         self._initialize()
         self.__name__ = self.attention_type.capitalize() + 'Transformer'
 
-    def forward(self, node, pos, edge=None, grid=None, weight=None):
+    def forward(self, node, pos, edge=None, grid=None, weight=None, return_weight=False):
         '''
         seq_len: n, number of grid points
         node_feats: number of features of the inputs
@@ -446,10 +446,13 @@ class SimpleTransformer(nn.Module):
         x = self.dpo(x)
         x = self.regressor(x, grid=grid)
 
-        return dict(preds=x,
-                    preds_freq=x_freq,
-                    preds_latent=x_latent,
-                    attn_weights=attn_weights)
+        if return_weight:
+            return dict(preds=x,
+                        preds_freq=x_freq,
+                        preds_latent=x_latent,
+                        attn_weights=attn_weights)
+        else:
+            return x
 
     def _initialize(self):
         """

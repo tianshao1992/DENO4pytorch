@@ -55,7 +55,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         yy = yy.to(device)
         grid, edge = feature_transform(xx)
 
-        pred = netmodel(xx, grid, edge, grid)['preds']
+        pred = netmodel(xx, grid, edge, grid)
         loss = lossfunc(pred, yy)
 
         optimizer.zero_grad()
@@ -82,7 +82,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             yy = yy.to(device)
             grid, edge = feature_transform(xx)
 
-            pred = netmodel(xx, grid, edge, grid)['preds']
+            pred = netmodel(xx, grid, edge, grid)
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 

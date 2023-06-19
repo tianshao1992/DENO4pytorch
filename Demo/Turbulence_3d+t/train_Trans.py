@@ -68,7 +68,7 @@ def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, schedul
         yy = yy.to(device)
         grid, edge = feature_transform(xx)
 
-        pred = netmodel(xx, grid, edge, grid)['preds']
+        pred = netmodel(xx, grid, edge, grid)
         loss = lossfunc(pred, yy)
         metric = lossmetric(pred.reshape(input_sizes[0], -1, 1), yy.reshape(input_sizes[0], -1, 1))
 
@@ -104,7 +104,7 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
             yy = yy.to(device)
             grid, edge = feature_transform(xx)
 
-            pred = netmodel(xx, grid, edge, grid)['preds']
+            pred = netmodel(xx, grid, edge, grid)
             loss = lossfunc(pred, yy)
             metric = lossmetric(pred.reshape(input_sizes[0], -1, 1), yy.reshape(input_sizes[0], -1, 1))
 
@@ -116,29 +116,7 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
     return valid_loss / total_size, valid_metric / total_size, torch.cat(all_metric, dim=0).cpu().numpy()
 
 
-def inference(dataloader, netmodel, device):  # 这个是？？
-    """
-    Args:
-        dataloader: input coordinates
-        netmodel: Network
-    Returns:
-        out_pred: predicted fields
-    """
-
-    with torch.no_grad():
-        xx, yy = next(iter(dataloader))
-        input_sizes = xx.shape
-        xx = xx.reshape(input_sizes[:-2] + [-1, ])
-        xx = xx.to(device)
-        gd, edge = feature_transform(xx)
-        pred = netmodel(xx, gd, edge, gd)['preds']
-
-    # equation = model.equation(u_var, y_var, out_pred)
-    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
-
-
 from torch.utils.data import Dataset
-
 
 class custom_dataset(Dataset):
     def __init__(self, data, input_step):

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 # @copyright (c) 2023 Baidu.com, Inc. Allrights Reserved
-@Time ： 2023/6/19 14:56
+@Time ： 2023/6/20 1:15
 @Author ： Liu Tianyuan (liutianyuan02@baidu.com)
-@Site ：inference_FNO.py
-@File ：inference_FNO.py
+@Site ：infer_Trans.py
+@File ：infer_Trans.py
 """
 
 import os
@@ -13,8 +13,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
-from fno.FNOs import FNO3d
-from cnn.ConvNets import UNet2d
+from transformer.Transformers import FourierTransformer
 
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.process_data import DataNormer
@@ -22,15 +21,16 @@ from Utilizes.loss_metrics import FieldsLpLoss
 
 import matplotlib.pyplot as plt
 import time
+import yaml
 
-from train_FNO import feature_transform, custom_dataset
+from train_Trans import feature_transform, custom_dataset
 
 if __name__ == "__main__":
     ################################################################
     # configs
     ################################################################
 
-    name = 'FNO'
+    name = 'Trans'
     work_path = os.path.join('work', name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
@@ -46,19 +46,10 @@ if __name__ == "__main__":
         Device = torch.device('cpu')
     Logger.info("Model Name: {:s}, Computing Device: {:s}".format(name, str(Device)))
 
-    in_dim = 3
-    out_dim = 3
-    infer_T = 200
     ntrain = 40
     ninfer = 10
-
-    mode = 16
-    modes = (mode, mode, mode)
-    width = 64
-    depth = 4
+    infer_T = 200
     steps = 5
-    padding = 0
-    dropout = 0.0
 
     r1 = 1
     r2 = 1
@@ -80,10 +71,13 @@ if __name__ == "__main__":
     # Neural Networks
     ################################################################
 
-    # 建立网络
+    with open(os.path.join('transformer_config.yml')) as f:
+        config = yaml.full_load(f)
 
-    Net_model = FNO3d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
-                      padding=padding, activation='gelu').to(Device)
+    config = config['Turbulence_3d+t']
+
+    # 建立网络
+    Net_model = FourierTransformer(**config).to(Device)
 
     try:
         checkpoint = torch.load(os.path.join(work_path, 'latest_model.pth'))
@@ -92,9 +86,14 @@ if __name__ == "__main__":
     except:
         Logger.warning("model doesn't exist!")
 
-    input1 = torch.randn(16, 32, 32, 32, 5 * 3).to(Device)
-    input2 = torch.randn(16, 32, 32, 32, 3).to(Device)
-    model_statistics = summary(Net_model, input_data=[input1, input2], device=Device, verbose=0)
+    xx = torch.randn(16, 32, 32, 32, 3, 5).to(Device)
+    yy = torch.randn(16, 32, 32, 32, 3).to(Device)
+    input_sizes = list(xx.shape)
+    xx = xx.reshape(input_sizes[:-2] + [-1, ])
+    xx = xx.to(Device)
+    yy = yy.to(Device)
+    grid, edge = feature_transform(xx)
+    model_statistics = summary(Net_model, input_data=[xx, grid, edge, grid], device=Device, verbose=0)
     Logger.write(str(model_statistics))
 
     # 损失函数
@@ -125,8 +124,8 @@ if __name__ == "__main__":
                 x = torch.cat((x[..., -steps + 1:], yy), dim=-1)
 
             xx = x.reshape(input_sizes[:-2] + [-1, ])
-            gd = feature_transform(xx)
-            yy = Net_model(xx, gd).unsqueeze(-1)
+            grid, edge = feature_transform(xx)
+            yy = Net_model(xx, grid, edge, grid).unsqueeze(-1)
             preds.append(yy.cpu().numpy())
 
     preds = np.concatenate(preds, axis=-1).transpose((0, 5, 1, 2, 3, 4))
@@ -147,3 +146,5 @@ if __name__ == "__main__":
                      facecolor='firebrick', alpha=0.3)
     fig.savefig(os.path.join(work_path, '{}.svg'.format('time_lploss')))
     plt.close(fig)
+
+    np.savetxt(os.path.join(work_path, '{}.txt'.format('time_lploss')), np.concatenate((avg_error, std_error), axis=-1))

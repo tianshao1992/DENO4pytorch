@@ -61,7 +61,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         grid, edge = feature_transform(xx)
         for t in range(0, T, step):
             # y = yy[..., t:t + step]
-            im = netmodel(xx, grid, edge, grid)['preds']
+            im = netmodel(xx, grid, edge, grid)
             if t == 0:
                 pred = im
             else:
@@ -95,7 +95,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             grid, edge = feature_transform(xx)
             for t in range(0, T, step):
                 y = yy[..., t:t + step]
-                im = netmodel(xx, grid, edge, grid)['preds']
+                im = netmodel(xx, grid, edge, grid)
                 if t == 0:
                     pred = im
                 else:
@@ -123,7 +123,7 @@ def inference(dataloader, netmodel, device):
         grid, edge = feature_transform(xx)
         for t in range(0, T, step):
             y = yy[..., t:t + step]
-            im = netmodel(xx, grid, edge, grid)['preds']
+            im = netmodel(xx, grid, edge, grid)
             if t == 0:
                 pred = im
             else:
