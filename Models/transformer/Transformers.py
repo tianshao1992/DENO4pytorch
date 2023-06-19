@@ -621,9 +621,9 @@ class FourierTransformer(nn.Module):
         self.config = defaultdict(lambda: None, **kwargs)
         self._get_setting()
         self._initialize()
-        self.__name__ = self.attention_type.capitalize() + 'Transformer2D'
+        self.__name__ = self.attention_type.capitalize() + 'Transformer'
 
-    def forward(self, node, pos, edge, grid, weight=None, boundary_value=None):
+    def forward(self, node, pos, edge, grid, weight=None, boundary_value=None, return_weight=False):
         '''
         Args:
             - node: (batch_size, n, n, node_feats)
@@ -690,10 +690,12 @@ class FourierTransformer(nn.Module):
         #     if boundary_value is not None:
         #         assert x.size() == boundary_value.size()
         #         x += boundary_value
-
-        return dict(preds=x,
-                    preds_latent=x_latent,
-                    attn_weights=attn_weights)
+        if return_weight:
+            return dict(preds=x,
+                        preds_latent=x_latent,
+                        attn_weights=attn_weights)
+        else:
+            return x
 
     def _initialize(self):
         self._get_feature()

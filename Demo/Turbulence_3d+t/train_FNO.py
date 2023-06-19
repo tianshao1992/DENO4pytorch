@@ -22,7 +22,6 @@ from Utilizes.loss_metrics import FieldsLpLoss
 
 import matplotlib.pyplot as plt
 import time
-import sys
 
 
 def feature_transform(x):
@@ -110,26 +109,6 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
 
         return valid_loss / total_size, valid_metric / total_size, torch.cat(all_metric, dim=0).cpu().numpy()
 
-
-def inference(dataloader, netmodel, device):  # 这个是？？
-    """
-    Args:
-        dataloader: input coordinates
-        netmodel: Network
-    Returns:
-        out_pred: predicted fields
-    """
-
-    with torch.no_grad():
-        xx, yy = next(iter(dataloader))
-        input_sizes = xx.shape
-        xx = xx.reshape(input_sizes[:-2] + [-1, ])
-        xx = xx.to(device)
-        gd = feature_transform(xx)
-        pred = netmodel(xx, gd)
-
-    # equation = model.equation(u_var, y_var, out_pred)
-    return xx.cpu().numpy(), gd.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 from torch.utils.data import Dataset
