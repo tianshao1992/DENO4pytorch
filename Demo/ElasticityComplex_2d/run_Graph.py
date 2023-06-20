@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     # 建立网络
     if 'BasicPointNet' in name:
-        Net_model = BasicPointNet(input_dim=in_dim, output_dim=out_dim, scaling=1.0, activation='gelu',
+        Net_model = BasicPointNet(input_dim=in_dim, output_dim=out_dim, scaling=1.0, activation='gelu', max_pool=False,
                                   input_transform=True, feature_transform=True).to(Device)
 
     input = torch.randn(batch_size, train_x.shape[1], train_x.shape[2]).to(Device)

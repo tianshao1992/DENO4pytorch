@@ -141,9 +141,8 @@ if __name__ == "__main__":
     std_error = np.std(error, axis=0)
 
     fig, axs = plt.subplots(1, 1, figsize=(10, 5), num=2, constrained_layout=True)
-    axs.plot(np.arange(infer_T), avg_error, color='steelblue', linewidth=3)
-    axs.fill_between(np.arange(infer_T), avg_error[:, 0] - std_error[:, 0], avg_error[:, 0] + std_error[:, 0],
-                     facecolor='firebrick', alpha=0.3)
+    Visual.plot_value(fig, axs, np.arange(infer_T), avg_error, std=std_error, label='relative_l2_loss',
+                      xylabels=('time_steps', 'lp_loss'))
     fig.savefig(os.path.join(work_path, '{}.svg'.format('time_lploss')))
     plt.close(fig)
 

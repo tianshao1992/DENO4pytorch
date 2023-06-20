@@ -167,7 +167,7 @@ if __name__ == "__main__":
     dropout = 0.0
 
     # 训练参数
-    batch_size = 32
+    batch_size = 64
     epochs = 500
     learning_rate = 0.0002
     scheduler_step = 400
@@ -187,7 +187,7 @@ if __name__ == "__main__":
 
     # 建立网络
     if 'BasicPointNet' in name:
-        Net_model = BasicPointNet(input_dim=in_dim, output_dim=out_dim, scaling=1.0, activation='gelu',
+        Net_model = BasicPointNet(input_dim=in_dim, output_dim=out_dim, scaling=1.0, activation='gelu', max_pool=False,
                                   input_transform=True, feature_transform=True).to(Device)
 
     input = torch.randn(batch_size, train_x.shape[1], train_x.shape[2]).to(Device)
@@ -258,7 +258,7 @@ if __name__ == "__main__":
 
                 fig, axs = plt.subplots(out_dim, 3, figsize=(15, 5), num=1, layout='constrained')
                 Visual.plot_fields_tr(fig, axs, train_true[t], train_pred[t], train_coord[t],
-                                      triang.edges, mask=profile_train[t])
+                                      triang.edges, mask=train_prof[t])
                 fig.savefig(os.path.join(work_path, 'train_solution_' + str(t) + '_graph.jpg'))
                 plt.close(fig)
 
@@ -266,6 +266,6 @@ if __name__ == "__main__":
 
                 fig, axs = plt.subplots(out_dim, 3, figsize=(15, 5), num=1, layout='constrained')
                 Visual.plot_fields_tr(fig, axs, valid_true[t], valid_pred[t], valid_coord[t],
-                                      triang.edges, mask=profile_valid[t])
+                                      triang.edges, mask=valid_prof[t])
                 fig.savefig(os.path.join(work_path, 'valid_solution_' + str(t) + '_graph.jpg'))
                 plt.close(fig)

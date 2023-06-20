@@ -160,11 +160,13 @@ class MatplotlibVision(object):
         axs.set_title(title, fontdict=self.font)
         # plt.pause(0.001)
 
-    def plot_value(self, fig, axs, x, y, label, title=None, xylabels=('x', 'y')):
+    def plot_value(self, fig, axs, x, y, label, std=None, title=None, xylabels=('x', 'y')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
         axs.plot(x, y, label=label)
+        if std is not None:
+            axs.fill_between(x, y - std, y + std, alpha=0.2)
         axs.grid(True)  # 添加网格
         axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)

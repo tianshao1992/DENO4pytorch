@@ -16,10 +16,10 @@ from point_layers import STNLayer, SimpleLayer
 from configs import activation_dict
 
 
-class PointNetfeature(nn.Module):
+class PointNetFeature(nn.Module):
     def __init__(self, input_dim, scaling=1.0, activation='relu', max_pool=True,
                  global_feat=True, input_transform=False, feature_transform=False):
-        super(PointNetfeature, self).__init__()
+        super(PointNetFeature, self).__init__()
 
         self.feature_size = int(64 * scaling)
         self.max_pool = max_pool
@@ -124,7 +124,7 @@ class BasicPointNet(nn.Module):
         self.scaling = scaling
         self.activation = activation
 
-        self.feature_layer = PointNetfeature(input_dim=input_dim, scaling=scaling, activation=activation,
+        self.feature_layer = PointNetFeature(input_dim=input_dim, scaling=scaling, activation=activation,
                                              global_feat=False, max_pool=max_pool,
                                              input_transform=input_transform,
                                              feature_transform=feature_transform)
