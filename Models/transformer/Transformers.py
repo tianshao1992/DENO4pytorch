@@ -147,6 +147,124 @@ class SimpleTransformerEncoderLayer(nn.Module):
             return x
 
 
+class SimpleTransformerDecoderLayer(nn.Module):
+    '''
+    EncoderLayer for transformer
+
+    Args:
+
+    Input:
+        (-1, seq_len, n_features)
+    Output:
+        (-1, pred_len, n_target)
+    '''
+
+    def __init__(self, d_model=96,
+                 pos_dim=1,
+                 n_head=2,
+                 dim_feedforward=512,
+                 attention_type='fourier',
+                 pos_emb=False,
+                 layer_norm=True,
+                 attn_norm=None,
+                 norm_type='layer',
+                 norm_eps=None,
+                 batch_norm=False,
+                 attn_weight=False,
+                 xavier_init: float = 1e-2,
+                 diagonal_weight: float = 1e-2,
+                 symmetric_init=False,
+                 residual_type='add',
+                 activation_type='relu',
+                 dropout=0.1,
+                 ffn_dropout=None,
+                 debug=False,
+                 ):
+        super(SimpleTransformerDecoderLayer, self).__init__()
+
+        dropout = default(dropout, 0.05)
+        if attention_type in ['linear', 'softmax']:
+            dropout = 0.1
+        ffn_dropout = default(ffn_dropout, dropout)
+        norm_eps = default(norm_eps, 1e-5)
+        attn_norm = default(attn_norm, not layer_norm)
+        if (not layer_norm) and (not attn_norm):
+            attn_norm = True
+        norm_type = default(norm_type, 'layer')
+
+        self.attn = SimpleAttention(n_head=n_head,
+                                    d_model=d_model,
+                                    attention_type=attention_type,
+                                    diagonal_weight=diagonal_weight,
+                                    xavier_init=xavier_init,
+                                    symmetric_init=symmetric_init,
+                                    pos_dim=pos_dim,
+                                    norm_add=attn_norm,
+                                    norm_type=norm_type,
+                                    eps=norm_eps,
+                                    dropout=dropout)
+        self.d_model = d_model
+        self.n_head = n_head
+        self.pos_dim = pos_dim
+        self.add_layer_norm = layer_norm
+        if layer_norm:
+            self.layer_norm1 = nn.LayerNorm(d_model, eps=norm_eps)
+        dim_feedforward = default(dim_feedforward, 2 * d_model)
+        self.ff = FeedForward(in_dim=d_model,
+                              dim_feedforward=dim_feedforward,
+                              batch_norm=batch_norm,
+                              activation=activation_type,
+                              dropout=ffn_dropout,
+                              )
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+        self.residual_type = residual_type  # plus or minus
+        self.add_pos_emb = pos_emb
+        if self.add_pos_emb:
+            self.pos_emb = PositionalEncoding(d_model)
+
+        self.debug = debug
+        self.attn_weight = attn_weight
+        self.__name__ = attention_type.capitalize() + 'TransformerEncoderLayer'
+
+    def forward(self, x, pos=None, weight=None):
+        '''
+        - x: node feature, (batch_size, seq_len, n_feats)
+        - pos: position coords, needed in every head
+
+        Remark:
+            - for n_head=1, no need to encode positional
+            information if coords are in features
+        '''
+        x_shape = x.shape
+        x = x.view(x_shape[0], -1, x_shape[-1])
+        if self.add_pos_emb:
+            x = x.permute((1, 0, 2))
+            x = self.pos_emb(x)
+            x = x.permute((1, 0, 2))
+
+        if pos is not None and self.pos_dim > 0:
+            att_output, attn_weight = self.attn(
+                x, x, x, pos=pos, weight=weight)  # encoder no mask
+        else:
+            att_output, attn_weight = self.attn(x, x, x, weight=weight)
+
+        if self.residual_type in ['add', 'plus'] or self.residual_type is None:
+            x = x + self.dropout1(att_output)
+        else:
+            x = x - self.dropout1(att_output)
+        if self.add_layer_norm:
+            x = self.layer_norm1(x)
+
+        x1 = self.ff(x)
+        x = x + self.dropout2(x1)
+
+        if self.attn_weight:
+            return x, attn_weight
+        else:
+            return x
+
+
 class PointwiseRegressor(nn.Module):
     '''
     A wrapper for a simple pointwise linear layers
@@ -211,7 +329,7 @@ class PointwiseRegressor(nn.Module):
 
 class SpectralRegressor(nn.Module):
     '''
-    A wrapper for both SpectralConv1d and SpectralConv2d
+    A wrapper for both SpectralConv1d SpectralConv2d and SpectralConv3d
     Ref: Li et 2020 FNO paper
     https://github.com/zongyi-li/fourier_neural_operator/blob/master/fourier_2d.py
     A new implementation incoporating all spacial-based FNO
@@ -387,6 +505,96 @@ class BulkRegressor(nn.Module):
         if self.sort_output:
             x, _ = torch.sort(x)
         return x
+
+
+class SimpleAttnRegressor(nn.Module):
+    """
+    simpleTransformers
+    https://github.com/scaomath/galerkin-transformer
+    """
+
+    def __init__(self, in_dim,
+                 n_hidden,
+                 n_head,
+                 out_dim,
+                 num_layers: int = 2,
+                 pos_emb=False,
+                 layer_norm=True,
+                 attn_norm=None,
+                 dim_feedforward=512,
+                 attention_type='galerkin',
+                 spacial_dim=2,
+                 return_weight=False,
+                 return_latent=False,
+                 normalizer=None,
+                 activation='silu',
+                 dropout=0.1,
+                 debug=False):
+        super(SimpleAttnRegressor, self).__init__()
+
+        self.feature_transform = nn.Linear(in_dim, n_hidden)
+        self.attention_decoder = nn.ModuleList([])
+        for _ in range(num_layers - 1):
+            self.attention_decoder.append(SimpleTransformerDecoderLayer
+                                          (d_model=n_hidden,
+                                           pos_dim=spacial_dim,
+                                           n_head=n_head,
+                                           dim_feedforward=dim_feedforward,
+                                           attention_type=attention_type,
+                                           pos_emb=pos_emb,
+                                           layer_norm=layer_norm,
+                                           attn_norm=attn_norm,
+                                           norm_type='layer',
+                                           norm_eps=None,
+                                           batch_norm=False,
+                                           attn_weight=False,
+                                           activation_type=activation,
+                                           dropout=dropout,
+                                           ffn_dropout=None))
+        self.activation = activation_dict[activation]
+        self.normalizer = normalizer
+        self.return_weight = return_weight
+        self.return_latent = return_latent
+        self.debug = debug
+
+        self.regressor = nn.Sequential(
+            nn.Linear(n_hidden, self.dim_feedforward),
+            self.activation,
+            nn.Linear(self.dim_feedforward, out_dim),
+        )
+
+        def forward(self, x, pos, edge=None, grid=None, weight=None, return_weight=False):
+            '''
+            1D:
+                Input: (-1, n, in_features)
+                Output: (-1, n, n_targets)
+            '''
+
+            x_latent = []
+            attn_weights = []
+
+            x = self.feature_transform(x)
+            for layer in self.attention_decoder:
+                if self.return_latent:
+                    x, attn_weight = layer(x, pos, edge, grid, weight, return_weight)
+                    attn_weights.append(attn_weight.contiguous())
+                else:
+                    x = layer(x, pos, edge, grid, weight, return_weight)
+
+                if self.return_latent:
+                    x_latent.append(x.contiguous())
+
+            x = self.regressor(x)
+
+            if self.normalizer:
+                x = self.normalizer.inverse_transform(x)
+
+            if return_weight:
+                return dict(preds=x,
+                            preds_latent=x_latent,
+                            attn_weights=attn_weights)
+            else:
+                return x
 
 
 class SimpleTransformer(nn.Module):
@@ -602,6 +810,20 @@ class SimpleTransformer(nn.Module):
                                                activation=self.regressor_activation,
                                                dropout=self.decoder_dropout,
                                                )
+        elif self.decoder_type == 'attention':
+            self.regressor = SimpleAttnRegressor(in_dim=self.n_hidden,
+                                                 n_hidden=self.n_hidden,
+                                                 n_head=self.n_head,
+                                                 out_dim=self.n_targets,
+                                                 num_layers=self.num_regressor_layers,
+                                                 layer_norm=self.layer_norm,
+                                                 dim_feedforward=self.dim_feedforward,
+                                                 attention_type=self.attention_type,
+                                                 spacial_dim=self.spacial_dim,
+                                                 return_weight=self.return_attn_weight,
+                                                 return_latent=self.return_latent,
+                                                 activation=self.regressor_activation,
+                                                 dropout=self.decoder_dropout)
         else:
             raise NotImplementedError("Decoder type not implemented")
 
@@ -840,7 +1062,7 @@ class FourierTransformer(nn.Module):
     def _get_regressor(self):
         if self.decoder_type == 'pointwise':
             self.regressor = PointwiseRegressor(in_dim=self.n_hidden,
-                                                n_hidden=self.n_hidden,
+                                                n_hidden=self.n_hidden * 4,
                                                 out_dim=self.n_targets,
                                                 num_layers=self.num_regressor_layers,
                                                 spacial_fc=self.spacial_fc,
@@ -864,6 +1086,20 @@ class FourierTransformer(nn.Module):
                                                return_latent=self.return_latent,
                                                debug=self.debug
                                                )
+        elif self.decoder_type == 'attention':
+            self.regressor = SimpleAttnRegressor(in_dim=self.n_hidden,
+                                                 n_hidden=self.n_hidden,
+                                                 n_head=self.n_head,
+                                                 out_dim=self.n_targets,
+                                                 num_layers=self.num_regressor_layers,
+                                                 layer_norm=self.layer_norm,
+                                                 dim_feedforward=self.dim_feedforward,
+                                                 attention_type=self.attention_type,
+                                                 spacial_dim=self.spacial_dim,
+                                                 return_weight=self.return_attn_weight,
+                                                 return_latent=self.return_latent,
+                                                 activation=self.regressor_activation,
+                                                 dropout=self.decoder_dropout)
         else:
             raise NotImplementedError("Decoder type not implemented")
 
