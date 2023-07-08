@@ -788,6 +788,7 @@ class SimpleTransformer(nn.Module):
         """
         get_regressor
         """
+        torch.max()
         if self.decoder_type == 'pointwise':
             self.regressor = PointwiseRegressor(in_dim=self.n_hidden,
                                                 n_hidden=self.n_hidden,

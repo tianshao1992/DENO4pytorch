@@ -160,25 +160,35 @@ class MatplotlibVision(object):
         axs.set_title(title, fontdict=self.font)
         # plt.pause(0.001)
 
-    def plot_value(self, fig, axs, x, y, label, std=None, title=None, xylabels=('x', 'y')):
+    def plot_value(self, fig, axs, x, y, label, std=None, title=None, xylabels=('x', 'y'), rangeIndex=1.0):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
         axs.plot(x, y, label=label)
+
         if std is not None:
+            std = std * rangeIndex
             axs.fill_between(x, y - std, y + std, alpha=0.2)
         axs.grid(True)  # 添加网格
-        axs.legend(loc="best", prop=self.font)
+        if std is not None:
+            axs.legend([label, label+'_error'], loc="best", prop=self.font)
+        else:
+            axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
         axs.set_ylabel(xylabels[1], fontdict=self.font)
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_value_std(self, fig, axs, x, y, label, std = None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1):
+    def plot_value_std(self, fig, axs, x, y, label, std=None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1):
         """
         stdaxis 表示std所在的坐标维度 x-0, y-1
         """
-        axs.plot(x, y, label=label)
+        if std is None:
+            axs.plot(x, y.mean(axis=0), label=label)
+            std = y.std(axis=1)
+        else:
+            axs.plot(x, y, label=label)
+
         std = std * rangeIndex
         if stdaxis==0:
             plt.fill_betweenx(y, x - std / 2, x + std / 2, alpha=0.3, label='Variance Range')
@@ -434,7 +444,7 @@ class MatplotlibVision(object):
                 axs[i][j].spines['right'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
                 axs[i][j].spines['top'].set_linewidth(self.box_line_width)  # 设置右边坐标轴的粗细
 
-    def plot_fields_ms(self, fig, axs, real, pred, coord, cmin_max=None, fmin_max=None, show_channel=None,
+    def plot_fields_ms(self, fig, axs, real, pred, coord=None, cmin_max=None, fmin_max=None, show_channel=None,
                        cmaps=None, titles=None):
         if len(axs.shape) == 1:
             axs = axs[None, :]
@@ -446,6 +456,11 @@ class MatplotlibVision(object):
             fmin, fmax = real.min(axis=(0, 1)), real.max(axis=(0, 1))
         else:
             fmin, fmax = fmin_max[0], fmin_max[1]
+
+        if coord is None:
+            x = np.linspace(0, 1, real.shape[1])
+            y = np.linspace(0, 1, real.shape[0])
+            coord = np.stack(np.meshgrid(x, y), axis=-1)
 
         if cmin_max == None:
             cmin, cmax = coord.min(axis=(0, 1)), coord.max(axis=(0, 1))

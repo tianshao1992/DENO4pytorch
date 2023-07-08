@@ -19,10 +19,10 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
 from Models.configs import *
-
+from typing import Any, List, Tuple, Union
 
 class FcnSingle(nn.Module):
-    def __init__(self, planes: list, activation="gelu", last_activation=False):
+    def __init__(self, planes: list or tuple, activation="gelu", last_activation=False):
         # =============================================================================
         #     Inspired by M. Raissi a, P. Perdikaris b,∗, G.E. Karniadakis.
         #     "Physics-informed neural networks: A deep learning framework for solving forward and inverse problems
@@ -166,6 +166,50 @@ class Identity(nn.Module):
             raise NotImplementedError("input sizes not implemented.")
 
         return x
+
+
+class Empircal(object):
+    """
+    Empirical model
+    """
+    def __init__(self, parameters: Union[dict, None] = None, models: Union[dict, None] = None):
+        super().__init__()
+        self._parameters = parameters
+        self.__dict__.update(parameters)
+        self._modules = models
+        self.__dict__.update(models)
+
+
+    def train(self, x: Union[np.ndarray, None] = None,
+                    h: Union[np.ndarray, None] = None,
+                    y: Union[np.ndarray, None] = None,
+              ) -> np.ndarray:
+        """
+        :param x: input data
+        :param h: auxiliary data
+        :param y: output data
+        :return:
+        """
+
+    def infer(self, x: Union[np.ndarray, None] = None,
+                    h: Union[np.ndarray, None] = None,
+                    y: Union[np.ndarray, None] = None,
+                    steps_ahead: Union[int, None] = None,
+                    forecast_horizon: Union[int, None] = None,
+                    **kwargs
+              ) -> np.ndarray:
+        """
+        infer the model
+        :param x: input data
+        :param h: auxiliary data
+        :param y: output initial data
+        :param steps_ahead:
+        :param forecast_horizon:
+        :return:
+        """
+
+    def __call__(self, *args, **kwargs):
+        return self.infer(*args, **kwargs)
 
 
 if __name__ == '__main__':

@@ -48,11 +48,26 @@ class FNO1d(nn.Module):
         self.fc1 = nn.Linear(self.width, self.hidden)
         self.fc2 = nn.Linear(self.hidden, out_dim)
 
-    def forward(self, x, grid):
+    def feature_transform(self, x):
+        """
+        Args:
+            x: input coordinates
+        Returns:
+            res: input transform
+        """
+        shape = x.shape
+        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
+        return gridx.to(x.device)
+
+    def forward(self, x, grid=None):
         """
         forward computation
         """
         # x dim = [b, x1, t*v]
+        if grid is None:
+            grid = self.feature_transform(x)
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 2, 1)
@@ -116,11 +131,28 @@ class FNO2d(nn.Module):
         self.fc1 = nn.Linear(self.width, self.hidden)
         self.fc2 = nn.Linear(self.hidden, out_dim)
 
-    def forward(self, x, grid):
+    def feature_transform(self, x):
+        """
+        Args:
+            x: input coordinates
+        Returns:
+            res: input transform
+        """
+        shape = x.shape
+        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+        gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
+        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
+        gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
+        return torch.cat((gridx, gridy), dim=-1).to(x.device)
+
+    def forward(self, x, grid=None):
         """
         forward computation
         """
         # x dim = [b, x1, x2, t*v]
+        if grid is None:
+            grid = self.feature_transform(x)
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 3, 1, 2)
@@ -180,11 +212,31 @@ class FNO3d(nn.Module):
         self.fc1 = nn.Linear(self.width, self.hidden)
         self.fc2 = nn.Linear(self.hidden, out_dim)
 
-    def forward(self, x, grid):
+    def feature_transform(self, x):
+        """
+        Args:
+            x: input coordinates
+        Returns:
+            res: input transform
+        """
+        shape = x.shape
+        batchsize, size_x, size_y, size_z = shape[0], shape[1], shape[2], shape[3]
+        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+        gridx = gridx.reshape(1, size_x, 1, 1, 1).repeat([batchsize, 1, size_y, size_z, 1])
+        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
+        gridy = gridy.reshape(1, 1, size_y, 1, 1).repeat([batchsize, size_x, 1, size_z, 1])
+        gridz = torch.linspace(0, 1, size_z, dtype=torch.float32)
+        gridz = gridz.reshape(1, 1, 1, size_y, 1).repeat([batchsize, size_x, size_y, 1, 1])
+        return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device)
+
+    def forward(self, x, grid=None):
         """
         forward computation
         x dim = [b, x1, x2, x3, t*v]
         """
+        if grid is None:
+            grid = self.feature_transform(x)
+
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 4, 1, 2, 3)
