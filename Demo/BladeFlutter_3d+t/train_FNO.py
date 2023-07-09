@@ -60,9 +60,9 @@ if __name__ == "__main__":
     nvalid = 5
 
     batch_size = 32
-    epochs = 301
+    epochs = 201
     learning_rate = 0.001
-    scheduler_step = 201
+    scheduler_step = 151
     scheduler_gamma = 0.1
 
     Logger.info('Total epochs: {:d}, learning_rate: {:e}, scheduler_step: {:d}, scheduler_gamma: {:.3e}'
@@ -198,7 +198,7 @@ if __name__ == "__main__":
             copyfile(save_file, os.path.join(train_path, 'latest_model.pth'))
             if log_loss[1][-1][1] < best_acc:
                 best_acc = log_loss[1][-1][1]
-                save_file = os.path.join(train_path, 'best_model.pth')
+                copyfile(save_file, os.path.join(train_path, 'best_model.pth'))
 
             train_design, train_coords, train_fields_t, train_target_t, train_fields_p, train_target_p \
                 = inference(train_loader, Net_model, Device)
