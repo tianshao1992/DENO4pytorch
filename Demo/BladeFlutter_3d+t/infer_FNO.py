@@ -107,7 +107,7 @@ if __name__ == "__main__":
                           field_dim=10, infer_dim=target.shape[-1]).to(Device)
 
     try:
-        checkpoint = torch.load(os.path.join(train_path, 'latest_model.pth'))
+        checkpoint = torch.load(os.path.join(train_path, 'best_model.pth'))
         Net_model.load_state_dict(checkpoint['net_model'])
         Logger.warning("model load successful!")
     except:

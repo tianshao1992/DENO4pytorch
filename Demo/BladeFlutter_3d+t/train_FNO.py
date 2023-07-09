@@ -141,6 +141,7 @@ if __name__ == "__main__":
     star_time = time.time()
     log_loss = [[], []]
     log_per = [[], []]
+    best_acc = 1000.
     ################################################################
     # train process
     ################################################################
@@ -195,6 +196,9 @@ if __name__ == "__main__":
             torch.save({'log_loss': log_loss, 'log_per': log_per,
                         'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()}, save_file)
             copyfile(save_file, os.path.join(train_path, 'latest_model.pth'))
+            if log_loss[1][-1][1] < best_acc:
+                best_acc = log_loss[1][-1][1]
+                save_file = os.path.join(train_path, 'best_model.pth')
 
             train_design, train_coords, train_fields_t, train_target_t, train_fields_p, train_target_p \
                 = inference(train_loader, Net_model, Device)
@@ -239,5 +243,11 @@ if __name__ == "__main__":
                 fig.savefig(os.path.join(train_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                 plt.close(fig)
 
+
+        if epoch==scheduler_step:
+            checkpoint = torch.load(os.path.join(train_path, 'best_model.pth'))
+            Net_model.load_state_dict(checkpoint['net_model'])
+            Optimizer.load_state_dict(checkpoint['optimizer'])
+            Logger.warning("model load successful!")
 
 

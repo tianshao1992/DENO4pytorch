@@ -285,9 +285,10 @@ class DownSampleNet2d(nn.Module):
                 Conv2dResBlock(self.width, self.width, basic_block=True, activation=activation, dropout=dropout),
                 nn.AvgPool2d(2, 2), ))
 
-        self.linear = nn.Sequential(nn.Linear(math.prod(self._out_size) * self.width, 64),
+        self.linear = nn.Sequential(nn.Linear(math.prod(self._out_size) * self.width,
+                                              int(math.prod(self._out_size) * self.width / 4)),
                                     activation_dict[activation],
-                                    nn.Linear(64, self.out_dim)
+                                    nn.Linear(int(math.prod(self._out_size) * self.width / 4), self.out_dim)
                                     )
 
     def forward(self, x):
