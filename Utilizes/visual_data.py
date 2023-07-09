@@ -141,7 +141,7 @@ class MatplotlibVision(object):
         # gs.update(top=0.95, bottom=0.07, left=0.1, right=0.9, wspace=0.5, hspace=0.7)
         # gs_dict = {key: value for key, value in gs.__dict__.items() if key in gs._AllowedKeys}
         # self.fig, self.axes = plt.subplots(len(self.field_name), 3, gridspec_kw=gs_dict, num=100, figsize=(30, 20))
-        self.font = {'family': 'Times New Roman', 'weight': 'normal', 'size': 20}
+        self.font = {'family': 'SimSun', 'weight': 'normal', 'size': 20}
         self.config = {"font.family": 'Times New Roman',
                        "font.size": 20,
                        "mathtext.fontset": 'stix',
@@ -160,20 +160,17 @@ class MatplotlibVision(object):
         axs.set_title(title, fontdict=self.font)
         # plt.pause(0.001)
 
-    def plot_value(self, fig, axs, x, y, label, std=None, title=None, xylabels=('x', 'y'), rangeIndex=1.0):
+    def plot_value(self, fig, axs, x, y, label, std=None, std_factor=1.0, title=None, xylabels=('x', 'y')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
         axs.plot(x, y, label=label)
 
         if std is not None:
-            std = std * rangeIndex
-            axs.fill_between(x, y - std, y + std, alpha=0.2)
+            std = std * std_factor
+            axs.fill_between(x, y - std, y + std, alpha=0.2, label=label+'_error')
         axs.grid(True)  # 添加网格
-        if std is not None:
-            axs.legend([label, label+'_error'], loc="best", prop=self.font)
-        else:
-            axs.legend(loc="best", prop=self.font)
+        axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
         axs.set_ylabel(xylabels[1], fontdict=self.font)
         axs.tick_params('both', labelsize=self.font["size"], )
@@ -214,7 +211,8 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_regression(self, fig, axs, true, pred, title=None, xylabels=('true value', 'pred value')):
+    def plot_regression(self, fig, axs, true, pred, error_ratio=0.05,
+                        title=None, xylabels=('true value', 'pred value')):
         # 所有功率预测误差与真实结果的回归直线
         # sbn.set(color_codes=True)
 
@@ -223,44 +221,50 @@ class MatplotlibVision(object):
         split_value = np.linspace(min_value, max_value, 11)
 
         split_dict = {}
-        split_label = np.zeros(len(true), np.int)
+        split_label = np.zeros(len(true), np.int32)
         for i in range(len(split_value)):
             split_dict[i] = str(split_value[i])
             index = true >= split_value[i]
             split_label[index] = i + 1
 
-        axs.scatter(true, pred, marker='.')
-
-        axs.plot([min_value, max_value], [min_value, max_value], 'r-', linewidth=5.0)
+        axs.scatter(true, pred, marker='.', color='firebrick', linewidth=2.0)
+        axs.plot([min_value, max_value], [min_value, max_value], '-', color='steelblue', linewidth=5.0)
         # 在两个曲线之间填充颜色
-        axs.fill_between([min_value, max_value], [0.95 * min_value, 0.95 * max_value],
-                         [1.05 * min_value, 1.05 * max_value],
-                         alpha=0.2, color='b')
+        axs.fill_between([min_value, max_value], [(1-error_ratio) * min_value, (1-error_ratio) * max_value],
+                         [((1+error_ratio)) * min_value, ((1+error_ratio)) * max_value],
+                         alpha=0.2, color='steelblue')
 
         # plt.ylim((min_value, max_value))
         axs.set_xlim((min_value, max_value))
         axs.grid(True)  # 添加网格
-        axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
         axs.set_ylabel(xylabels[1], fontdict=self.font)
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
+        axs.legend(['真实-预测', 'y=x', '±{:.2f}%'.format(error_ratio*100)], prop=self.font)
 
         # plt.ylim((-0.2, 0.2))
         # plt.pause(0.001)
 
-    def plot_error(self, fig, axs, error, title=None,
+    def plot_error(self, fig, axs, error, error_ratio=0.05, title=None,
                    xylabels=('predicted relative error / %', 'distribution density')):
         # sbn.set_color_codes()
         # ax.bar(np.arange(len(error)), error*100, )
 
         error = pd.DataFrame(error) * 100 # 转换格式
+        acc = (np.abs(np.array(error)) < error_ratio * 100).sum() / error.shape[0]
         # 绘制针对单变量的分布图
         sbn.distplot(error, bins=20, norm_hist=True, rug=True, fit=stats.norm, kde=False,
-                     rug_kws={"color": "g"}, fit_kws={"color": "r", "lw": 3}, hist_kws={"color": "b"})
+                     rug_kws={"color": "forestgreen"},
+                     fit_kws={"color": "firebrick", "lw": 3},
+                     hist_kws={"color": "steelblue"},
+                     ax=axs)
         # plt.xlim([-1, 1])
+        if title is None:
+            title = '预测平均误差小于 {:.2f}% \n 占比为{:.2f}%'.format(error_ratio * 100, acc * 100)
+
         axs.grid(True)  # 添加网格
-        axs.legend(loc="best", prop=self.font)
+        # axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
         axs.set_ylabel(xylabels[1], fontdict=self.font)
         axs.tick_params('both', labelsize=self.font["size"], )
@@ -339,7 +343,8 @@ class MatplotlibVision(object):
         ax.set_xlabel(xlabel)
         set_axis_style(ax, xticks, x_pos)
 
-    def plot_fields1d(self, fig, axs, real, pred, coord, title=None, xylabels=['x coordinate', 'field'],
+    def plot_fields1d(self, fig, axs, real, pred, coord=None,
+                      title=None, xylabels=('x coordinate', 'field'), legends=None,
                       show_channel=None):
 
         if len(axs.shape) == 1:
@@ -347,6 +352,9 @@ class MatplotlibVision(object):
 
         if show_channel is None:
             show_channel = np.arange(len(self.field_name))
+
+        if legends is None:
+            legends = ['true', 'pred', 'error']
 
         num_channel = len(show_channel)
         name_channel = [self.field_name[i] for i in show_channel]
@@ -358,9 +366,9 @@ class MatplotlibVision(object):
             limit = max(abs(ff[-1].min()), abs(ff[-1].max()))
 
             axs[i][0].cla()
-            axs[i][0].plot(coord, ff[0], color='g', linewidth=3, label='true')
-            axs[i][0].plot(coord, ff[1], '--', color='r', linewidth=2, label='pred')
-            axs[i][1].plot(coord, ff[2], color='r', linewidth=2, label='error')
+            axs[i][0].plot(coord, ff[0], color='steelblue', linewidth=3, label=legends[0])
+            axs[i][0].plot(coord, ff[1], '*', color='firebrick', linewidth=10, label=legends[1])
+            axs[i][1].plot(coord, ff[2], color='forestgreen', linewidth=2, label=legends[2])
             for j in range(2):
                 axs[i][j].legend(loc="best", prop=self.font)
                 axs[i][j].set_xlabel(xylabels[0], fontdict=self.font)
