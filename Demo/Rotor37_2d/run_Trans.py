@@ -9,9 +9,7 @@
 """
 import os
 import numpy as np
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
@@ -27,8 +25,11 @@ import time
 
 import sys
 import yaml
+from utilizes_rotor37 import get_origin_old
 from run_MLP import get_grid, get_origin
 from post_process.post_data import Post_2d
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 class predictor(nn.Module):
 
@@ -38,7 +39,7 @@ class predictor(nn.Module):
 
         self.branch_net = branch
         self.trunc_net = trunc
-        self.field_net = nn.Linear(trunc.out_dim, field_dim)
+        self.field_net = nn.Linear(branch.planes[-1], field_dim)
 
 
     def forward(self, design, coords):
@@ -73,8 +74,9 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
+        coords = grid.tile([xx.shape[0], 1, 1, 1])
 
-        pred = netmodel(xx)
+        pred = netmodel(xx, coords)
         loss = lossfunc(pred, yy)
 
         optimizer.zero_grad()
@@ -99,8 +101,8 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-
-            pred = netmodel(xx)
+            coords = grid.tile([xx.shape[0], 1, 1, 1])
+            pred = netmodel(xx, coords)
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
@@ -118,10 +120,11 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        pred = netmodel(xx)
+        coords = grid.tile([xx.shape[0], 1, 1, 1])
+        pred = netmodel(xx, coords)
 
     # equation = model.equation(u_var, y_var, out_pred)
-    return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
+    return xx.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
 
 
 if __name__ == "__main__":
@@ -130,8 +133,8 @@ if __name__ == "__main__":
     ################################################################
     for mode in [8, 10, 12, 14, 16]:
 
-        name = 'Transformer_' + str(mode)
-
+        # name = 'Transformer_' + str(mode)
+        name = 'FNO_' + str(mode)
         # name = 'Transformer'
         work_path = os.path.join('work', name)
         train_path = os.path.join(work_path, 'train')
@@ -148,24 +151,18 @@ if __name__ == "__main__":
         else:
             Device = torch.device('cpu')
 
-        design, fields = get_origin()
+        design, fields = get_origin_old()
+        fields = fields[:, 0].transpose(0, 2, 3, 1)
 
         in_dim = 28
         out_dim = 5
-        ntrain = 2700
+        ntrain = 700
         nvalid = 200
 
-        # modes = (12, 12)
-        # width = 32
-        # depth = 4
-        # steps = 1
-        # padding = 9
-        # dropout = 0.0
-
         batch_size = 32
-        epochs = 1001
+        epochs = 501
         learning_rate = 0.001
-        scheduler_step = 800
+        scheduler_step = 400
         scheduler_gamma = 0.1
 
         print(epochs, learning_rate, scheduler_step, scheduler_gamma)
@@ -189,9 +186,9 @@ if __name__ == "__main__":
 
         print(input.shape, output.shape)
 
-        train_x = input[:ntrain, :, :]
+        train_x = input[:ntrain]
         train_y = output[:ntrain, :, :]
-        valid_x = input[ntrain:ntrain + nvalid, :, :]
+        valid_x = input[ntrain:ntrain + nvalid]
         valid_y = output[ntrain:ntrain + nvalid, :, :]
 
         x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
@@ -218,19 +215,19 @@ if __name__ == "__main__":
 
         # 建立网络
         Tra_model = FourierTransformer(**config).to(Device)
-        FNO_model = FNO2d(in_dim=in_dim, out_dim=config['n_targets'], modes=(16, 16), width=64, depth=4,
-                          padding=8, activation='gelu').to(Device)
+        FNO_model = FNO2d(in_dim=2, out_dim=config['n_targets'], modes=(16, 16), width=64, depth=4,
+                          padding=9, activation='gelu').to(Device)
         MLP_model = FcnSingle(planes=(in_dim, 64, 64, config['n_targets']), last_activation=True).to(Device)
-        Net_model = predictor(trunc=Tra_model, branch=MLP_model, field_dim=out_dim).to(Device)
+        Net_model = predictor(trunc=FNO_model, branch=MLP_model, field_dim=out_dim).to(Device)
 
-        model_statistics = summary(Net_model, input_size=(batch_size, train_x.shape[1]), device=Device)
-        Logger.write(str(model_statistics))
+        # model_statistics = summary(Net_model, input_size=(batch_size, train_x.shape[1]), device=Device)
+        # Logger.write(str(model_statistics))
 
         # 损失函数
         Loss_func = nn.MSELoss()
         # Loss_func = nn.SmoothL1Loss()
         # 优化算法
-        Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-8)
+        Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-7)
         # 下降策略
         Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
         # 可视化
@@ -242,7 +239,9 @@ if __name__ == "__main__":
         ################################################################
         # train process
         ################################################################
-        grid = get_grid()
+        # grid = get_grid()
+        from geometrics import gen_uniform_grid
+        grid = gen_uniform_grid(train_y[:1]).to(Device)
         for epoch in range(epochs):
 
             Net_model.train()
@@ -270,21 +269,21 @@ if __name__ == "__main__":
             if epoch > 0 and epoch % 100 == 0:
                 # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
                 #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
-                train_source, train_coord, train_true, train_pred = inference(train_loader, Net_model, Device)
-                valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
+                train_source, train_true, train_pred = inference(train_loader, Net_model, Device)
+                valid_source, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
                 torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                            os.path.join(train_path, 'latest_model.pth'))
 
                 for fig_id in range(5):
                     fig, axs = plt.subplots(out_dim, 3, figsize=(18, 25), num=2)
-                    Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], grid)
+                    Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id])
                     fig.savefig(os.path.join(train_path, 'train_solution_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
 
                 for fig_id in range(5):
                     fig, axs = plt.subplots(out_dim, 3, figsize=(18, 25), num=3)
-                    Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
+                    Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id])
                     fig.savefig(os.path.join(train_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
 

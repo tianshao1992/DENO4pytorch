@@ -1,8 +1,8 @@
 Rotor37_2d:
-  node_feats: 28
+  node_feats: 2
   pos_dim: 2
   n_targets: 64
-  n_hidden: 128
+  n_hidden: 64
   num_feat_layers: 0
   num_encoder_layers: 3
   n_head: 4
