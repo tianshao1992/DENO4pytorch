@@ -12,7 +12,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 
-def data_preprocess(reader):
+def data_preprocess(reader, seed):
     """
         data preprocess
         :param file_loader: Mat loader
@@ -27,7 +27,7 @@ def data_preprocess(reader):
                 .repeat((fields.shape[0],) + (1,) + tuple(fields.shape[2:-1])).unsqueeze(-1)
     coords = torch.cat((coords_x, coords_t), dim=-1)
 
-    np.random.seed(2023)
+    np.random.seed(seed)
     index = np.random.permutation(np.arange(fields.shape[0]))
 
     return design[index], fields[index], coords[index], target[index]

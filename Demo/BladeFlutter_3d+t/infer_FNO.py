@@ -56,7 +56,7 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'FNO+MLP+CNN-2'
+    name = 'FNO+MLP+CNN-1'
     work_path = os.path.join('work', name)
     train_path = os.path.join(work_path, 'train')
     infer_path = os.path.join(work_path, 'infer')
@@ -101,7 +101,7 @@ if __name__ == "__main__":
                       padding=5, activation='gelu').to(Device)
     MLP_model = FcnSingle(planes=(1, 64, 64, 64), last_activation=True).to(Device)
     CNN_model = DownSampleNet2d(in_sizes=tuple(fields.shape[1:-1]) + (64,), out_sizes=target.shape[-1],
-                                width=16, depth=4)
+                                width=64, depth=4)
 
     Net_model = predictor(trunc=FNO_model, branch=MLP_model, infer=CNN_model,
                           field_dim=10, infer_dim=target.shape[-1]).to(Device)

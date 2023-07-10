@@ -62,3 +62,42 @@ def knn(x1, x2, k):
 
     idx = pairwise_distance.topk(k=k, dim=-1)[1]  # (batch_size, n1, k)
     return idx
+
+
+def gen_uniform_grid(x):
+    """
+    Args:
+        x: input coordinates
+    Returns:
+        res: input transform
+    """
+    shape = x.shape
+    if len(shape) == 3:
+
+        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
+        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
+        return gridx.to(x.device)
+
+    elif len(shape) == 4:
+
+        batchsize, size_x, size_y, size_z = shape[0], shape[1], shape[2], shape[3]
+        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+        gridx = gridx.reshape(1, size_x, 1, 1, 1).repeat([batchsize, 1, size_y, size_z, 1])
+        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
+        gridy = gridy.reshape(1, 1, size_y, 1, 1).repeat([batchsize, size_x, 1, size_z, 1])
+        gridz = torch.linspace(0, 1, size_z, dtype=torch.float32)
+        gridz = gridz.reshape(1, 1, 1, size_y, 1).repeat([batchsize, size_x, size_y, 1, 1])
+        return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device)
+
+    elif len(shape) == 5:
+        batchsize, size_x, size_y, size_z = shape[0], shape[1], shape[2], shape[3]
+        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
+        gridx = gridx.reshape(1, size_x, 1, 1, 1).repeat([batchsize, 1, size_y, size_z, 1])
+        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
+        gridy = gridy.reshape(1, 1, size_y, 1, 1).repeat([batchsize, size_x, 1, size_z, 1])
+        gridz = torch.linspace(0, 1, size_z, dtype=torch.float32)
+        gridz = gridz.reshape(1, 1, 1, size_y, 1).repeat([batchsize, size_x, size_y, 1, 1])
+        return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device)
+    else:
+        raise NotImplementedError("The tensor shape is Not implemented yet!")

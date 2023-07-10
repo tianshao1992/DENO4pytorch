@@ -38,7 +38,7 @@ class DataNormer(object):
                 except:
                     raise ValueError("the savefile format is not supported!")
             else:
-                raise ValueError("the data type is not supported!")
+                raise ValueError("the file does not exist!")
         elif type(data) is np.ndarray:
             if axis is None:
                 axis = tuple(range(len(data.shape) - 1))
@@ -62,7 +62,6 @@ class DataNormer(object):
                 self.mean = np.mean(data.numpy(), axis=axis)
                 self.std = np.std(data.numpy(), axis=axis)
         else:
-
             raise NotImplementedError("the data type is not supported!")
 
 
@@ -122,17 +121,20 @@ class DataNormer(object):
         import pickle
         isExist = os.path.exists(save_path)
         if isExist:
-            with open(save_path, 'rb') as f:
-                load = pickle.load(f)
-            self.method = load.method
-            if load.method == "mean-std":
-                self.std = load.std
-                self.mean = load.mean
-            elif load.method == "min-max":
-                self.min = load.min
-                self.max = load.max
+            try:
+                with open(save_path, 'rb') as f:
+                    load = pickle.load(f)
+                self.method = load.method
+                if load.method == "mean-std":
+                    self.std = load.std
+                    self.mean = load.mean
+                elif load.method == "min-max":
+                    self.min = load.min
+                    self.max = load.max
+            except:
+                raise ValueError("the savefile format is not supported!")
         else:
-            print("The pkl file is not exist, CHECK PLEASE!")
+            raise ValueError("The pkl file is not exist, CHECK PLEASE!")
 
 
 # reading data

@@ -16,7 +16,10 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchinfo import summary
 from Utilizes.process_data import DataNormer, MatLoader
-from transformer.Transformers import SimpleTransformer, FourierTransformer2D
+from basic.basic_layers import FcnSingle
+from fno.FNOs import FNO2d
+from transformer.Transformers import SimpleTransformer, FourierTransformer
+
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
 import matplotlib.pyplot as plt
@@ -27,22 +30,33 @@ import yaml
 from run_MLP import get_grid, get_origin
 from post_process.post_data import Post_2d
 
-def feature_transform(x):
-    """
-    Args:
-        x: input coordinates
-    Returns:
-        res: input transform
-    """
-    shape = x.shape
-    batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-    gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-    gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-    gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
-    gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
+class predictor(nn.Module):
 
-    edge = torch.ones((x.shape[0], 1))
-    return torch.cat((gridx, gridy), dim=-1).to(x.device), edge.to(x.device)
+    def __init__(self, branch, trunc, field_dim):
+
+        super(predictor, self).__init__()
+
+        self.branch_net = branch
+        self.trunc_net = trunc
+        self.field_net = nn.Linear(trunc.out_dim, field_dim)
+
+
+    def forward(self, design, coords):
+        """
+        forward compute
+        :param design: tensor list[(batch_size, ..., operator_dims[0]), (batch_size, ..., operator_dims[1]), ...]
+        :param coords: (batch_size, ..., input_dim)
+        """
+
+        T = self.trunc_net(coords)
+        B = self.branch_net(design)
+        T_size = T.shape[1:-1]
+        for i in range(len(T_size)):
+            B = B.unsqueeze(1)
+        B = torch.tile(B, [1, ] + list(T_size) + [1, ])
+        feature = B * T
+        F = self.field_net(feature)
+        return F
 
 
 def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
@@ -59,9 +73,8 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
     for batch, (xx, yy) in enumerate(dataloader):
         xx = xx.to(device)
         yy = yy.to(device)
-        grid, edge = feature_transform(xx)
 
-        pred = netmodel(xx, grid, edge, grid)['preds']
+        pred = netmodel(xx)
         loss = lossfunc(pred, yy)
 
         optimizer.zero_grad()
@@ -86,9 +99,8 @@ def valid(dataloader, netmodel, device, lossfunc):
         for batch, (xx, yy) in enumerate(dataloader):
             xx = xx.to(device)
             yy = yy.to(device)
-            grid, edge = feature_transform(xx)
 
-            pred = netmodel(xx, grid, edge, grid)['preds']
+            pred = netmodel(xx)
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
@@ -106,8 +118,7 @@ def inference(dataloader, netmodel, device):
     with torch.no_grad():
         xx, yy = next(iter(dataloader))
         xx = xx.to(device)
-        grid, edge = feature_transform(xx)
-        pred = netmodel(xx, grid, edge, grid)['preds']
+        pred = netmodel(xx)
 
     # equation = model.equation(u_var, y_var, out_pred)
     return xx.cpu().numpy(), grid.cpu().numpy(), yy.numpy(), pred.cpu().numpy()
@@ -117,18 +128,20 @@ if __name__ == "__main__":
     ################################################################
     # configs
     ################################################################
-    for mode in [8,10,12,14,16]:
+    for mode in [8, 10, 12, 14, 16]:
 
         name = 'Transformer_' + str(mode)
 
         # name = 'Transformer'
         work_path = os.path.join('work', name)
+        train_path = os.path.join(work_path, 'train')
         isCreated = os.path.exists(work_path)
         if not isCreated:
             os.makedirs(work_path)
+            os.makedirs(train_path)
 
         # 将控制台的结果输出到log文件
-        sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+        Logger = TextLogger(os.path.join(train_path, 'train.log'))
 
         if torch.cuda.is_available():
             Device = torch.device('cuda:0')
@@ -171,12 +184,8 @@ if __name__ == "__main__":
         # load data
         ################################################################
 
-        input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
-        input = torch.tensor(input, dtype=torch.float)
-
-        # output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
-        output = fields
-        output = torch.tensor(output, dtype=torch.float)
+        input = torch.tensor(design, dtype=torch.float)
+        output = torch.tensor(fields, dtype=torch.float)
 
         print(input.shape, output.shape)
 
@@ -208,18 +217,24 @@ if __name__ == "__main__":
         config['fourier_modes'] = mode
 
         # 建立网络
-        Net_model = FourierTransformer2D(**config).to(Device)
-        # summary(Net_model, input_size=(batch_size, train_x.shape[1]), device=Device)
+        Tra_model = FourierTransformer(**config).to(Device)
+        FNO_model = FNO2d(in_dim=in_dim, out_dim=config['n_targets'], modes=(16, 16), width=64, depth=4,
+                          padding=8, activation='gelu').to(Device)
+        MLP_model = FcnSingle(planes=(in_dim, 64, 64, config['n_targets']), last_activation=True).to(Device)
+        Net_model = predictor(trunc=Tra_model, branch=MLP_model, field_dim=out_dim).to(Device)
+
+        model_statistics = summary(Net_model, input_size=(batch_size, train_x.shape[1]), device=Device)
+        Logger.write(str(model_statistics))
 
         # 损失函数
         Loss_func = nn.MSELoss()
         # Loss_func = nn.SmoothL1Loss()
         # 优化算法
-        Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-4)
+        Optimizer = torch.optim.Adam(Net_model.parameters(), lr=learning_rate, betas=(0.7, 0.9), weight_decay=1e-8)
         # 下降策略
         Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
         # 可视化
-        Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('p', 't', 'rho', 'alf', 'v'))
+        Visual = MatplotlibVision(train_path, input_name=('x', 'y'), field_name=('p', 't', 'rho', 'alf', 'v'))
 
         star_time = time.time()
         log_loss = [[], []]
@@ -245,7 +260,7 @@ if __name__ == "__main__":
                 Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
                 Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
                 fig.suptitle('training loss')
-                fig.savefig(os.path.join(work_path, 'log_loss.svg'))
+                fig.savefig(os.path.join(train_path, 'log_loss.svg'))
                 plt.close(fig)
 
             ################################################################
@@ -259,17 +274,17 @@ if __name__ == "__main__":
                 valid_source, valid_coord, valid_true, valid_pred = inference(valid_loader, Net_model, Device)
 
                 torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
-                           os.path.join(work_path, 'latest_model.pth'))
+                           os.path.join(train_path, 'latest_model.pth'))
 
                 for fig_id in range(5):
                     fig, axs = plt.subplots(out_dim, 3, figsize=(18, 25), num=2)
                     Visual.plot_fields_ms(fig, axs, train_true[fig_id], train_pred[fig_id], grid)
-                    fig.savefig(os.path.join(work_path, 'train_solution_' + str(fig_id) + '.jpg'))
+                    fig.savefig(os.path.join(train_path, 'train_solution_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
 
                 for fig_id in range(5):
                     fig, axs = plt.subplots(out_dim, 3, figsize=(18, 25), num=3)
                     Visual.plot_fields_ms(fig, axs, valid_true[fig_id], valid_pred[fig_id], grid)
-                    fig.savefig(os.path.join(work_path, 'valid_solution_' + str(fig_id) + '.jpg'))
+                    fig.savefig(os.path.join(train_path, 'valid_solution_' + str(fig_id) + '.jpg'))
                     plt.close(fig)
 

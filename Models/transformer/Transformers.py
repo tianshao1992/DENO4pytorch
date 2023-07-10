@@ -31,6 +31,7 @@ from gnn.graph_layers import *
 from transformer.attention_layers import *
 from fno.spectral_layers import *
 from attention_layers import *
+from Utilizes.geometrics import *
 
 
 class SimpleTransformerEncoderLayer(nn.Module):
@@ -863,6 +864,15 @@ class FourierTransformer(nn.Module):
         n_s = int(pos.size(1))
         x_latent = []
         attn_weights = []
+
+        if pos is None:
+            pos = gen_uniform_grid(node)
+
+        if edge is None:
+            edge = torch.ones((x.shape[0], 1))
+
+        if grid is None:
+            grid = pos
 
         # if not self.downscaler_size:
         node = torch.cat([node, pos], dim=-1)
