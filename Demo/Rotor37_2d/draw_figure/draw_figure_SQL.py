@@ -1,12 +1,12 @@
 from utilizes_draw import *
-
+from post_process.load_model import loaddata_Sql
 
 if __name__ == "__main__":
 
-    name = 'FNO_1'
-    input_dim = 28
+    name = 'Transformer_0'
+    input_dim = 363
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_FNO2")
+    work_load_path = os.path.join("..", "work_trainsql_Trans1")
     workList = os.listdir(work_load_path)
     for name in workList:
         work_path = os.path.join(work_load_path, name)
@@ -38,10 +38,9 @@ if __name__ == "__main__":
             if isExist:
                 checkpoint = torch.load(work.pth, map_location=Device)
                 Net_model.load_state_dict(checkpoint['net_model'])
-
         else:
             Net_model, inference = rebuild_model(work_path, Device, name=nameReal)
-        train_loader, valid_loader, _, _ = loaddata(nameReal, 2500, 400, shuffled=True)
+        train_loader, valid_loader, _, _ = loaddata_Sql(nameReal, 2500, 400, shuffled=True)
 
         for type in ["valid"]:
             if type == "valid":
@@ -94,9 +93,9 @@ if __name__ == "__main__":
             #     "Mach", "Load",
             #     "MF"]
 
-            for kk, parameter_Name in enumerate(parameterList):
-                true[...,kk] = getattr(post_true, parameter_Name)
-                pred[...,kk] = getattr(post_pred, parameter_Name)
+            # for kk, parameter_Name in enumerate(parameterList):
+            #     true[...,kk] = getattr(post_true, parameter_Name)
+            #     pred[...,kk] = getattr(post_pred, parameter_Name)
 
             # dict = plot_error(post_true, post_pred, parameterList + ["MassFlow"],
             #            paraNameList=parameterListN,
@@ -105,8 +104,7 @@ if __name__ == "__main__":
             # if type=="valid":
             #     np.savez(os.path.join(work_path, "FNO_num.npz"), **dict)
 
-            # plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
-            #
+            plot_field_2d(post_true, post_pred, parameterList, work_path=work_path, type=type, grid=grid)
             Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('p', 't', 'V', 'W', 'mass'))
             # field_name = ['p[kPa]', 't[K]', '$\mathrm{v^{2}/1000[m^{2}s^{-2}]}$', '$\mathrm{w^{2}/1000[m^{2}s^{-2}]}$', '$\mathrm{mass [kg m^{-2}s^{-1}]}$']
             field_name = ['p[kPa]', 't[K]',
@@ -115,11 +113,11 @@ if __name__ == "__main__":
                           '$\mathrm{\psi}$']
 
             # scaleList = [1000, 1, 1, 1, 1]
-            scaleList = [1000,1,1000,1000,1]
+            scaleList = [1,1,1,1,1]
 
 
-            limitList = [20,20,50,0.1,0.1]
-            for ii in [5, 8, 58]:
+            # limitList = [20,20,50,0.1,0.1]
+            for ii in [1, 2, 3]:
                 for jj in range(5):
                     true[ii, :, :, jj:jj + 1] = true[ii, :, :, jj:jj + 1]/scaleList[jj]
                     pred[ii, :, :, jj:jj + 1] = pred[ii, :, :, jj:jj + 1] / scaleList[jj]
@@ -135,10 +133,10 @@ if __name__ == "__main__":
                 Visual.field_name = field_name
                 Visual.plot_fields_ms(fig, axs, true[ii], pred[ii],
                                       grid, show_channel=None, cmaps=['Spectral_r', 'Spectral_r', 'coolwarm'],
-                                      limitList=limitList)
+                                      limitList=None)
 
-                save_path = os.path.join("..", "data", "final_fig")
-                fig.patch.set_alpha(0.)
+                save_path = work_path
+                # fig.patch.set_alpha(0.)
                 fig.savefig(os.path.join(save_path, 'derive' + str(0) + '_field_' + str(ii) + '.png'),transparent=True)
                 plt.close(fig)
 

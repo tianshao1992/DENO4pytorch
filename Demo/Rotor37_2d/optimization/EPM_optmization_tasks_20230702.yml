@@ -1,0 +1,35 @@
+task_0:
+  parameterList:
+    - Efficiency
+    - PressureRatioV
+  softconstrList: []
+  hardConstrList: []
+  hardConstrIneqList:
+      - MassFlow
+
+task_1:
+  parameterList:
+    - Efficiency
+  softconstrList: []
+  hardConstrList: []
+  hardConstrIneqList:
+      - MassFlow
+
+task_2:
+  parameterList:
+    - Efficiency
+  softconstrList: []
+  hardConstrList: []
+  hardConstrIneqList:
+    - PressureRatioV
+
+task_3:
+  parameterList:
+    - Efficiency
+  softconstrList: []
+  hardConstrList: []
+  hardConstrIneqList:
+    - MassFlow
+    - PressureRatioV
+
+

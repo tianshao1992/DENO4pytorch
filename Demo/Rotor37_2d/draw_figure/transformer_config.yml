@@ -1,10 +1,10 @@
 Rotor37_2d:
-  node_feats: 28
+  node_feats: 2
   pos_dim: 2
-  n_targets: 5
-  n_hidden: 128
+  n_targets: 64
+  n_hidden: 64
   num_feat_layers: 0
-  num_encoder_layers: 4
+  num_encoder_layers: 3
   n_head: 4
   dim_feedforward: 128
   attention_type: galerkin
@@ -18,12 +18,12 @@ Rotor37_2d:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: ifft2
+  decoder_type: ifft
   last_activation: False
   freq_dim: 64
-  num_regressor_layers: 4
+  num_regressor_layers: 1
   regressor_activation: gelu
-  fourier_modes: 8
+  fourier_modes: 16
   spacial_dim: 2
   spacial_fc: True
   dropout: 0.0
