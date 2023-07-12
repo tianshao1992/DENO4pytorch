@@ -850,7 +850,7 @@ class FourierTransformer(nn.Module):
         self._initialize()
         self.__name__ = self.attention_type.capitalize() + 'Transformer'
 
-    def forward(self, node, pos, edge, grid, weight=None, boundary_value=None, return_weight=False):
+    def forward(self, node, pos=None, edge=None, grid=None, weight=None, boundary_value=None, return_weight=False):
         '''
         Args:
             - node: (batch_size, n, n, node_feats)
@@ -860,19 +860,20 @@ class FourierTransformer(nn.Module):
                 or (batch_size, n_s*n_s) when mass matrices are not provided (lumped mass)
             - grid: (batch_size, n-2, n-2, 2) excluding boundary
         '''
-        bsz = node.size(0)
-        n_s = int(pos.size(1))
-        x_latent = []
-        attn_weights = []
 
         if pos is None:
             pos = gen_uniform_grid(node)
 
         if edge is None:
-            edge = torch.ones((x.shape[0], 1))
+            edge = torch.ones((node.shape[0], 1))
 
         if grid is None:
             grid = pos
+
+        bsz = node.size(0)
+        n_s = int(pos.size(1))
+        x_latent = []
+        attn_weights = []
 
         # if not self.downscaler_size:
         node = torch.cat([node, pos], dim=-1)
