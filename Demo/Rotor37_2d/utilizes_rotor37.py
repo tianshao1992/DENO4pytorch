@@ -150,15 +150,17 @@ def get_origin_gemo(quanlityList=None,
         quanlityList = ["Static Pressure", "Static Temperature",
                         'V2', 'W2', "DensityFlow"]
     if realpath is None:
-        sample_files = [os.path.join("data", "sampleRstZip_1500"),
-                        os.path.join("data", "sampleRstZip_500"),
-                        os.path.join("data", "sampleRstZip_970")
-                        ]
+        sample_files = [os.path.join("data", "Rotor37sampleRstZip_2970")]
+        # sample_files = [os.path.join("data", "sampleRstZip_1500"),
+        #                 os.path.join("data", "sampleRstZip_500"),
+        #                 os.path.join("data", "sampleRstZip_970")
+        #                 ]
     else:
-        sample_files = [os.path.join(realpath, "sampleRstZip_1500"),
-                        os.path.join(realpath, "sampleRstZip_500"),
-                        os.path.join(realpath, "sampleRstZip_970")
-                        ]
+        sample_files = [os.path.join(realpath, "Rotor37sampleRstZip_2970")]
+        # sample_files = [os.path.join(realpath, "sampleRstZip_1500"),
+        #                 os.path.join(realpath, "sampleRstZip_500"),
+        #                 os.path.join(realpath, "sampleRstZip_970")
+        #                 ]
     if existcheck:
         sample_files_exists = []
         for file in sample_files:
