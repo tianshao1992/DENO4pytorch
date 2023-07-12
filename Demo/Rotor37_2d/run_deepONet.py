@@ -103,7 +103,7 @@ if __name__ == "__main__":
         os.makedirs(work_path)
 
     # 将控制台的结果输出到log文件
-    sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+    # sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
 
     if torch.cuda.is_available():
         Device = torch.device('cuda')

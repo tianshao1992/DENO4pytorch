@@ -1,21 +1,23 @@
-import torch
 import os
+import torch
 import numpy as np
 from post_process.post_data import Post_2d
 from run_FNO import feature_transform
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid
+from utilizes_rotor37 import Rotor37WeightLoss
 from post_process.load_model import build_model_yml, loaddata
 from post_process.model_predict import DLModelPost
 from Utilizes.visual_data import MatplotlibVision
 import matplotlib.pyplot as plt
 import yaml
 import time
+from torchsummary import summary
 
 
 def change_yml(name, yml_path=None, **kwargs):
     # 加载config模板
     template_path = os.path.join("..", "data", "config_template.yml")
-    with open(template_path) as f:
+    with open(template_path, 'r', encoding="utf-8") as f:
         config_all = yaml.full_load(f)
         config_para = config_all[name + '_config']
     # 修改参数
@@ -25,18 +27,22 @@ def change_yml(name, yml_path=None, **kwargs):
         else:
             print("The keywords {} is illegal, CHECK PLEASE".format(key))
     # 保存到新的文件
-    with open(yml_path, 'r') as f:
+    isExist = os.path.exists(yml_path)
+    if not isExist:
+        with open(yml_path, 'w', encoding="utf-8") as f:
+            pass
+    with open(yml_path, 'r', encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
     if data is None:
         data = {}
     data[name + '_config'] = config_para
-    with open(yml_path, 'w') as f:
+    with open(yml_path, 'w', encoding="utf-8") as f:
         yaml.dump(data, f)
 
 def add_yml(key_set_list, yml_path=None):
-    # 加载config模板
     template_path = os.path.join("..", "data", "config_template.yml")
-    with open(template_path) as f:
+    with open(template_path, 'r', encoding="utf-8") as f:
+    # 加载config模板
         config_all = yaml.full_load(f)
     for key_set in key_set_list:
         config_para = config_all[key_set]
@@ -59,6 +65,17 @@ class WorkPrj(object):
         self.x_norm = os.path.join(self.root, 'x_norm.pkl')
         self.y_norm = os.path.join(self.root, 'y_norm.pkl')
 
+    def config(self, name):
+        with open(self.yml) as f:
+            config_all = yaml.full_load(f)
+
+        if name + "_config" in config_all.keys():
+            return config_all[name + "_config"]
+        else:
+            return None
+
+
+
     # def exist_check(self):
 
 class DLModelWhole(object):
@@ -68,6 +85,7 @@ class DLModelWhole(object):
                  out_norm=None,
                  grid_size=64,
                  work=None,
+                 epochs=1000,
                  ):
         self.device = device
         self.work = work
@@ -75,11 +93,14 @@ class DLModelWhole(object):
         self.net_model, self.inference, self.train, self.valid = \
             build_model_yml(work.yml, self.device, name=name)
 
+        # summary(self.net_model, [(64, 64, 28),(64, 64, 2),(64, 64, 28),(64, 64, 2)])
+        # summary(self.net_model, [(64, 64, 28), (64, 64, 2), (1,), (64, 64, 2)])
+
         self.in_norm = in_norm
         self.out_norm = out_norm
         self.grid_size = grid_size
 
-        self.epochs = 1000
+        self.epochs = epochs
 
         self.Loss_func = None
         self.Optimizer = None
@@ -89,7 +110,8 @@ class DLModelWhole(object):
         with open(self.work.yml) as f:
             config = yaml.full_load(f)
         # 损失函数
-        self.Loss_func = torch.nn.MSELoss()
+        # self.Loss_func = torch.nn.MSELoss()
+        self.Loss_func = Rotor37WeightLoss()
         # 优化算法
         temp = config["Optimizer_config"]
         temp['betas'] = tuple(float(x) for x in temp['betas'][0].split())
@@ -110,6 +132,7 @@ class DLModelWhole(object):
             print('epoch: {:6d}, lr: {:.3e}, train_step_loss: {:.3e}, valid_step_loss: {:.3e}, cost: {:.2f}'.
                   format(epoch, self.Optimizer.param_groups[0]['lr'], log_loss[0][-1], log_loss[1][-1],
                          time.time() - star_time))
+            # print(os.environ['CUDA_VISIBLE_DEVICES'])
             star_time = time.time()
 
             if epoch > 0 and epoch % 5 == 0:
@@ -131,7 +154,7 @@ if __name__ == "__main__":
     id = 0
     train_num = 2500
     valid_num = 450
-    work = WorkPrj(os.path.join("..", "work", name + "_" + str(id)))
+    work = WorkPrj(os.path.join("..", "work_train", name + "_" + str(id)))
 
     if torch.cuda.is_available():
         Device = torch.device('cuda')

@@ -77,18 +77,27 @@ def MkdirCheck(file_path):
 
 
 if __name__ == "__main__":
-    name = 'FNO_1'
-    input_dim = 28
+    name = 'Transformer'
+    input_dim = 363
     output_dim = 5
-    work_load_path = os.path.join("..", "work_train_FNO2")
-    work_path = os.path.join(work_load_path, name)
-    work = WorkPrj(work_path)
+    work_load_path = os.path.join("..", "work_trainsql_Trans1")
+    # work_path = os.path.join(work_load_path, name)
+    # work = WorkPrj(work_path)
+    #
+    #
+    # nameReal = name.split("_")[0]
+    # id = None
+    # if len(name.split("_")) == 2:
+    #     id = int(name.split("_")[1])
+    workList = os.listdir(work_load_path)
+    for name in workList:
+        work_path = os.path.join(work_load_path, name)
+        work = WorkPrj(work_path)
 
-
-    nameReal = name.split("_")[0]
-    id = None
-    if len(name.split("_")) == 2:
-        id = int(name.split("_")[1])
+        nameReal = name.split("_")[0]
+        id = None
+        if len(name.split("_")) == 2:
+            id = int(name.split("_")[1])
 
     if torch.cuda.is_available():
         Device = torch.device('cuda')

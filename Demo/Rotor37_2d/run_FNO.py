@@ -11,10 +11,10 @@ import os
 import numpy as np
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchinfo import summary
+# from torchinfo import summary
+from torchsummary import summary
 from fno.FNOs import FNO2d
 from cnn.ConvNets import UNet2d
 
@@ -73,7 +73,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1) / batch_size
+    return train_loss / (batch + 1)
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -94,8 +94,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1) / batch_size
-
+    return valid_loss / (batch + 1)
 
 def inference(dataloader, netmodel, device): # 这个是？？
     """
@@ -130,7 +129,7 @@ if __name__ == "__main__":
             os.makedirs(work_path)
 
         # 将控制台的结果输出到log文件
-        sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
+        # sys.stdout = TextLogger(os.path.join(work_path, 'train.log'), sys.stdout)
         #  torch.cuda.set_device(1)
 
         if torch.cuda.is_available():
@@ -150,12 +149,12 @@ if __name__ == "__main__":
         nvalid = 200
 
         # modes = (10, 10)
-        modes = (mode, mode)
-        width = 64
+        modes = (4, 4)
+        width = 128
         depth = 4
         steps = 1
         padding = 8
-        dropout = 0.0
+        dropout = 0.5
 
         batch_size = 32
         epochs = 1001
@@ -215,7 +214,8 @@ if __name__ == "__main__":
         input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
         input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
         print(name)
-        summary(Net_model, input_data=[input1, input2], device=Device)
+        summary(Net_model, [(64, 64, 28), (64, 64, 5)])
+        exit()
 
         # 损失函数
         Loss_func = nn.MSELoss()
