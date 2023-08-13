@@ -4,7 +4,8 @@ import torch
 from post_process.load_model import loaddata, rebuild_model, build_model_yml
 from Utilizes.process_data import DataNormer, MatLoader, SquareMeshGenerator
 from Demo.Rotor37_2d.utilizes_rotor37 import get_grid, get_origin
-from draw_figure import plot_span_std, plot_span_curve, plot_flow_curve, plot_flow_std
+from draw_figure.utilizes_draw import plot_flow_std, plot_span_std
+# from utilizes_draw import plot_span_std, plot_span_curve, plot_flow_curve, plot_flow_std
 from Utilizes.visual_data import MatplotlibVision
 import matplotlib.pyplot as plt
 from post_process.post_data import Post_2d
@@ -20,7 +21,7 @@ def predicter(netmodel, input, Device, name=None):
     Net_model 训练完成的模型
     input 模型的输入 shape:[num, input_dim]
     """
-    if name in ("FNO", "UNet", "Transformer","deepONet"):
+    if name in ("FNO", "UNet", "Transformer"):
         input = torch.tensor(np.tile(input[:, None, None, :], (1, 64, 64, 1)))
         input = input.to(Device)
         grid = feature_transform(input)
@@ -30,6 +31,50 @@ def predicter(netmodel, input, Device, name=None):
         pred = netmodel(input)
 
     return pred
+
+def predicter_loader(netmodel, input_data, Device, name=None):
+    """
+    加载完整的模型预测输入的坐标
+    Net_model 训练完成的模型
+    input 模型的输入 shape:[num, input_dim]
+    先转换数据，分批计算
+    """
+    # torch.utils.data.TensorDataset(input_data)
+    loader = torch.utils.data.DataLoader(input_data,
+                                         batch_size=32,
+                                         shuffle=False,
+                                         drop_last=False)
+    pred = []
+    for input in loader:
+        if name in ("FNO", "UNet"):
+            with torch.no_grad():
+                input = torch.tensor(np.tile(input[:, None, None, :], (1, 64, 64, 1)))
+                input = input.to(Device)
+                grid = feature_transform(input)
+                temp = netmodel(input, grid)
+                pred.append(temp.clone())
+                temp = None
+
+        elif name in ("Transformer"):
+            from Utilizes.geometrics import gen_uniform_grid
+            grid = gen_uniform_grid(torch.tensor(np.zeros([1, 64, 64, 5]))).to(Device)
+            xx = input.to(Device)
+            coords = grid.tile([xx.shape[0], 1, 1, 1])
+
+            temp = netmodel(xx, coords)
+            pred.append(temp.clone())
+            temp = None
+
+        else:
+            with torch.no_grad():
+                input = input.to(Device)
+                temp = netmodel(input)
+                pred.append(temp.clone())
+                temp = None
+
+    pred = torch.cat(pred, dim=0)
+    return pred
+
 
 def mesh_sliced(input_dim, slice_index, elite=None, type='lhsdesign', sample_num=None):
     slice_dim = len(slice_index)
@@ -95,15 +140,14 @@ if __name__ == "__main__":
     else:
         Device = torch.device('cpu')
 
-    if os.path.exists(work.x_norm):
-        norm_save_x = work.x_norm
-        norm_save_y = work.y_norm
-    else:
-        norm_save_x = os.path.join("..", "data", "x_norm_1250.pkl")
-        norm_save_y = os.path.join("..", "data", "y_norm_1250.pkl")
+
+    norm_save_x = work.x_norm
+    norm_save_y = work.y_norm
 
     x_normlizer = DataNormer([1, 1], method="mean-std", axis=0)
     x_normlizer.load(norm_save_x)
+    y_normlizer = DataNormer([1, 1], method="mean-std", axis=0)
+    y_normlizer.load(norm_save_y)
 
     if os.path.exists(work.yml):
         Net_model, inference, _, _ = build_model_yml(work.yml, Device, name=nameReal)
@@ -117,79 +161,34 @@ if __name__ == "__main__":
     Net_model.eval()
 
     parameterList = [
-        "Efficiency",
+        # "Efficiency",
         # "EfficiencyPoly",
-        # "PressureRatioV", "TemperatureRatioV",
-        # "PressureLossR", "EntropyStatic",
-        # "MachIsentropic", "Load",
+        # "PressureRatioV",
+        # "TemperatureRatioV",
+        "PressureLossR",
+        # "EntropyStatic",
+        # "MachIsentropic",
+        # "Load",
     ]
 
     var_group = list(range(25))
     var_group = [[x] for x in var_group]
 
-    # 按叶高分组
-    # var_group = [
-    #             [0, 1, 2],
-    #             [3, 4, 5, 6, 7],
-    #             [8, 9, 10, 11, 12],
-    #             [13, 14, 15, 16, 17],
-    #             [18, 19, 20, 21, 22],
-    #             [23, 24, 25, 26, 27]
-    #             ]
 
-    #按流向位置分组
-    # var_group = [
-    #     [0, 1, 2],
-    #     [3, 8, 13, 18, 23],
-    #     [4, 9, 14, 19, 24],
-    #     [5, 10, 15, 20, 25],
-    #     [6, 11, 16, 21, 26],
-    #     [7, 12, 17, 22, 27],
-    # ]
-
-    # 按叶高分组-只有前缘
-    # var_group = [
-    #             [0, 1, 2],
-    #             [3,4],
-    #             [8,9],
-    #             [13,14],
-    #             [18,19],
-    #             [23,24]
-    #             ]
-
-    # 按叶高分组-只有中间
-    # var_group = [
-    #             [0, 1, 2],
-    #             [5],
-    #             [10],
-    #             [15],
-    #             [20],
-    #             [25]
-    #             ]
-
-    # 按叶高分组-只有尾缘
-    # var_group = [
-    #             [0, 1, 2],
-    #             [6, 7],
-    #             [11, 12],
-    #             [16, 17],
-    #             [21, 22],
-    #             [26, 27]
-    #             ]
     dict_fig = {}
     dict_axs = {}
-    for parameter in parameterList:
-        fig, axs = plt.subplots(5, 5, figsize=(20, 20), num=1)
-        dict_fig.update({parameter : fig})
+    for ii, parameter in enumerate(parameterList):
+        fig, axs = plt.subplots(5, 5, figsize=(15, 15), num=ii)
+        dict_fig.update({parameter: fig})
         dict_axs.update({parameter: axs})
+
 
     for idx, var_list in enumerate(var_group):
         sample_grid = mesh_sliced(input_dim, var_list, sample_num=1001)
         sample_grid = x_normlizer.norm(sample_grid)
 
-        pred = predicter(Net_model, sample_grid, Device, name=nameReal) # 获得预测值
-        y_normlizer = DataNormer([1, 1], method="mean-std", axis=0)
-        y_normlizer.load(norm_save_y)
+        pred = predicter_loader(Net_model, sample_grid, Device, name=nameReal) # 获得预测值
+
         pred = pred.reshape([pred.shape[0], 64, 64, output_dim])
         pred = y_normlizer.back(pred)
 
@@ -209,33 +208,50 @@ if __name__ == "__main__":
 
 
 
-        # save_path = os.path.join(work_path,"sensitive_test")
+        # save_path = os.path.join(work_path, "sensitive_test")
         save_path = os.path.join("..", "data", "final_fig")
 
-        MkdirCheck(save_path)
-
+        # MkdirCheck(save_path)
         # MkdirCheck(os.path.join(save_path, "span_std"))
-        # plot_span_std(post_pred, parameterList,
-        #               work_path=os.path.join(save_path, "span_std"),
-        #               fig_id=idx, rangeIndex=50, singlefile=True)
         dict_axs_sub = {}
 
-        x1 = int((idx)/5)
-        x2 = (idx)%5
+        #old order way
+        # x1 = int((24-idx) / 5)
+        # x2 = (24-idx) % 5
+
+        # new order way
+        x1 = int(idx / 5)
+        x2 = (24-idx) % 5
 
         for parameter in parameterList:
             dict_axs_sub.update({parameter : dict_axs[parameter][x1][x2]})
 
         xlimList = [
-            [0.5, 1.01],
+            [0.5, 1.0],
+            [-0.04,0.16],
             [1.75, 2.2],
             [0, 115],
         ]
-        tt = 0
-        plot_span_std(post_pred, parameterList,
-                      work_path=os.path.join(save_path, "span_std"),
+        tt = 1
+        # plot_span_std(post_pred, parameterList,
+        #               work_path=os.path.join(save_path, "span_std"),
+        #               fig_id=idx, rangeIndex=50, singlefile=True, xlim=xlimList[tt],
+        #               singlefigure=True, fig_dict=dict_fig, axs_dict=dict_axs_sub)
+
+        # plot_span_std(post_pred, parameterList,
+        #               work_path=os.path.join(save_path, "span_std"),
+        #               fig_id=idx, rangeIndex=50, singlefile=True,
+        #               singlefigure=True, fig_dict=dict_fig, axs_dict=dict_axs_sub)
+
+        plot_flow_std(post_pred, parameterList,
+                      work_path=os.path.join(save_path, "flow_std"),
                       fig_id=idx, rangeIndex=40, singlefile=True, xlim=xlimList[tt],
                       singlefigure=True, fig_dict=dict_fig, axs_dict=dict_axs_sub)
+
+        # for ii, parameter in enumerate(parameterList):
+        #     fig = dict_fig[parameter]
+        #     plt.figure(fig.number)
+        #     plt.show()
 
         # MkdirCheck(os.path.join(save_path, "span_curve"))
         # plot_span_curve(post_pred, parameterList,
@@ -255,7 +271,10 @@ if __name__ == "__main__":
 
     for parameter in parameterList:
         fig = dict_fig[parameter]
-        jpg_path = os.path.join(save_path, parameter + "_" + "all_" + '.jpg')
+        plt.figure(fig.number)
+        plt.subplots_adjust(hspace=0.1, wspace=0.1)
+        jpg_path = os.path.join(save_path, parameter + "_flow_" + "all_" + '.jpg')
+        plt.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95, wspace=0.05, hspace=0.05)
         fig.savefig(jpg_path)
         plt.close(fig)
 

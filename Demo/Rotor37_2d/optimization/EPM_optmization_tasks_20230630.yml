@@ -1,0 +1,68 @@
+task_0:
+  parameterList:
+    - Efficiency
+    - PressureRatioV
+    - MassFlow
+  softconstrList:
+    - MassFlow
+  hardConstrList: []
+  hardConstrIneqList: []
+
+task_1:
+  parameterList:
+    - Efficiency
+    - PressureRatioV
+  softconstrList: []
+  hardConstrList:
+    - MassFlow
+  hardConstrIneqList: []
+
+task_2:
+  parameterList:
+    - Efficiency
+    - PressureRatioV
+  softconstrList:
+    - PressureRatioV
+  hardConstrList: []
+  hardConstrIneqList: []
+
+task_3:
+  parameterList:
+    - Efficiency
+    - MassFlow
+  softconstrList:
+    - MassFlow
+  hardConstrList: []
+  hardConstrIneqList:
+    - PressureRatioV
+
+task_4:
+  parameterList:
+    - Efficiency
+  softconstrList: []
+  hardConstrList:
+    - MassFlow
+  hardConstrIneqList:
+    - PressureRatioV
+
+task_5:
+  parameterList:
+    - Efficiency
+    - MassFlow
+  softconstrList:
+    - MassFlow
+  hardConstrList:
+    - PressureRatioV
+  hardConstrIneqList: []
+
+task_6:
+  parameterList:
+    - Efficiency
+    - PressureRatioV
+  softconstrList:
+    - PressureRatioV
+  hardConstrList:
+    - MassFlow
+  hardConstrIneqList: []
+
+

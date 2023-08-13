@@ -14,7 +14,9 @@ import torch
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchinfo import summary
+
+# from torchinfo import summary
+from torchsummary import summary
 from fno.FNOs import FNO2d
 from cnn.ConvNets import UNet2d
 from Utilizes.visual_data import MatplotlibVision
@@ -24,6 +26,7 @@ import matplotlib.pyplot as plt
 import time
 from run_MLP import get_grid
 from run_MLP import get_grid, get_origin
+from utilizes_rotor37 import get_gemodata_from_mat,get_origin_gemo
 from post_process.post_data import Post_2d
 
 def feature_transform(x):
@@ -67,7 +70,7 @@ def train(dataloader, netmodel, device, lossfunc, optimizer, scheduler):
         train_loss += loss.item()
 
     scheduler.step()
-    return train_loss / (batch + 1) / batch_size
+    return train_loss / (batch + 1)
 
 
 def valid(dataloader, netmodel, device, lossfunc):
@@ -88,7 +91,7 @@ def valid(dataloader, netmodel, device, lossfunc):
             loss = lossfunc(pred, yy)
             valid_loss += loss.item()
 
-    return valid_loss / (batch + 1) / batch_size
+    return valid_loss / (batch + 1)
 
 
 def inference(dataloader, netmodel, device): # 这个是？？
@@ -126,8 +129,13 @@ if __name__ == "__main__":
         Device = torch.device('cuda')
     else:
         Device = torch.device('cpu')
+    design, fields = get_origin(quanlityList=["Static Pressure", "Static Temperature","DensityFlow",'Relative Total Pressure', 'Relative Total Temperature'])  # 获取原始数据
 
-    design, fields = get_origin()
+    # design, fields = get_origin_gemo(quanlityList=None,
+    #             realpath=None,
+    #             existcheck=True,
+    #             shuffled=True,
+    #             getridbad=True)
 
     in_dim = 28
     out_dim = 5
@@ -157,6 +165,7 @@ if __name__ == "__main__":
     ################################################################
     # load data
     ################################################################
+    # input = design
     input = np.tile(design[:, None, None, :], (1, 64, 64, 1))
     input = torch.tensor(input, dtype=torch.float)
     # output = fields[:, 0, :, :, :].transpose((0, 2, 3, 1))
@@ -168,6 +177,10 @@ if __name__ == "__main__":
     train_y = output[:ntrain, ::r1, ::r2][:, :s1, :s2]
     valid_x = input[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
     valid_y = output[ntrain:ntrain + nvalid, ::r1, ::r2][:, :s1, :s2]
+    # train_x = input[:ntrain, :, :]
+    # train_y = output[:ntrain, :, :]
+    # valid_x = input[ntrain:ntrain + nvalid, :, :]
+    # valid_y = output[ntrain:ntrain + nvalid, :, :]
 
     x_normalizer = DataNormer(train_x.numpy(), method='mean-std')
     train_x = x_normalizer.norm(train_x)
@@ -197,7 +210,9 @@ if __name__ == "__main__":
     input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
     input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
     print(name)
-    summary(Net_model, input_data=[input1, input2], device=Device)
+    # summary(Net_model, input_data=[input1, input2], device=Device)
+    # summary(Net_model, [(64, 64, 28), (64, 64, 2)])
+    exit()
 
     # 损失函数
     Loss_func = nn.MSELoss()
