@@ -213,8 +213,8 @@ class Empircal(object):
 
 
 if __name__ == '__main__':
-    x = torch.ones([10, 64, 64, 3])
-    layer = FcnSingle([3, 64, 64, 10])
+    x = torch.ones([10, 50, 30, 80, 10, 3])
+    layer = FcnSingle([3, 64, 10])
     y = layer(x)
     print(y.shape)
 
@@ -222,4 +222,5 @@ if __name__ == '__main__':
     layer = FcnMulti([3, 64, 64, 10])
     y = layer(x)
     print(y.shape)
+
 

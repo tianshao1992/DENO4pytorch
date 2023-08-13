@@ -119,10 +119,9 @@ class TextLogger(object):
         """
         pass
 
-
 class MatplotlibVision(object):
     # 主要的绘图类
-    def __init__(self, log_dir, input_name=('x'), field_name=('f',)):
+    def __init__(self, log_dir, input_name=('x',), field_name=('f',), **kwargs):
         """Create a summary writer logging to log_dir."""
         self.log_dir = log_dir
         # sbn.set_style('ticks')
@@ -130,6 +129,7 @@ class MatplotlibVision(object):
 
         self.field_name = field_name
         self.input_name = input_name
+        self.target_name = kwargs.get('target_name', None)
 
         self.font_EN = {'family': 'Times New Roman', 'weight': 'normal', 'size': 20}
         self.font_CHN = {'family': 'SimSun', 'weight': 'normal', 'size': 20}
@@ -148,9 +148,10 @@ class MatplotlibVision(object):
                        "font.serif": ['SimSun'], }
         rcParams.update(self.config)
 
-    def plot_loss(self, fig, axs, x, y, label, title=None, xylabels=('epoch', 'loss value')):
+    def plot_loss(self, fig, axs, y, label, epoch=None, title=None, xylabels=('epoch', 'loss value')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
+        x = np.arange(1, len(y) + 1) if epoch is None else epoch
         axs.semilogy(x, y, label=label) #对数坐标
         axs.grid(True)  # 添加网格
         axs.legend(loc="best", prop=self.font)
@@ -246,13 +247,18 @@ class MatplotlibVision(object):
         # plt.ylim((-0.2, 0.2))
         # plt.pause(0.001)
 
-    def plot_error(self, fig, axs, error, error_ratio=0.05, title=None,
+    def plot_error(self, fig, axs, error, error_ratio=0.05, title=None, rel_error=False,
                    xylabels=('predicted relative error / %', 'distribution density')):
         # sbn.set_color_codes()
         # ax.bar(np.arange(len(error)), error*100, )
 
-        error = pd.DataFrame(error) * 100 # 转换格式
-        acc = (np.abs(np.array(error)) < error_ratio * 100).sum() / error.shape[0]
+        if rel_error:
+            error = pd.DataFrame(error) * 100 # 转换格式
+            acc = (np.abs(np.array(error)) < error_ratio * 100).sum() / error.shape[0]
+        else:
+            error = pd.DataFrame(error)
+            acc = (np.abs(np.array(error)) < error_ratio).sum() / error.shape[0]
+
         # 绘制针对单变量的分布图
         sbn.distplot(error, bins=20, norm_hist=True, rug=True, fit=stats.norm, kde=False,
                      rug_kws={"color": "forestgreen"},
@@ -261,7 +267,10 @@ class MatplotlibVision(object):
                      ax=axs)
         # plt.xlim([-1, 1])
         if title is None:
-            title = '预测平均误差小于 {:.2f}% \n 占比为{:.2f}%'.format(error_ratio * 100, acc * 100)
+            if rel_error:
+                title = '平均误差小于 {:.2f}% \n 占比为{:.2f}%'.format(error_ratio * 100, acc * 100)
+            else:
+                title = '平均误差小于 {:.2f} \n 占比为{:.2f}%'.format(error_ratio, acc * 100)
 
         axs.grid(True)  # 添加网格
         # axs.legend(loc="best", prop=self.font)

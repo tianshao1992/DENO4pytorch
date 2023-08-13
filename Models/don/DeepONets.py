@@ -86,8 +86,8 @@ class DeepONetMulti(nn.Module):
 
 
 if __name__ == "__main__":
-    us = [torch.ones([10, 256 * 2]), torch.ones([10, 1])]
-    x = torch.ones([10, 2])
+    us = [torch.ones([10, 64, 256 * 2]), torch.ones([10, 64, 1])]
+    x = torch.ones([10, 64, 2])
     layer = DeepONetMulti(input_dim=2, operator_dims=[256 * 2, 1], output_dim=5,
                           planes_branch=[64] * 3, planes_trunk=[64] * 2)
     y = layer(us, x)

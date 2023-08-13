@@ -12,7 +12,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 
-def data_preprocess(reader, seed):
+def data_preprocess(reader, train_size):
     """
         data preprocess
         :param file_loader: Mat loader
@@ -27,10 +27,28 @@ def data_preprocess(reader, seed):
                 .repeat((fields.shape[0],) + (1,) + tuple(fields.shape[2:-1])).unsqueeze(-1)
     coords = torch.cat((coords_x, coords_t), dim=-1)
 
-    np.random.seed(seed)
-    index = np.random.permutation(np.arange(fields.shape[0]))
+    index = train_test_split(design, train_size)
 
-    return design[index], fields[index], coords[index], target[index]
+    return design, fields, coords, target, index
+
+def train_test_split(design, train_size):
+    """
+        train test split
+    """
+    train_design = {4: [0, 90, 180, 270],
+                   7: [0, 30, 90, 150, 180, 270, 340],
+                   10: [0, 30, 80, 90, 150, 180, 240, 270, 300, 340],}
+    test_design = [60, 120, 130, 210, 330, 350]
+    train_index = []
+    test_index = []
+    for i in range(len(design)):
+        if int(design[i]) in train_design[train_size]:
+            train_index.append(i)
+        elif int(design[i]) in test_design:
+            test_index.append(i)
+    return train_index, test_index
+
+
 
 from torch.utils.data import Dataset
 class custom_dataset(Dataset):

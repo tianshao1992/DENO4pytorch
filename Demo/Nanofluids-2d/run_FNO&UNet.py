@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
         star_time = time.time()
 
-        if epoch > 0 and epoch % 5 == 0:
+        if epoch == 0 and epoch % 5 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :], 'train_step')
             Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :], 'valid_step')
@@ -256,7 +256,7 @@ if __name__ == "__main__":
         # Visualization
         ################################################################
 
-        if epoch > 0 and epoch % 20 == 0:
+        if epoch == 0 and epoch % 20 == 0:
             # print('epoch: {:6d}, lr: {:.3e}, eqs_loss: {:.3e}, bcs_loss: {:.3e}, cost: {:.2f}'.
             #       format(epoch, learning_rate, log_loss[-1][0], log_loss[-1][1], time.time()-star_time))
             train_coord, train_grid, train_true, train_pred = inference(train_loader, Net_model, Device)
