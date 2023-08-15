@@ -248,7 +248,7 @@ class MatplotlibVision(object):
         # plt.pause(0.001)
 
     def plot_error(self, fig, axs, error, error_ratio=0.05, title=None, rel_error=False,
-                   xylabels=('predicted relative error / %', 'distribution density')):
+                   xylabels=('predicted error / %', 'distribution density')):
         # sbn.set_color_codes()
         # ax.bar(np.arange(len(error)), error*100, )
 

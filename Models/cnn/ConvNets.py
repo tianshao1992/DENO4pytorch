@@ -88,9 +88,9 @@ class DownSampleNet1d(nn.Module):
                 Conv1dResBlock(self.width, self.width, basic_block=True, activation=activation, dropout=dropout),
                 nn.AvgPool1d(2, 2), ))
 
-        self.linear = nn.Sequential(nn.Linear(math.prod(self._out_size) * self.width, 64),
+        self.linear = nn.Sequential(nn.Linear(math.prod(self._out_size) * self.width, 256),
                                     activation_dict[activation],
-                                    nn.Linear(64, self.out_dim)
+                                    nn.Linear(256, self.out_dim)
                                     )
 
     def forward(self, x):
@@ -600,7 +600,7 @@ if __name__ == '__main__':
     y = layer(x)
     print(y.shape)
 
-    x = torch.ones([10, 92, 8])
+    x = torch.ones([10, 4000, 8])
     in_sizes, out_sizes = x.shape[1:], 10
     layer = DownSampleNet1d(in_sizes, out_sizes, width=32, depth=4)
     y = layer(x)
