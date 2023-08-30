@@ -17,12 +17,14 @@ sys.path.append(os.path.join(file_path.split('Models')[0]))
 
 from Models.fno.spectral_layers import *
 
+
 class FNO1d(nn.Module):
     """
         1维FNO网络
     """
 
-    def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, hidden=128, steps=1, padding=2, activation='gelu'):
+    def __init__(self, in_dim, out_dim, modes=16, width=64, depth=4, hidden=128, steps=1, padding=2,
+                 activation='gelu', use_complex=True):
         super(FNO1d, self).__init__()
         """
         The overall network. It contains /depth/ layers of the Fourier layer.
@@ -44,36 +46,23 @@ class FNO1d(nn.Module):
         self.hidden = hidden
         self.steps = steps
         self.activation = activation
+        self.use_complex = use_complex
         self.padding = padding  # pad the domain if input is non-periodic
         self.fc0 = nn.Linear(steps * in_dim + 1, self.width)  # input channel is 2: (a(x), x)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv1d(self.width, self.width, self.modes, activation=self.activation, norm=None))
+            self.convs.append(SpectralConv1d(self.width, self.width, self.modes, activation=self.activation,
+                                             norm=None, use_complex=self.use_complex))
 
         self.fc1 = nn.Linear(self.width, self.hidden)
         self.fc2 = nn.Linear(self.hidden, out_dim)
 
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1).repeat([batchsize, 1, 1])
-        return gridx.to(x.device)
-
-    def forward(self, x, grid=None):
+    def forward(self, x, grid):
         """
         forward computation
         """
         # x dim = [b, x1, t*v]
-        if grid is None:
-            grid = self.feature_transform(x)
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 2, 1)
@@ -100,7 +89,7 @@ class FNO2d(nn.Module):
     """
 
     def __init__(self, in_dim, out_dim, modes=(8, 8), width=32, depth=4, hidden=128, steps=1, padding=2,
-                 activation='gelu', dropout=0.0):
+                 activation='gelu', dropout=0.0, use_complex=True):
         super(FNO2d, self).__init__()
 
         """
@@ -125,6 +114,7 @@ class FNO2d(nn.Module):
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
         self.dropout = dropout
+        self.use_complex = use_complex
         self.fc0 = nn.Linear(steps * in_dim + 2, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
@@ -132,45 +122,29 @@ class FNO2d(nn.Module):
         for i in range(self.depth):
             self.convs.append(
                 SpectralConv2d(self.width, self.width, self.modes, activation=self.activation, dropout=self.dropout,
-                               norm=None))
+                               use_complex=self.use_complex, norm=None)
+                               )
 
         self.fc1 = nn.Linear(self.width, self.hidden)
         self.fc2 = nn.Linear(self.hidden, out_dim)
 
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y = shape[0], shape[1], shape[2]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1, 1).repeat([batchsize, 1, size_y, 1])
-        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
-        gridy = gridy.reshape(1, 1, size_y, 1).repeat([batchsize, size_x, 1, 1])
-        return torch.cat((gridx, gridy), dim=-1).to(x.device)
-
-    def forward(self, x, grid=None):
+    def forward(self, x, grid):
         """
         forward computation
         """
         # x dim = [b, x1, x2, t*v]
-        if grid is None:
-            grid = self.feature_transform(x)
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 3, 1, 2)
 
         if self.padding != 0:
-            x = F.pad(x, [0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
+            x = F.pad(x, [0, self.padding, 0, self.padding]).contiguous()  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
         if self.padding != 0:
-            x = x[..., :-self.padding, :-self.padding]
+            x = x[..., :-self.padding, :-self.padding].contiguous()
         x = x.permute(0, 2, 3, 1)  # pad the domain if input is non-periodic
         x = self.fc1(x)
         x = F.gelu(x)
@@ -184,7 +158,7 @@ class FNO3d(nn.Module):
     """
 
     def __init__(self, in_dim, out_dim, modes=(8, 8, 8), width=32, depth=4, hidden=128,
-                 steps=1, padding=6, activation='gelu'):
+                 steps=1, padding=6, activation='gelu', use_complex=True):
         super(FNO3d, self).__init__()
 
         """
@@ -208,53 +182,35 @@ class FNO3d(nn.Module):
         self.hidden = hidden
         self.padding = padding  # pad the domain if input is non-periodic
         self.activation = activation
+        self.use_complex = use_complex
         self.fc0 = nn.Linear(steps * in_dim + 3, self.width)
         # input channel is 12: the solution of the first 10 timesteps + 3 locations (u(1, x, y), ..., u(10, x, y),  x, y, t)
 
         self.convs = nn.ModuleList()
         for i in range(self.depth):
-            self.convs.append(SpectralConv3d(self.width, self.width, self.modes, activation=self.activation, norm=None))
+            self.convs.append(SpectralConv3d(self.width, self.width, self.modes, activation=self.activation,
+                              norm=None, use_complex=self.use_complex))
 
         self.fc1 = nn.Linear(self.width, self.hidden)
         self.fc2 = nn.Linear(self.hidden, out_dim)
 
-    def feature_transform(self, x):
-        """
-        Args:
-            x: input coordinates
-        Returns:
-            res: input transform
-        """
-        shape = x.shape
-        batchsize, size_x, size_y, size_z = shape[0], shape[1], shape[2], shape[3]
-        gridx = torch.linspace(0, 1, size_x, dtype=torch.float32)
-        gridx = gridx.reshape(1, size_x, 1, 1, 1).repeat([batchsize, 1, size_y, size_z, 1])
-        gridy = torch.linspace(0, 1, size_y, dtype=torch.float32)
-        gridy = gridy.reshape(1, 1, size_y, 1, 1).repeat([batchsize, size_x, 1, size_z, 1])
-        gridz = torch.linspace(0, 1, size_z, dtype=torch.float32)
-        gridz = gridz.reshape(1, 1, 1, size_y, 1).repeat([batchsize, size_x, size_y, 1, 1])
-        return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device)
-
-    def forward(self, x, grid=None):
+    def forward(self, x, grid):
         """
         forward computation
         x dim = [b, x1, x2, x3, t*v]
         """
-        if grid is None:
-            grid = self.feature_transform(x)
-
         x = torch.cat((x, grid), dim=-1)
         x = self.fc0(x)
         x = x.permute(0, 4, 1, 2, 3)
 
         if self.padding != 0:
-            x = F.pad(x, [0, self.padding, 0, self.padding, 0, self.padding])  # pad the domain if input is non-periodic
+            x = F.pad(x, [0, self.padding, 0, self.padding, 0, self.padding]).contiguous()  # pad the domain if input is non-periodic
 
         for i in range(self.depth):
             x = self.convs[i](x)
 
         if self.padding != 0:
-            x = x[..., :-self.padding, :-self.padding, :-self.padding]  # pad the domain if input is non-periodic
+            x = x[..., :-self.padding, :-self.padding, :-self.padding].contiguous()  # pad the domain if input is non-periodic
 
         x = x.permute(0, 2, 3, 4, 1)
         x = self.fc1(x)
@@ -278,6 +234,6 @@ if __name__ == '__main__':
 
     x = torch.ones([10, 32, 32, 32, 4])
     g = torch.ones([10, 32, 32, 32, 3])
-    layer = FNO3d(in_dim=4, out_dim=1, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu')
+    layer = FNO3d(in_dim=4, out_dim=1, modes=(8, 8, 8), width=32, depth=4, steps=1, padding=6, activation='gelu', use_complex=False)
     y = layer(x, g)
     print(y.shape)
