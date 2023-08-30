@@ -7,8 +7,16 @@
 # @Site    : 
 # @File    : ConvNets.py
 """
-from cnn.conv_layers import *
-from basic.basic_layers import *
+import os
+import sys
+
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('cnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
+from Models.cnn.conv_layers import *
+from Models.basic.basic_layers import *
 
 class UpSampleNet1d(nn.Module):
     """

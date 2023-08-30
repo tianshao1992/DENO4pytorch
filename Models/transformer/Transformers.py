@@ -9,30 +9,21 @@
 """
 
 import os
-import copy
 import sys
-import math
-import numpy as np
-
-import torch
-import torch.nn as nn
-import torch.fft as fft
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
+from collections import defaultdict
 from torchinfo import summary
 
-from collections import defaultdict
-from functools import partial
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('transformer')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
 
 # from utilize import *
 from basic.basic_layers import *
 from gnn.graph_layers import *
 from transformer.attention_layers import *
 from fno.spectral_layers import *
-from attention_layers import *
 from Utilizes.geometrics import *
-
 
 class SimpleTransformerEncoderLayer(nn.Module):
     """

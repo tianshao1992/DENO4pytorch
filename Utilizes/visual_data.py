@@ -59,13 +59,11 @@ class TextLogger(object):
         self.terminal = stream
         # self.log = open(filename, 'a')
 
-        formatter = logging.Formatter("%(levelname)s: %(asctime)s:   %(message)s",
+        formatter = logging.Formatter("%(levelname)s:    %(asctime)s:   %(message)s",
                                       "%m-%d %H:%M:%S")
         logger = logging.getLogger()
-        logger.setLevel(logging.INFO)
+        logger.setLevel(level)
 
-        # logger = logging.getLogger()
-        # logger.setLevel(level)
         handler = logging.FileHandler(filename)
         handler.setFormatter(formatter)
         handler.setLevel(level)
@@ -79,32 +77,32 @@ class TextLogger(object):
     @staticmethod
     def info(message: str):
         # info级别的日志，绿色
-        logging.info("\033[0;32m" + message + "\033[0m")
+        logging.info("\033[0;32m  " + message + "  \033[0m")
 
     @staticmethod
     def warning(message: str):
         # warning级别的日志，黄色
-        logging.warning("\033[0;33m" + message + "\033[0m")
+        logging.warning("\033[0;33m  " + message + "  \033[0m")
 
     @staticmethod
     def important(message: str):
         # 重要信息的日志，红色加下划线
-        logging.info("\033[4;31m" + message + "\033[0m")
+        logging.info("\033[4;31m  " + message + "  \033[0m")
 
     @staticmethod
     def conclusion(message: str):
         # 结论级别的日志，紫红色加下划线
-        logging.info("\033[4;35m" + message + "\033[0m")
+        logging.info("\033[4;35m  " + message + "  \033[0m")
 
     @staticmethod
     def error(message: str):
         # error级别的日志，红色
-        logging.error("\033[0;31m" + "-" * 120 + '\n| ' + message + "\033[0m" + "\n" + "└" + "-" * 150)
+        logging.error("\033[0;31m" + "-" * 120 + '\n|  ' + message + "  \033[0m" + "\n" + "└" + "-" * 150)
 
     @staticmethod
     def debug(message: str):
         # debug级别的日志，灰色
-        logging.debug("\033[0;37m" + message + "\033[0m")
+        logging.debug("\033[0;37m  " + message + "  \033[0m")
 
     @staticmethod
     def write(message):
@@ -118,6 +116,7 @@ class TextLogger(object):
         通过
         """
         pass
+
 
 class MatplotlibVision(object):
     # 主要的绘图类
@@ -148,11 +147,18 @@ class MatplotlibVision(object):
                        "font.serif": ['SimSun'], }
         rcParams.update(self.config)
 
-    def plot_loss(self, fig, axs, y, label, epoch=None, title=None, xylabels=('epoch', 'loss value')):
+    def plot_loss(self, fig, axs, y, label, epoch=None, title=None,
+                  axis_log=(False, False), xylabels=('epoch', 'loss value')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
         x = np.arange(1, len(y) + 1) if epoch is None else epoch
-        axs.semilogy(x, y, label=label) #对数坐标
+        axs.plot(x, y, label=label) #对数坐标
+
+        if axis_log[0]:
+            axs.semilogx()
+        if axis_log[1]:
+            axs.semilogy()
+
         axs.grid(True)  # 添加网格
         axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
@@ -161,50 +167,43 @@ class MatplotlibVision(object):
         axs.set_title(title, fontdict=self.font)
         # plt.pause(0.001)
 
-    def plot_value(self, fig, axs, x, y, label, std=None, std_factor=1.0, title=None, xylabels=('x', 'y')):
+    def plot_value(self, fig, axs, x, y, label, std=None, std_factor=1.0, title=None,
+                   axis_log=(False, False), xylabels=('x', 'y')):
         # sbn.set_style('ticks')
         # sbn.set(color_codes=True)
 
         axs.plot(x, y, label=label)
+        axs.grid(True)  # 添加网格
 
         if std is not None:
             std = std * std_factor
-            axs.fill_between(x, y - std, y + std, alpha=0.2, label=label+'_error')
-        axs.grid(True)  # 添加网格
+            axs.fill_between(x, y.squeeze() - std.squeeze(), y.squeeze() + std.squeeze(), alpha=0.3,
+                             label=label + '_error')
+
+        if axis_log[0]:
+            axs.semilogx()
+        if axis_log[1]:
+            axs.semilogy()
+
         axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
         axs.set_ylabel(xylabels[1], fontdict=self.font)
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_value_std(self, fig, axs, x, y, label, std=None, stdaxis=0, title=None, xylabels=('x', 'y'), rangeIndex=1):
-        """
-        stdaxis 表示std所在的坐标维度 x-0, y-1
-        """
-        if std is None:
-            axs.plot(x, y.mean(axis=0), label=label)
-            std = y.std(axis=1)
-        else:
-            axs.plot(x, y, label=label)
 
-        std = std * rangeIndex
-        if stdaxis==0:
-            plt.fill_betweenx(y, x - std / 2, x + std / 2, alpha=0.3, label='Variance Range')
-        elif stdaxis==1:
-            plt.fill_between(x, y - std/2, y + std/2, alpha=0.3, label='Variance Range')
-        axs.grid(True)  # 添加网格
-        axs.legend(loc="best", prop=self.font)
-        axs.set_xlabel(xylabels[0], fontdict=self.font)
-        axs.set_ylabel(xylabels[1], fontdict=self.font)
-        axs.tick_params('both', labelsize=self.font["size"], )
-        axs.set_title(title, fontdict=self.font)
-
-    def plot_scatter(self, fig, axs, true, pred, axis=0, title=None, xylabels=('x', 'y')):
+    def plot_scatter(self, fig, axs, true, pred, title=None,
+                     axis_log=(False, False), xylabels=('x', 'y')):
         # sbn.set(color_codes=True)
 
         axs.scatter(np.arange(true.shape[0]), true, marker='*')
         axs.scatter(np.arange(true.shape[0]), pred, marker='.')
 
+        if axis_log[0]:
+            axs.semilogx()
+        if axis_log[1]:
+            axs.semilogy()
+
         axs.grid(True)  # 添加网格
         axs.legend(loc="best", prop=self.font)
         axs.set_xlabel(xylabels[0], fontdict=self.font)
@@ -212,8 +211,8 @@ class MatplotlibVision(object):
         axs.tick_params('both', labelsize=self.font["size"], )
         axs.set_title(title, fontdict=self.font)
 
-    def plot_regression(self, fig, axs, true, pred, error_ratio=0.05,
-                        title=None, xylabels=('true value', 'pred value')):
+    def plot_regression(self, fig, axs, true, pred, error_ratio=0.05, title=None,
+                        axis_log=(False, False), xylabels=('true value', 'pred value')):
         # 所有功率预测误差与真实结果的回归直线
         # sbn.set(color_codes=True)
 
@@ -234,6 +233,11 @@ class MatplotlibVision(object):
         axs.fill_between([min_value, max_value], [(1-error_ratio) * min_value, (1-error_ratio) * max_value],
                          [((1+error_ratio)) * min_value, ((1+error_ratio)) * max_value],
                          alpha=0.2, color='steelblue')
+
+        if axis_log[0]:
+            axs.semilogx()
+        if axis_log[1]:
+            axs.semilogy()
 
         # plt.ylim((min_value, max_value))
         axs.set_xlim((min_value, max_value))

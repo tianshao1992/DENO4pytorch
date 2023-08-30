@@ -8,20 +8,22 @@
 # @File    : graph_layers.py
 """
 
-import copy
-import math
-import numpy as np
+# from torch_geometric.nn import GCNConv
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import os
+import sys
+import copy
+
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('gnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
 from torch.nn.parameter import Parameter
 from torch.nn.init import xavier_normal_
 
-# from torch_geometric.nn import GCNConv
-# from utilize import activation_dict
-
-from cnn.conv_layers import Conv2dResBlock
+from Models.configs import *
+from Models.cnn.conv_layers import Conv2dResBlock
 
 
 class GraphConvolution(nn.Module):

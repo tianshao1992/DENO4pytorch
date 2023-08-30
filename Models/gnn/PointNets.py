@@ -8,13 +8,16 @@
 # @File    : PointNets.py
 """
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from point_layers import STNLayer, SimpleLayer
+import os
+import sys
 
-from configs import activation_dict
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('gnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
 
+from Models.gnn.point_layers import *
+from Models.configs import *
 
 class PointNetFeature(nn.Module):
     def __init__(self, input_dim, scaling=1.0, activation='relu', max_pool=True,

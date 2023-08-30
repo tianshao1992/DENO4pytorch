@@ -7,7 +7,11 @@
 # @Site    :
 # @File    : spectral_layers.py
 """
+import os
+import sys
 import math
+from functools import partial
+
 import torch
 import torch.nn as nn
 import torch.fft as fft
@@ -15,8 +19,12 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
 
-from functools import partial
-from Models.configs import activation_dict
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('fno')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
+from Models.configs import *
 
 
 class SpectralConv1d(nn.Module):
@@ -31,8 +39,10 @@ class SpectralConv1d(nn.Module):
                  modes: int,  # number of fourier modes
                  dropout=0.1,
                  norm="ortho",
+                 activation='gelu',
                  return_freq=False,
-                 activation='gelu'):
+                 use_complex=True,
+                 ):
         super(SpectralConv1d, self).__init__()
 
         """
@@ -45,17 +55,30 @@ class SpectralConv1d(nn.Module):
         self.norm = norm
         self.dropout = nn.Dropout(dropout)
         self.return_freq = return_freq
+        self.use_complex = use_complex
         self.activation = activation_dict[activation]
         self.linear = nn.Conv1d(self.in_dim, self.out_dim, 1)  # for residual
         # self.linear = nn.Linear(self.in_dim, self.out_dim)
         self.scale = (1 / (in_dim * out_dim))
-        self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes, dtype=torch.cfloat))
+
+        if self.use_complex:
+            self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes, dtype=torch.cfloat))
+        else:
+            self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes, 2, dtype=torch.float32))
+
         # xavier_normal_(self.weights1, gain=1 / (in_dim * out_dim))
 
     # Complex multiplication
     def compl_mul1d(self, input, weights):
         # (batch, in_channel, x ), (in_channel, out_channel, x) -> (batch, out_channel, x)
-        return torch.einsum("bix,iox->box", input, weights)
+        if self.use_complex:
+            return torch.einsum("bix, iox->box", input, weights)
+        else:
+            _real = torch.einsum("bix, iox->box", input[..., 0], weights[..., 0]) - \
+                    torch.einsum("bix, iox->box", input[..., 1], weights[..., 1])
+            _imag = torch.einsum("bix, iox->box", input[..., 0], weights[..., 1]) + \
+                    torch.einsum("bix, iox->box", input[..., 1], weights[..., 0])
+            return torch.stack((_real, _imag), dim=-1)
 
     def forward(self, x):
         """
@@ -65,14 +88,24 @@ class SpectralConv1d(nn.Module):
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         res = self.linear(x)
         # x = self.dropout(x)
-        x_ft = torch.fft.rfft(x, norm=self.norm)
 
         # Multiply relevant Fourier modes
-        out_ft = torch.zeros(batchsize, self.out_dim, x.size(-1) // 2 + 1, device=x.device, dtype=torch.cfloat)
+        if self.use_complex:
+            x_ft = torch.fft.rfft(x, norm=self.norm)
+            out_ft = torch.zeros(batchsize, self.out_dim, x.size(-1) // 2 + 1, device=x.device, dtype=torch.cfloat)
+
+        else:
+            x_ft = torch.view_as_real(torch.fft.rfft(x, norm=self.norm))
+            out_ft = torch.zeros(batchsize, self.out_dim, x.size(-1) // 2 + 1, 2, device=x.device, dtype=torch.float32)
+
         out_ft[:, :, :self.modes] = self.compl_mul1d(x_ft[:, :, :self.modes], self.weights1)
 
         # Return to physical space
-        x = torch.fft.irfft(out_ft, norm=self.norm)
+        if self.use_complex:
+            x = torch.fft.irfft(out_ft, norm=self.norm)
+        else:
+            x = torch.fft.irfft(torch.view_as_complex(out_ft), norm=self.norm)
+
         x = self.activation(x + res)
 
         if self.return_freq:
@@ -95,7 +128,9 @@ class SpectralConv2d(nn.Module):
                  dropout=0.1,
                  norm='ortho',
                  activation='gelu',
-                 return_freq=False):
+                 return_freq=False,
+                 use_complex=True,
+                 ):
         super(SpectralConv2d, self).__init__()
 
         """
@@ -115,18 +150,34 @@ class SpectralConv2d(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = activation_dict[activation]
         self.return_freq = return_freq
+        self.use_complex = use_complex
         self.linear = nn.Conv2d(self.in_dim, self.out_dim, 1)  # for residual
 
         self.scale = (1 / (in_dim * out_dim))
-        self.weights1 = nn.Parameter(
-            self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, dtype=torch.cfloat))
-        self.weights2 = nn.Parameter(
-            self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, dtype=torch.cfloat))
+
+        if self.use_complex:
+            self.weights1 = nn.Parameter(
+                self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, dtype=torch.cfloat))
+            self.weights2 = nn.Parameter(
+                self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, dtype=torch.cfloat))
+
+        else:
+            self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, 2,
+                                                                 dtype=torch.float32))
+            self.weights2 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, 2,
+                                                                 dtype=torch.float32))
 
     # Complex multiplication
     def compl_mul2d(self, input, weights):
         # (batch, in_channel, x,y ), (in_channel, out_channel, x,y) -> (batch, out_channel, x,y)
-        return torch.einsum("bixy,ioxy->boxy", input, weights)
+        if self.use_complex:
+            return torch.einsum("bixy, ioxy->boxy", input, weights)
+        else:
+            _real = torch.einsum("bixy, ioxy->boxy", input[..., 0], weights[..., 0]) - \
+                    torch.einsum("bixy, ioxy->boxy", input[..., 1], weights[..., 1])
+            _imag = torch.einsum("bixy, ioxy->boxy", input[..., 0], weights[..., 1]) + \
+                    torch.einsum("bixy, ioxy->boxy", input[..., 1], weights[..., 0])
+            return torch.stack((_real, _imag), dim=-1)
 
     def forward(self, x):
         """
@@ -170,7 +221,9 @@ class SpectralConv3d(nn.Module):
                  dropout=0.1,
                  norm='ortho',
                  activation='silu',
-                 return_freq=False):  # whether to return the frequency target
+                 return_freq=False,
+                 use_complex=True,
+                 ):  # whether to return the frequency target
         super(SpectralConv3d, self).__init__()
 
         """
@@ -191,28 +244,53 @@ class SpectralConv3d(nn.Module):
         self.norm = norm
         self.dropout = nn.Dropout(dropout)
         self.return_freq = return_freq
+        self.use_complex = use_complex
         self.activation = activation_dict[activation]
 
         self.linear = nn.Conv3d(self.in_dim, self.out_dim, 1)  # for residual
 
         self.scale = (1 / (in_dim * out_dim))
-        self.weights1 = nn.Parameter(
-            self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
-                                    dtype=torch.cfloat))
-        self.weights2 = nn.Parameter(
-            self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
-                                    dtype=torch.cfloat))
-        self.weights3 = nn.Parameter(
-            self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
-                                    dtype=torch.cfloat))
-        self.weights4 = nn.Parameter(
-            self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
-                                    dtype=torch.cfloat))
+
+        if self.use_complex:
+            self.weights1 = nn.Parameter(
+                self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
+                                        dtype=torch.cfloat))
+            self.weights2 = nn.Parameter(
+                self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
+                                        dtype=torch.cfloat))
+            self.weights3 = nn.Parameter(
+                self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
+                                        dtype=torch.cfloat))
+            self.weights3 = nn.Parameter(
+                self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
+                                        dtype=torch.cfloat))
+
+        else:
+            self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim,
+                                                                 self.modes1, self.modes2, self.modes3, 2,
+                                                                 dtype=torch.float32))
+            self.weights2 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim,
+                                                                 self.modes1, self.modes2, self.modes3, 2,
+                                                                 dtype=torch.float32))
+            self.weights3 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim,
+                                                                 self.modes1, self.modes2, self.modes3, 2,
+                                                                 dtype=torch.float32))
+            self.weights4 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim,
+                                                                 self.modes1, self.modes2, self.modes3, 2,
+                                                                 dtype=torch.float32))
 
     # Complex multiplication
     def compl_mul3d(self, input, weights):
         # (batch, in_channel, x,y,t ), (in_channel, out_channel, x,y,t) -> (batch, out_channel, x,y,t)
-        return torch.einsum("bixyz,ioxyz->boxyz", input, weights)
+
+        if self.use_complex:
+            return torch.einsum("bixyz,ioxyz->boxyz", input, weights)
+        else:
+            _real = torch.einsum("bixyz,ioxyz->boxyz", input[..., 0], weights[..., 0]) - \
+                    torch.einsum("bixyz,ioxyz->boxyz", input[..., 1], weights[..., 1])
+            _imag = torch.einsum("bixyz,ioxyz->boxyz", input[..., 0], weights[..., 1]) + \
+                    torch.einsum("bixyz,ioxyz->boxyz", input[..., 1], weights[..., 0])
+            return torch.stack((_real, _imag), dim=-1)
 
     def forward(self, x):
         """
@@ -222,10 +300,17 @@ class SpectralConv3d(nn.Module):
         # Compute Fourier coeffcients up to factor of e^(- something constant)
         res = self.linear(x)
         # x = self.dropout(x)
-        x_ft = torch.fft.rfftn(x, dim=[-3, -2, -1], norm=self.norm)
+
         # Multiply relevant Fourier modes
-        out_ft = torch.zeros(batch_size, self.out_dim, x.size(-3), x.size(-2), x.size(-1) // 2 + 1,
-                             dtype=torch.cfloat, device=x.device)
+        if self.use_complex:
+            x_ft = torch.fft.rfftn(x, dim=[-3, -2, -1], norm=self.norm)
+            out_ft = torch.zeros(batch_size, self.out_dim, x.size(-3), x.size(-2), x.size(-1) // 2 + 1,
+                                 dtype=torch.cfloat, device=x.device)
+        else:
+            x_ft = torch.view_as_real(torch.fft.rfftn(x, dim=[-3, -2, -1], norm=self.norm))
+            out_ft = torch.zeros(batch_size, self.out_dim, x.size(-3), x.size(-2), x.size(-1) // 2 + 1, 2,
+                                 dtype=torch.float32, device=x.device)
+
         out_ft[:, :, :self.modes1, :self.modes2, :self.modes3] = \
             self.compl_mul3d(x_ft[:, :, :self.modes1, :self.modes2, :self.modes3], self.weights1)
         out_ft[:, :, -self.modes1:, :self.modes2, :self.modes3] = \
@@ -236,7 +321,11 @@ class SpectralConv3d(nn.Module):
             self.compl_mul3d(x_ft[:, :, -self.modes1:, -self.modes2:, :self.modes3], self.weights4)
 
         # Return to physical space
-        x = torch.fft.irfftn(out_ft, s=(x.size(-3), x.size(-2), x.size(-1)), norm=self.norm)
+        if self.use_complex:
+            x = torch.fft.irfftn(out_ft, s=(x.size(-3), x.size(-2), x.size(-1)), norm=self.norm)
+        else:
+            x = torch.fft.irfftn(torch.view_as_complex(out_ft), s=(x.size(-3), x.size(-2), x.size(-1)), norm=self.norm)
+
         x = self.activation(x + res)
 
         if self.return_freq:
@@ -482,7 +571,7 @@ class AdaptiveFourier3d(nn.Module):
 
 if __name__ == '__main__':
     x = torch.ones([10, 3, 64])
-    layer = SpectralConv1d(in_dim=3, out_dim=10, modes=5)
+    layer = SpectralConv1d(in_dim=3, out_dim=10, modes=5, use_complex=False)
     y = layer(x)
     print(y.shape)
 
@@ -499,7 +588,7 @@ if __name__ == '__main__':
     print(y.shape)
 
     x = torch.ones([10, 3, 16, 32, 48])
-    layer = SpectralConv3d(in_dim=3, out_dim=4, modes=(5, 5, 5))
+    layer = SpectralConv3d(in_dim=3, out_dim=4, modes=(5, 5, 5), use_complex=False)
     y = layer(x)
     print(y.shape)
 

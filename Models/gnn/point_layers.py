@@ -8,13 +8,15 @@
 # @File    : PointNets.py
 """
 
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import os
+import sys
 
-from configs import activation_dict
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('gnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
 
+from Models.configs import *
 
 class STNLayer(nn.Module):
     '''

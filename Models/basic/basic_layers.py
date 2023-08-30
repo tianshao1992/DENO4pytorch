@@ -8,18 +8,17 @@
 # @File    : basic_layers.py
 """
 
-import math
-import copy
-import numpy as np
-
-import torch
-import torch.nn as nn
-import torch.fft as fft
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
-from Models.configs import *
+import os
+import sys
 from typing import Any, List, Tuple, Union
+
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('basic')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
+from Models.configs import *
+
 
 class FcnSingle(nn.Module):
     def __init__(self, planes: list or tuple, activation="gelu", last_activation=False):
