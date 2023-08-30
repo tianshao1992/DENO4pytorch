@@ -27,6 +27,7 @@ sys.path.append(os.path.join(file_path.split('Models')[0]))
 from Models.configs import *
 
 
+
 class SpectralConv1d(nn.Module):
     '''
     1维谱卷积
