@@ -7,18 +7,22 @@
 # @Site    :
 # @File    : GraphNets.py
 """
-import torch
+import os
+import sys
+
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('gnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
 from torch_geometric.nn.conv import GMMConv
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.inits import reset, uniform
 from torch_sparse import coalesce
-from torch.nn import Parameter
-import torch.nn.functional as F
 
+from Models.gnn.graph_layers import *
 from Models.configs import *
-from basic.basic_layers import Identity
-from basic_layers import Identity
-
+from Models.basic.basic_layers import Identity
 
 class GMMResBlock(nn.Module):
     def __init__(self, in_dim, out_dim, attr_dim,

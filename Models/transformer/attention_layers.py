@@ -8,18 +8,18 @@
 # @File    : attention_layers.py
 """
 
+import os
+import sys
 import copy
-import math
-import numpy as np
 
-import torch
-import torch.nn as nn
-import torch.fft as fft
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('transformer')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
 
-from functools import partial
+from torch.nn.init import xavier_uniform_, constant_, xavier_normal_, orthogonal_
+from einops.layers.torch import Rearrange
+from einops import rearrange, repeat, reduce
 from Models.configs import *
 
 
@@ -162,6 +162,37 @@ class RotaryEmbedding(nn.Module):
         t = t * (self.scale / self.min_freq)
         freqs = torch.einsum('... i , j -> ... i j', t, self.inv_freq)  # [b, n, d//2]
         return torch.cat((freqs, freqs), dim=-1)  # [b, n, d]
+
+def rotate_half(x):
+    x = rearrange(x, '... (j d) -> ... j d', j=2)
+    x1, x2 = x.unbind(dim=-2)
+    return torch.cat((-x2, x1), dim=-1)
+
+
+def apply_rotary_pos_emb(t, freqs):
+    return (t * freqs.cos()) + (rotate_half(t) * freqs.sin())
+
+
+def apply_2d_rotary_pos_emb(t, freqs_x, freqs_y):
+    # split t into first half and second half
+    # t: [b, h, n, d]
+    # freq_x/y: [b, n, d]
+    d = t.shape[-1]
+    t_x, t_y = t[..., :d//2], t[..., d//2:]
+
+    return torch.cat((apply_rotary_pos_emb(t_x, freqs_x),
+                      apply_rotary_pos_emb(t_y, freqs_y)), dim=-1)
+
+
+def apply_3d_rotary_pos_emb(t, freqs_x, freqs_y, freqs_z):
+    # split t into first half and second half
+    # t: [b, h, n, d]
+    # freq_x/y: [b, n, d]
+    d = t.shape[-1]
+    t_x, t_y, t_z = t[..., :d//2], t[..., d//2:],
+
+    return torch.cat((apply_rotary_pos_emb(t_x, freqs_x),
+                      apply_rotary_pos_emb(t_y, freqs_y)), dim=-1)
 
 
 class FeedForward(nn.Module):
@@ -327,7 +358,7 @@ class SimpleAttention(nn.Module):
         elif self.attention_type == 'causal':
             assert mask is not None
             x, self.attn_weight = causal_linear_attn(query, key, value,
-                                                     mask=mask,
+                                                     kv_mask=mask,
                                                      dropout=self.dropout)
         else:
             x, self.attn_weight = attention(query, key, value,
@@ -440,6 +471,7 @@ class CrossAttention(nn.Module):
 
     def __init__(self, n_head, d_model,
                  pos_dim: int = 1,
+                 pos_cat=False,
                  attention_type='fourier',
                  dropout=0.1,
                  xavier_init=1e-4,
@@ -447,13 +479,18 @@ class CrossAttention(nn.Module):
                  symmetric_init=False,
                  norm_add=False,
                  norm_type='layer',
+                 relative_emb=False,
+                 relative_emb_dim=2,
+                 min_freq=1 / 64,
+                 scale=1.,
                  eps=1e-5):
-        super(SimpleAttention, self).__init__()
+        super(CrossAttention, self).__init__()
         assert d_model % n_head == 0
         self.attention_type = attention_type
         self.d_k = d_model // n_head
         self.n_head = n_head
         self.pos_dim = pos_dim
+        self.pos_cat = pos_cat
         self.linears = nn.ModuleList(
             [copy.deepcopy(nn.Linear(d_model, d_model)) for _ in range(3)])
         self.xavier_init = xavier_init
@@ -472,12 +509,18 @@ class CrossAttention(nn.Module):
         self.attn_weight = None
         self.dropout = nn.Dropout(dropout)
 
+        self.relative_emb = relative_emb
+        self.relative_emb_dim = relative_emb_dim
+        if relative_emb:
+            self.emb_module = RotaryEmbedding(self.d_k // self.relative_emb_dim, min_freq=min_freq, scale=scale)
+
     def forward(self, query, key, value, pos=None, mask=None, weight=None):
         """
         forward compute
-        :param query: (batch, seq_len, d_model)
-        :param key: (batch, seq_len, d_model)
-        :param value: (batch, seq_len, d_model)
+        note : the seq_len of q (n1) and kv (n2) is different for cross attention
+        :param query: (batch, seq_len_n1, d_model)
+        :param key: (batch, seq_len_n2, d_model)
+        :param value: (batch, seq_len_n2, d_model)
         """
         if mask is not None:
             mask = mask.unsqueeze(1)

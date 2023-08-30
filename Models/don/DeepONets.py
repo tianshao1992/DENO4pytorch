@@ -8,17 +8,15 @@
 # @File    : DeepONets.py
 """
 
-import math
-import copy
-import numpy as np
+import os
+import sys
 
-import torch
-import torch.nn as nn
-import torch.fft as fft
-import torch.nn.functional as F
-from torch.nn.parameter import Parameter
-from torch.nn.init import xavier_uniform_, constant_, xavier_normal_
-from basic.basic_layers import *
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('cnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
+from Models.basic.basic_layers import *
 from Models.configs import *
 
 

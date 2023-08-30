@@ -7,8 +7,16 @@
 # @Site    : 
 # @File    : ConvNets.py
 """
-from cnn.conv_layers import *
-from basic.basic_layers import *
+import os
+import sys
+
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('cnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
+from Models.cnn.conv_layers import *
+from Models.basic.basic_layers import *
 
 class UpSampleNet1d(nn.Module):
     """
@@ -88,9 +96,9 @@ class DownSampleNet1d(nn.Module):
                 Conv1dResBlock(self.width, self.width, basic_block=True, activation=activation, dropout=dropout),
                 nn.AvgPool1d(2, 2), ))
 
-        self.linear = nn.Sequential(nn.Linear(math.prod(self._out_size) * self.width, 64),
+        self.linear = nn.Sequential(nn.Linear(math.prod(self._out_size) * self.width, 256),
                                     activation_dict[activation],
-                                    nn.Linear(64, self.out_dim)
+                                    nn.Linear(256, self.out_dim)
                                     )
 
     def forward(self, x):
@@ -600,7 +608,7 @@ if __name__ == '__main__':
     y = layer(x)
     print(y.shape)
 
-    x = torch.ones([10, 92, 8])
+    x = torch.ones([10, 4000, 8])
     in_sizes, out_sizes = x.shape[1:], 10
     layer = DownSampleNet1d(in_sizes, out_sizes, width=32, depth=4)
     y = layer(x)

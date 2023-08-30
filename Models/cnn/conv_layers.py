@@ -7,10 +7,17 @@
 # @Site    : 
 # @File    : conv_layers.py
 """
-from basic.basic_layers import Identity
-import torch.nn.functional as F
-from Models.configs import *
 
+import os
+import sys
+
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('cnn')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
+
+from Models.basic.basic_layers import Identity
+from Models.configs import *
 
 class Conv1dResBlock(nn.Module):
     """

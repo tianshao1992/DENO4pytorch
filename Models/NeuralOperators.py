@@ -181,3 +181,152 @@ class NeuralOperators(BasicModule):
         _loss.backward()
         self.optimizer.step()
         return _loss.item()
+
+def run_train(model, loss_func, metric_func,
+              train_loader, valid_loader,
+              optimizer, lr_scheduler,
+              train_batch=None,
+              validate_epoch=None,
+              epochs=10,
+              device="cuda",
+              mode='min',
+              tqdm_mode='batch',
+              patience=10,
+              grad_clip=0.999,
+              start_epoch: int = 0,
+              model_save_path=MODEL_PATH,
+              save_mode='state_dict',  # 'state_dict' or 'entire'
+              model_name='model.pt',
+              result_name='result.pt'):
+    loss_train = []
+    loss_val = []
+    loss_epoch = []
+    lr_history = []
+    it = 0
+
+    if patience is None or patience == 0:
+        patience = epochs
+    start_epoch = start_epoch
+    end_epoch = start_epoch + epochs
+    best_val_metric = -np.inf if mode == 'max' else np.inf
+    best_val_epoch = None
+    save_mode = 'state_dict' if save_mode is None else save_mode
+    stop_counter = 0
+    is_epoch_scheduler = any(s in str(lr_scheduler.__class__)
+                             for s in EPOCH_SCHEDULERS)
+    tqdm_epoch = False if tqdm_mode == 'batch' else True
+
+    with tqdm(total=end_epoch-start_epoch, disable=not tqdm_epoch) as pbar_ep:
+        for epoch in range(start_epoch, end_epoch):
+            model.train()
+            with tqdm(total=len(train_loader), disable=tqdm_epoch) as pbar_batch:
+                for batch in train_loader:
+                    if is_epoch_scheduler:
+                        loss, _, _ = train_batch(model, loss_func,
+                                                 batch, optimizer,
+                                                 None, device, grad_clip=grad_clip)
+                    else:
+                        loss, _, _ = train_batch(model, loss_func,
+                                                 batch, optimizer,
+                                                 lr_scheduler, device, grad_clip=grad_clip)
+                    loss = np.array(loss)
+                    loss_epoch.append(loss)
+                    it += 1
+                    lr = optimizer.param_groups[0]['lr']
+                    lr_history.append(lr)
+                    desc = f"epoch: [{epoch+1}/{end_epoch}]"
+                    if loss.ndim == 0:  # 1 target loss
+                        _loss_mean = np.mean(loss_epoch)
+                        desc += f" loss: {_loss_mean:.3e}"
+                    else:
+                        _loss_mean = np.mean(loss_epoch, axis=0)
+                        for j in range(len(_loss_mean)):
+                            if _loss_mean[j] > 0:
+                                desc += f" | loss {j}: {_loss_mean[j]:.3e}"
+                    desc += f" | current lr: {lr:.3e}"
+                    pbar_batch.set_description(desc)
+                    pbar_batch.update()
+
+            loss_train.append(_loss_mean)
+            # loss_train.append(loss_epoch)
+            loss_epoch = []
+
+            val_result = validate_epoch(
+                model, metric_func, valid_loader, device)
+
+            loss_val.append(val_result["metric"])
+            val_metric = val_result["metric"].sum()
+            if mode == 'max':
+                if val_metric > best_val_metric:
+                    best_val_epoch = epoch
+                    best_val_metric = val_metric
+                    stop_counter = 0
+                else:
+                    stop_counter += 1
+            else:
+                if val_metric < best_val_metric:
+                    best_val_epoch = epoch
+                    best_val_metric = val_metric
+                    stop_counter = 0
+                    if save_mode == 'state_dict':
+                        torch.save(model.state_dict(), os.path.join(
+                            model_save_path, model_name))
+                    else:
+                        torch.save(model, os.path.join(
+                            model_save_path, model_name))
+                    best_model_state_dict = {
+                        k: v.to('cpu') for k, v in model.state_dict().items()}
+                    best_model_state_dict = OrderedDict(best_model_state_dict)
+
+                else:
+                    stop_counter += 1
+
+            if lr_scheduler and is_epoch_scheduler:
+                if 'ReduceLROnPlateau' in str(lr_scheduler.__class__):
+                    lr_scheduler.step(val_metric)
+                else:
+                    lr_scheduler.step()
+
+            if stop_counter > patience:
+                print(f"Early stop at epoch {epoch}")
+                break
+            if val_result["metric"].ndim == 0:
+                desc = color(
+                    f"| val metric: {val_metric:.3e} ", color=Colors.blue)
+            else:
+                metric_0, metric_1 = val_result["metric"][0], val_result["metric"][1]
+                desc = color(
+                    f"| val metric 1: {metric_0:.3e} ", color=Colors.blue)
+                desc += color(f"| val metric 2: {metric_1:.3e} ",
+                              color=Colors.blue)
+            desc += color(
+                f"| best val: {best_val_metric:.3e} at epoch {best_val_epoch+1}", color=Colors.yellow)
+            desc += color(f" | early stop: {stop_counter} ", color=Colors.red)
+            desc += color(f" | current lr: {lr:.3e}", color=Colors.magenta)
+            if not tqdm_epoch:
+                tqdm.write("\n"+desc+"\n")
+            else:
+                desc_ep = color("", color=Colors.green)
+                if _loss_mean.ndim == 0:  # 1 target loss
+                    desc_ep += color(f"| loss: {_loss_mean:.3e} ",
+                                     color=Colors.green)
+                else:
+                    for j in range(len(_loss_mean)):
+                        if _loss_mean[j] > 0:
+                            desc_ep += color(
+                                f"| loss {j}: {_loss_mean[j]:.3e} ", color=Colors.green)
+                desc_ep += desc
+                pbar_ep.set_description(desc_ep)
+                pbar_ep.update()
+
+            result = dict(
+                best_val_epoch=best_val_epoch,
+                best_val_metric=best_val_metric,
+                loss_train=np.asarray(loss_train),
+                loss_val=np.asarray(loss_val),
+                lr_history=np.asarray(lr_history),
+                # best_model=best_model_state_dict,
+                optimizer_state=optimizer.state_dict()
+            )
+            save_pickle(result, os.path.join(model_save_path, result_name))
+    return result

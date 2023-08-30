@@ -2,11 +2,11 @@ Turbulence_3d+t:
   node_feats: 15
   pos_dim: 3
   n_targets: 3
-  n_hidden: 48
+  n_hidden: 64
   num_feat_layers: 0
   num_encoder_layers: 4
-  n_head: 1
-  dim_feedforward: 96
+  n_head: 4
+  dim_feedforward: 128
   attention_type: galerkin
   feat_extract_type: None
   xavier_init: 0.01
@@ -18,12 +18,12 @@ Turbulence_3d+t:
   batch_norm: False
   return_attn_weight: False
   return_latent: False
-  decoder_type: attention
+  decoder_type: ifft
   last_activation: True
-  freq_dim: 32
+  freq_dim: 64
   num_regressor_layers: 2
   regressor_activation: gelu
-  fourier_modes: 16
+  fourier_modes: 20
   spacial_dim: 3
   spacial_fc: True
   dropout: 0.0

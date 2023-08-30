@@ -143,7 +143,6 @@ class LogProbError(Exception):
 def flatten(model):
     return torch.cat([p.flatten() for p in model.parameters()])
 
-
 def unflatten(model, flattened_params):
     if flattened_params.dim() != 1:
         raise ValueError('Expecting a 1d flattened_params')

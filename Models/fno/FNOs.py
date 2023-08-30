@@ -7,9 +7,15 @@
 # @Site    : 
 # @File    : FNOs.py
 """
+import os
+import sys
 
-from fno.spectral_layers import *
+# add configs.py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('fno')[0]))
+sys.path.append(os.path.join(file_path.split('Models')[0]))
 
+from Models.fno.spectral_layers import *
 
 class FNO1d(nn.Module):
     """
