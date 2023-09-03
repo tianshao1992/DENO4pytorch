@@ -31,7 +31,7 @@ from Models.cnn.ConvNets import UNet3d
 from Models.fno.FNOs import FNO3d
 from Models.transformer.Transformers import FourierTransformer
 from Utilizes.loss_metrics import FieldsLpLoss
-from Utilizes.parallel import setup_DDP
+from Utilizes.parallel_run import setup_DDP
 from Utilizes.process_data import DataNormer
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 
@@ -185,15 +185,6 @@ if __name__ == "__main__":
     out_dim = 3
     steps = 5
 
-    # 空间分辨率
-    s = 64
-    r1 = 1
-    r2 = 1
-    r3 = 1
-    s1 = int(((s - 1) / r1) + 1)
-    s2 = int(((s - 1) / r2) + 1)
-    s3 = int(((s - 1) / r3) + 1)
-
     batch_size = args.batch_size
     total_epoch = args.total_epoch
     learning_rate = args.learning_rate
@@ -228,8 +219,15 @@ if __name__ == "__main__":
     valid_sampler = torch.utils.data.distributed.DistributedSampler(valid_dataset, shuffle=True)    # NOTE, 分布式mini-batch数据采样
     valid_loader = torch.utils.data.DataLoader(valid_dataset, num_workers=2, pin_memory=True,
                                                batch_size=batch_size, drop_last=True, sampler=valid_sampler)
-    
 
+    # 空间分辨率
+    s = 64
+    r1 = 1
+    r2 = 1
+    r3 = 1
+    s1 = int(((s - 1) / r1) + 1)
+    s2 = int(((s - 1) / r2) + 1)
+    s3 = int(((s - 1) / r3) + 1)
 
     Logger.info("local_rank: {:d}, train_data_name: {:s}, train data sizes: {}".format(local_rank, train_data_name, train_data.shape))
 

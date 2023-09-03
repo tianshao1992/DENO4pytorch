@@ -23,7 +23,13 @@ import sys
 import yaml
 from tqdm import tqdm
 
-from transformer.Transformers import FourierTransformer
+# add .py path
+file_path = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(os.path.join(file_path.split('Demo')[0]))
+
+from Models.cnn.ConvNets import UNet3d
+from Models.fno.FNOs import FNO3d
+from Models.transformer.Transformers import FourierTransformer
 from Utilizes.process_data import MatLoader
 from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.loss_metrics import FieldsLpLoss
@@ -64,9 +70,7 @@ def feature_transform(x):
     gridy = gridy.reshape(1, 1, size_y, 1, 1).repeat([batchsize, size_x, 1, size_z, 1])
     gridz = torch.linspace(0, 1, size_z, dtype=torch.float32)
     gridz = gridz.reshape(1, 1, 1, size_y, 1).repeat([batchsize, size_x, size_y, 1, 1])
-
-    edge = torch.ones((x.shape[0], 1))
-    return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device), edge.to(x.device)
+    return torch.cat((gridx, gridy, gridz), dim=-1).to(x.device)
 
 
 def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, scheduler):
@@ -87,9 +91,9 @@ def train(dataloader, netmodel, device, lossfunc, lossmetric, optimizer, schedul
         xx = xx.reshape(input_sizes[:-2] + [-1, ])
         xx = xx.to(device)
         yy = yy.to(device)
-        grid, edge = feature_transform(xx)
+        grid = feature_transform(xx)
 
-        pred = netmodel(xx, grid, edge, grid)
+        pred = netmodel(xx, grid)
         loss = lossfunc(pred, yy)
         metric = lossmetric(pred.reshape(input_sizes[0], -1, 1), yy.reshape(input_sizes[0], -1, 1))
 
@@ -123,9 +127,9 @@ def valid(dataloader, netmodel, device, lossfunc, lossmetric):
             xx = xx.reshape(input_sizes[:-2] + [-1, ])
             xx = xx.to(device)
             yy = yy.to(device)
-            grid, edge = feature_transform(xx)
+            grid = feature_transform(xx)
 
-            pred = netmodel(xx, grid, edge, grid)
+            pred = netmodel(xx, grid)
             loss = lossfunc(pred, yy)
             metric = lossmetric(pred.reshape(input_sizes[0], -1, 1), yy.reshape(input_sizes[0], -1, 1))
 
@@ -162,8 +166,8 @@ if __name__ == "__main__":
     # configs
     ################################################################
 
-    name = 'Trans-'
-    work_path = os.path.join('work', name)
+    model_name = 'FNO'
+    work_path = os.path.join('work', model_name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
@@ -173,23 +177,23 @@ if __name__ == "__main__":
 
     cudnn.benchmark = True
     if torch.cuda.is_available():
-        Device = torch.device('cuda')
+        device = torch.device('cuda')
     else:
-        Device = torch.device('cpu')
-    Logger.info("Model Name: {:s}, Computing Device: {:s}".format(name, str(Device)))
+        device = torch.device('cpu')
+    Logger.info("Model Name: {:s}, Computing device: {:s}".format(model_name, str(device)))
 
-    ntrain = 15
-    nvalid = 5
+    in_dim = 3
+    out_dim = 3
     steps = 5
 
     batch_size = 6
-    epochs = 151
+    total_epoch = 101
     learning_rate = 0.001
-    scheduler_step = 121
+    scheduler_step = int(total_epoch * 0.8)
     scheduler_gamma = 0.1
 
     Logger.info('Total epochs: {:d}, learning_rate: {:e}, scheduler_step: {:d}, scheduler_gamma: {:e}'
-                .format(epochs, learning_rate, scheduler_step, scheduler_gamma))
+                .format(total_epoch, learning_rate, scheduler_step, scheduler_gamma))
 
     r1 = 1
     r2 = 1
@@ -206,6 +210,8 @@ if __name__ == "__main__":
     # all_data = np.load('data/HIT_vel_50g_600p_gap200_32.npy')  #
     all_data = load_npy(num=1)
 
+    ntrain = 15
+
     train_data = all_data[:ntrain, :, ::r1, ::r2, ::r3][..., :s1, :s2, :s3, :]
     valid_data = all_data[ntrain:, :, ::r1, ::r2, ::r3][..., :s1, :s2, :s3, :]
     train_dataset = custom_dataset(train_data, input_step=steps)
@@ -221,24 +227,40 @@ if __name__ == "__main__":
     ################################################################
 
     # 建立网络
+    if 'FNO' in model_name:
+        mode = 16
+        modes = (mode, mode, mode)
+        width = 64
+        depth = 4
 
-    with open(os.path.join('transformer_config.yml')) as f:
-        config = yaml.full_load(f)
+        padding = 0
+        dropout = 0.0
+        Net_model = FNO3d(in_dim=in_dim, out_dim=out_dim, modes=modes, width=width, depth=depth, steps=steps,
+                          padding=padding, activation='gelu', use_complex=False).to(device)
 
-    config = config['Turbulence_3d+t']
+    if 'CNN' in model_name:
+        width = 64
+        depth = 4
+        padding = 0
+        dropout = 0.0
+        Net_model = UNet3d(in_sizes=(s, s, s, in_dim), out_sizes=(s, s, s, out_dim), width=width, depth=depth,
+                           steps=steps,
+                           activation='gelu').to(device)
 
-    # 建立网络
-    Net_model = FourierTransformer(**config).to(Device)
-    # input1 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], train_x.shape[3]).to(Device)
-    # input2 = torch.randn(batch_size, train_x.shape[1], train_x.shape[2], 2).to(Device)
+    if 'Trans' in model_name:
+        with open(os.path.join('./Demo/Turbulence_3d+t/transformer_config.yml')) as f:
+            config = yaml.full_load(f)
 
-    (xx, yy) = next(iter(train_loader))
-    input_sizes = list(xx.shape)
-    xx = xx.reshape(input_sizes[:-2] + [-1, ])
-    xx = xx.to(Device)
-    yy = yy.to(Device)
-    grid, edge = feature_transform(xx)
-    model_statistics = summary(Net_model, input_data=[xx, grid, edge, grid], device=Device, verbose=0)
+        config = config['Turbulence_3d+t']
+        Net_model = FourierTransformer(**config).to(device)
+
+        with open(os.path.join(work_path, 'model_config.yml'), 'w') as file:
+            file.write(yaml.dump({'Turbulence_3d+t': Net_model.config}, allow_unicode=True))
+
+
+    input1 = torch.randn(batch_size, s, s, s, steps * in_dim).to(device)
+    input2 = torch.randn(batch_size, s, s, s, in_dim).to(device)
+    model_statistics = summary(Net_model, input_data=[input1, input2], device=device, verbose=0)
     Logger.write(str(model_statistics))
 
     # 损失函数
@@ -251,7 +273,7 @@ if __name__ == "__main__":
     # 下降策略
     Scheduler = torch.optim.lr_scheduler.StepLR(Optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
     # 可视化
-    Visual = MatplotlibVision(work_path, input_name=('x', 'y'), field_name=('f',))
+    Visual = MatplotlibVision(work_path, input_name=('x', 'y', 'z'), field_name=('u', 'v', 'w'))
 
     star_time = time.time()
     log_loss = [[], []]
@@ -260,17 +282,17 @@ if __name__ == "__main__":
     # train process
     ################################################################
 
-    for epoch in range(epochs):
+    for epoch in range(total_epoch):
 
         Net_model.train()
         train_loss, train_metric, train_per = \
-            train(train_loader, Net_model, Device, Loss_func, Loss_metirc, Optimizer, Scheduler)
+            train(train_loader, Net_model, device, Loss_func, Loss_metirc, Optimizer, Scheduler)
         log_loss[0].append([train_loss, train_metric])
         log_per[0].append(train_per)
 
         Net_model.eval()
         valid_loss, valid_metric, valid_per = \
-            valid(valid_loader, Net_model, Device, Loss_func, Loss_metirc)
+            valid(valid_loader, Net_model, device, Loss_func, Loss_metirc)
         log_loss[1].append([valid_loss, valid_metric])
         log_per[1].append(valid_per)
 
@@ -300,7 +322,7 @@ if __name__ == "__main__":
             fig.savefig(os.path.join(work_path, 'log_metric.svg'))
             plt.close(fig)
 
-        if epoch > 0 and epoch % 30 == 0:
+        if epoch > 0 and epoch % 20 == 0:
             torch.save({'log_loss': log_loss, 'log_per': log_per,
                         'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
                        os.path.join(work_path, 'epoch_' + str(epoch) + '.pth'))
