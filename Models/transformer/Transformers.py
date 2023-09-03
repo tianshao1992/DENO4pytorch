@@ -31,10 +31,14 @@ class SimpleTransformerEncoderLayer(nn.Module):
     """
 
     def __init__(self,
-                 d_model=96,
-                 pos_dim=1,
-                 n_head=2,
-                 dim_feedforward=512,
+                 d_model,
+                 pos_dim,
+                 pos_cat,
+                 pos_rel,
+                 pos_freq,
+                 pos_scale,
+                 n_head,
+                 dim_feedforward,
                  attention_type='fourier',
                  pos_emb=False,
                  layer_norm=True,
@@ -66,11 +70,15 @@ class SimpleTransformerEncoderLayer(nn.Module):
 
         self.attn = SimpleAttention(n_head=n_head,
                                     d_model=d_model,
+                                    pos_dim=pos_dim,
+                                    pos_cat=pos_cat,
+                                    pos_rel=pos_rel,
+                                    pos_freq=pos_freq,
+                                    pos_scale=pos_scale,
                                     attention_type=attention_type,
                                     diagonal_weight=diagonal_weight,
                                     xavier_init=xavier_init,
                                     symmetric_init=symmetric_init,
-                                    pos_dim=pos_dim,
                                     norm_add=attn_norm,
                                     norm_type=norm_type,
                                     eps=norm_eps,
@@ -78,6 +86,10 @@ class SimpleTransformerEncoderLayer(nn.Module):
         self.d_model = d_model
         self.n_head = n_head
         self.pos_dim = pos_dim
+        self.pos_rel = pos_rel
+        self.pos_cat = pos_cat
+        self.pos_freq = pos_freq
+        self.pos_scale = pos_scale
         self.add_layer_norm = layer_norm
         if layer_norm:
             self.layer_norm1 = nn.LayerNorm(d_model, eps=norm_eps)
@@ -116,9 +128,9 @@ class SimpleTransformerEncoderLayer(nn.Module):
 
         if pos is not None and self.pos_dim > 0:
             att_output, attn_weight = self.attn(
-                x, x, x, pos=pos, weight=weight)  # encoder no mask
+                x, pos=pos, weight=weight)  # encoder no mask
         else:
-            att_output, attn_weight = self.attn(x, x, x, weight=weight)
+            att_output, attn_weight = self.attn(x, weight=weight)
 
         if self.residual_type in ['add', 'plus'] or self.residual_type is None:
             x = x + self.dropout1(att_output)
@@ -151,10 +163,14 @@ class SimpleTransformerDecoderLayer(nn.Module):
         (-1, pred_len, n_target)
     '''
 
-    def __init__(self, d_model=96,
-                 pos_dim=1,
-                 n_head=2,
-                 dim_feedforward=512,
+    def __init__(self, d_model,
+                 pos_dim,
+                 pos_cat,
+                 pos_rel,
+                 pos_freq,
+                 pos_scale,
+                 n_head,
+                 dim_feedforward,
                  attention_type='fourier',
                  pos_emb=False,
                  layer_norm=True,
@@ -186,11 +202,15 @@ class SimpleTransformerDecoderLayer(nn.Module):
 
         self.attn = SimpleAttention(n_head=n_head,
                                     d_model=d_model,
+                                    pos_dim=pos_dim,
+                                    pos_cat=pos_cat,
+                                    pos_rel=pos_rel,
+                                    pos_scale=pos_scale,
+                                    pos_freq=pos_freq,
                                     attention_type=attention_type,
                                     diagonal_weight=diagonal_weight,
                                     xavier_init=xavier_init,
                                     symmetric_init=symmetric_init,
-                                    pos_dim=pos_dim,
                                     norm_add=attn_norm,
                                     norm_type=norm_type,
                                     eps=norm_eps,
@@ -198,6 +218,10 @@ class SimpleTransformerDecoderLayer(nn.Module):
         self.d_model = d_model
         self.n_head = n_head
         self.pos_dim = pos_dim
+        self.pos_rel = pos_rel
+        self.pos_cat = pos_cat
+        self.pos_freq = pos_freq
+        self.pos_scale = pos_scale
         self.add_layer_norm = layer_norm
         if layer_norm:
             self.layer_norm1 = nn.LayerNorm(d_model, eps=norm_eps)
@@ -237,9 +261,9 @@ class SimpleTransformerDecoderLayer(nn.Module):
 
         if pos is not None and self.pos_dim > 0:
             att_output, attn_weight = self.attn(
-                x, x, x, pos=pos, weight=weight)  # encoder no mask
+                x, pos=pos, weight=weight)  # encoder no mask
         else:
-            att_output, attn_weight = self.attn(x, x, x, weight=weight)
+            att_output, attn_weight = self.attn(x, weight=weight)
 
         if self.residual_type in ['add', 'plus'] or self.residual_type is None:
             x = x + self.dropout1(att_output)
@@ -366,13 +390,15 @@ class SpectralRegressor(nn.Module):
                                                           out_dim=freq_dim,
                                                           modes=modes,
                                                           dropout=dropout,
-                                                          activation=activation)])
+                                                          activation=activation,
+                                                          use_complex=False,)])
         for _ in range(num_spectral_layers - 1):
             self.spectral_conv.append(spectral_conv(in_dim=freq_dim,
                                                     out_dim=freq_dim,
                                                     modes=modes,
                                                     dropout=dropout,
-                                                    activation=activation))
+                                                    activation=activation,
+                                                    use_complex=False,))
         if not last_activation:
             self.spectral_conv[-1].activation = Identity()
 
@@ -509,6 +535,11 @@ class SimpleAttnRegressor(nn.Module):
                  n_hidden,
                  n_head,
                  out_dim,
+                 pos_dim,
+                 pos_cat,
+                 pos_rel,
+                 pos_freq,
+                 pos_scale,
                  num_layers: int = 2,
                  pos_emb=False,
                  layer_norm=True,
@@ -530,6 +561,10 @@ class SimpleAttnRegressor(nn.Module):
             self.attention_decoder.append(SimpleTransformerDecoderLayer
                                           (d_model=n_hidden,
                                            pos_dim=spacial_dim,
+                                           pos_cat=pos_cat,
+                                           pos_rel=pos_rel,
+                                           pos_freq=pos_freq,
+                                           pos_scale=pos_scale,
                                            n_head=n_head,
                                            dim_feedforward=dim_feedforward,
                                            attention_type=attention_type,
@@ -694,6 +729,10 @@ class SimpleTransformer(nn.Module):
         self.dim_feedforward = default(self.dim_feedforward, 2 * self.n_hidden)
         self.spacial_dim = default(self.spacial_dim, self.pos_dim)
         self.spacial_fc = default(self.spacial_fc, False)
+        self.pos_cat = default(self.pos_dim, True)
+        self.pos_rel = default(self.pos_rel, False)
+        self.pos_freq = default(self.pos_freq, 1.0)
+        self.pos_scale = default(self.pos_scale, 1.0)
         self.dropout = default(self.dropout, 0.05)
         self.dpo = nn.Dropout(self.dropout)
         if self.decoder_type == 'attention':
@@ -732,13 +771,17 @@ class SimpleTransformer(nn.Module):
         if self.attention_type in self.attention_types:
             encoder_layer = SimpleTransformerEncoderLayer(d_model=self.n_hidden,
                                                           n_head=self.n_head,
+                                                          pos_dim=self.pos_dim,
+                                                          pos_cat=self.pos_cat,
+                                                          pos_rel=self.pos_rel,
+                                                          pos_freq=self.pos_freq,
+                                                          pos_scale=self.pos_scale,
                                                           attention_type=self.attention_type,
                                                           dim_feedforward=self.dim_feedforward,
                                                           layer_norm=self.layer_norm,
                                                           attn_norm=self.attn_norm,
                                                           norm_type=self.norm_type,
                                                           batch_norm=self.batch_norm,
-                                                          pos_dim=self.pos_dim,
                                                           xavier_init=self.xavier_init,
                                                           diagonal_weight=self.diagonal_weight,
                                                           symmetric_init=self.symmetric_init,
@@ -780,7 +823,6 @@ class SimpleTransformer(nn.Module):
         """
         get_regressor
         """
-        torch.max()
         if self.decoder_type == 'pointwise':
             self.regressor = PointwiseRegressor(in_dim=self.n_hidden,
                                                 n_hidden=self.n_hidden,
@@ -807,6 +849,11 @@ class SimpleTransformer(nn.Module):
             self.regressor = SimpleAttnRegressor(in_dim=self.n_hidden,
                                                  n_hidden=self.n_hidden,
                                                  n_head=self.n_head,
+                                                 pos_dim=self.pos_dim,
+                                                 pos_cat=self.pos_cat,
+                                                 pos_rel=self.pos_rel,
+                                                 pos_freq=self.pos_freq,
+                                                 pos_scale=self.pos_scale,
                                                  out_dim=self.n_targets,
                                                  num_layers=self.num_regressor_layers,
                                                  layer_norm=self.layer_norm,
@@ -982,6 +1029,10 @@ class FourierTransformer(nn.Module):
         for key in all_attr:
             setattr(self, key, self.config[key])
 
+        self.pos_cat = default(self.pos_cat, True)
+        self.pos_rel = default(self.pos_rel, False)
+        self.pos_freq = default(self.pos_freq, 1.0)
+        self.pos_scale = default(self.pos_scale, 1.0)
         self.dim_feedforward = default(self.dim_feedforward, 2 * self.n_hidden)
         self.dropout = default(self.dropout, 0.05)
         self.dpo = nn.Dropout(self.dropout)
@@ -1041,6 +1092,10 @@ class FourierTransformer(nn.Module):
                                                           attn_norm=self.attn_norm,
                                                           batch_norm=self.batch_norm,
                                                           pos_dim=self.pos_dim,
+                                                          pos_cat=self.pos_cat,
+                                                          pos_rel=self.pos_rel,
+                                                          pos_freq=self.pos_freq,
+                                                          pos_scale=self.pos_scale,
                                                           xavier_init=self.xavier_init,
                                                           diagonal_weight=self.diagonal_weight,
                                                           symmetric_init=self.symmetric_init,
@@ -1092,6 +1147,10 @@ class FourierTransformer(nn.Module):
         elif self.decoder_type == 'attention':
             self.regressor = SimpleAttnRegressor(in_dim=self.n_hidden,
                                                  n_hidden=self.n_hidden,
+                                                 pos_cat=self.pos_cat,
+                                                 pos_rel=self.pos_rel,
+                                                 pos_freq=self.pos_freq,
+                                                 pos_scale=self.pos_scale,
                                                  n_head=self.n_head,
                                                  out_dim=self.n_targets,
                                                  num_layers=self.num_regressor_layers,
@@ -1108,51 +1167,104 @@ class FourierTransformer(nn.Module):
 
 
 if __name__ == '__main__':
-    for graph in ['gcn', 'gat']:
+    # for graph in ['gcn', 'gat']:
+    #     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #     config = defaultdict(lambda: None,
+    #                          # node_feats=1,
+    #                          # edge_feats=5,
+    #                          pos_dim=1,
+    #                          pos_cat=True,
+    #                          pos_rel=False,
+    #                          n_targets=1,
+    #                          n_hidden=96,
+    #                          num_feat_layers=2,
+    #                          num_encoder_layers=2,
+    #                          n_head=2,
+    #                          pred_len=0,
+    #                          n_freq_targets=0,
+    #                          dim_feedforward=96 * 2,
+    #                          feat_extract_type=graph,
+    #                          graph_activation=True,
+    #                          raw_laplacian=True,
+    #                          attention_type='fourier',  # no softmax
+    #                          xavier_init=1e-4,
+    #                          diagonal_weight=1e-2,
+    #                          symmetric_init=False,
+    #                          layer_norm=True,
+    #                          attn_norm=False,
+    #                          batch_norm=False,
+    #                          spacial_residual=False,
+    #                          return_attn_weight=True,
+    #                          seq_len=None,
+    #                          bulk_regression=False,
+    #                          decoder_type='pointwise',
+    #                          freq_dim=64,
+    #                          num_regressor_layers=2,
+    #                          fourier_modes=16,
+    #                          spacial_dim=1,
+    #                          spacial_fc=True,
+    #                          dropout=0.1,
+    #                          debug=False,
+    #                          )
+    #
+    #     ft = SimpleTransformer(**config)
+    #     ft.to(device)
+    #     batch_size, seq_len = 8, 512
+    #     summary(ft, input_size=[(batch_size, seq_len, 1),
+    #                             (batch_size, seq_len, 5)], device=device)
+
+
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         config = defaultdict(lambda: None,
-                             node_feats=1,
-                             edge_feats=5,
-                             pos_dim=1,
-                             n_targets=1,
-                             n_hidden=96,
-                             num_feat_layers=2,
-                             num_encoder_layers=2,
-                             n_head=2,
-                             pred_len=0,
-                             n_freq_targets=0,
-                             dim_feedforward=96 * 2,
-                             feat_extract_type=graph,
-                             graph_activation=True,
-                             raw_laplacian=True,
-                             attention_type='fourier',  # no softmax
-                             xavier_init=1e-4,
-                             diagonal_weight=1e-2,
-                             symmetric_init=False,
-                             layer_norm=True,
-                             attn_norm=False,
-                             batch_norm=False,
-                             spacial_residual=False,
-                             return_attn_weight=True,
-                             seq_len=None,
-                             bulk_regression=False,
-                             decoder_type='pointwise',
-                             freq_dim=64,
-                             num_regressor_layers=2,
-                             fourier_modes=16,
-                             spacial_dim=1,
-                             spacial_fc=True,
-                             dropout=0.1,
-                             debug=False,
-                             )
+                            node_feats=15,
+                            pos_dim=3,
+                            pos_cat=False,
+                            pos_rel=True,
+                            pos_freq=1/64,  # e.g. 1/64 is for 64 x 64 ns2d: [0, 1] × [0, 1],
+                            pos_scale=1.0,
+                            n_targets=3,
+                            n_hidden=72,
+                            num_feat_layers=0,
+                            num_encoder_layers=4,
+                            n_head=4,
+                            dim_feedforward=128,
+                            attention_type='galerkin',
+                            feat_extract_type=None,
+                            xavier_init=0.01,
+                            diagonal_weight=0.01,
+                            symmetric_init=False,
+                            layer_norm=True,
+                            attn_norm=False,
+                            norm_eps=0.0000001,
+                            batch_norm=False,
+                            return_attn_weight=False,
+                            return_latent=False,
+                            decoder_type='ifft',
+                            last_activation=True,
+                            freq_dim=64,
+                            num_regressor_layers=2,
+                            regressor_activation='gelu',
+                            fourier_modes=16,
+                            spacial_dim=3,
+                            spacial_fc=True,
+                            dropout=0.0,
+                            encoder_dropout=0.0,
+                            decoder_dropout=0.0,
+                            ffn_dropout=0.0,
+                            debug=False,
+                            upsample_mode='interp',
+                            downsample_mode='interp',
+                            boundary_condition='dirichlet')
 
-        ft = SimpleTransformer(**config)
-        ft.to(device)
+
+        Net_model = FourierTransformer(**config).to(device)
         batch_size, seq_len = 8, 512
-        summary(ft, input_size=[(batch_size, seq_len, 1),
-                                (batch_size, seq_len, seq_len, 5),
-                                (batch_size, seq_len, 1),
-                                (batch_size, seq_len, 1)], device=device)
-
-    # layer = TransformerEncoderLayer(d_model=128, nhead=4)
-    # print(layer.__class__)
+        s = 64
+        steps = 5
+        in_dim = 3
+        out_dim = 3
+        # Logger.info("Total Number of Parameters: {:d}".format(Net_model.parameters()[0].numel()))
+        input1 = torch.randn(batch_size, s, s, s, steps * in_dim).to(device)
+        input2 = torch.randn(batch_size, s, s, s, in_dim).to(device)
+        model_statistics = summary(Net_model, input_data=[input1, input2], device=device, verbose=0)
+        print(model_statistics)

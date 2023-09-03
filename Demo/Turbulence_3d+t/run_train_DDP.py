@@ -171,7 +171,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_name = args.model_name
-    work_path = os.path.join('work', model_name)
+    work_path = os.path.join('Demo', 'Turbulence_3d+t', 'work', model_name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
@@ -188,12 +188,13 @@ if __name__ == "__main__":
     batch_size = args.batch_size
     total_epoch = args.total_epoch
     learning_rate = args.learning_rate
+    weight_decay = args.weight_decay
     scheduler_step = int(total_epoch * 0.8)
     scheduler_gamma = 0.1
 
     if rank == 0:
-        Logger.info('total_epoch: {:d}, learning_rate: {:e}, scheduler_step: {:d}, scheduler_gamma: {:e}'
-                    .format(total_epoch, learning_rate, scheduler_step, scheduler_gamma))
+        Logger.info('total_epoch: {:d}, learning_rate: {:e}, weight_decay: {:e}, scheduler_step: {:d}, scheduler_gamma: {:e}'
+                    .format(total_epoch, learning_rate, weight_decay, scheduler_step, scheduler_gamma))
 
 
     ################################################################
@@ -201,11 +202,11 @@ if __name__ == "__main__":
     ################################################################
 
     
-    train_data_name = '../DENO4pytorch/Demo/Turbulence_3d+t/data/vel_{:d}-{:d}g_600p_gap200_LES64.npy'.format(local_rank*20+1, (local_rank+1)*20)
+    train_data_name = 'Demo/Turbulence_3d+t/data/vel_{:d}-{:d}g_600p_gap200_LES64.npy'.format(local_rank*20+1, (local_rank+1)*20)
     train_data = np.load(train_data_name)  #默认 每个卡分配部分数据集
 
     
-    valid_data_name = '../DENO4pytorch/Demo/Turbulence_3d+t/data/vel_{:d}-{:d}g_600p_gap200_LES64.npy'.format(181, 200)
+    valid_data_name = 'Demo/Turbulence_3d+t/data/vel_{:d}-{:d}g_600p_gap200_LES64.npy'.format(181, 200)
     valid_data = np.load(valid_data_name)  #默认 181-200 为测试集
     valid_data = valid_data[-10:]
 
@@ -318,21 +319,21 @@ if __name__ == "__main__":
 
         if rank == 0 and epoch > 0 and epoch % 1 == 0:
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=1)
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :, 0], 'train_step')
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :, 0], 'valid_step')
+            Visual.plot_loss(fig, axs, np.array(log_loss)[0, :, 0], 'train_step')
+            Visual.plot_loss(fig, axs, np.array(log_loss)[1, :, 0], 'valid_step')
             fig.suptitle('training loss')
             fig.savefig(os.path.join(work_path, 'log_loss.svg'))
             plt.close(fig)
 
             fig, axs = plt.subplots(1, 1, figsize=(15, 8), num=2)
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[0, :, 1], 'train_step')
-            Visual.plot_loss(fig, axs, np.arange(len(log_loss[0])), np.array(log_loss)[1, :, 1], 'valid_step')
+            Visual.plot_loss(fig, axs, np.array(log_loss)[0, :, 1], 'train_step')
+            Visual.plot_loss(fig, axs, np.array(log_loss)[1, :, 1], 'valid_step')
             fig.suptitle('training metrics')
             fig.savefig(os.path.join(work_path, 'log_metric.svg'))
             plt.close(fig)
 
 
-        if rank == 0 and epoch > 0 and epoch % 20 == 0:
+        if rank == 0 and epoch > 0 and epoch % 10 == 0:
 
             torch.save({'log_loss': log_loss, 'net_model': Net_model.state_dict(), 'optimizer': Optimizer.state_dict()},
             os.path.join(work_path, 'latest_model.pth'))

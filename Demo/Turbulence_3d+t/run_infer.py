@@ -3,8 +3,8 @@
 # @copyright (c) 2023 Baidu.com, Inc. Allrights Reserved
 @Time ： 2023/6/20 1:15
 @Author ： Liu Tianyuan (liutianyuan02@baidu.com)
-@Site ：infer_Trans.py
-@File ：infer_Trans.py
+@Site ：run_infer.py
+@File ：run_infer.py
 """
 import argparse
 import os
@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader
 from torchinfo import summary
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # add .py path
 file_path = os.path.abspath(os.path.dirname(__file__))
@@ -31,6 +32,7 @@ from Utilizes.visual_data import MatplotlibVision, TextLogger
 from Utilizes.process_data import DataNormer
 from Utilizes.loss_metrics import FieldsLpLoss
 from run_train_DDP import feature_transform, custom_dataset
+
 
 
 def calc_spectra3d(var,kk,N):
@@ -52,18 +54,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda_device", default=0, type=int)    # 该变量由torch框架自动设置，并且设置为-1时表示不分配
     parser.add_argument("--model_name", default='FNO', type=str) # 模型名称
+    parser.add_argument('--infer_batch_size', type=int, default=10)  # 连续推理步数
     parser.add_argument('--total_infer_steps', type=int, default=300)  # 连续推理步数
+    parser.add_argument('--spatial_resolution', type=int, default=32)  # 测试集分辨率
     args = parser.parse_args()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_device)
     model_name = args.model_name
-    work_path = os.path.join('work', model_name)
+    work_path = os.path.join(file_path, 'work', model_name)
     isCreated = os.path.exists(work_path)
     if not isCreated:
         os.makedirs(work_path)
-    isCreated = os.path.exists(os.path.join(work_path, 'infer'))
+    infer_path = os.path.join(work_path, 'infer_'+str(args.spatial_resolution))
+    isCreated = os.path.exists(infer_path)
     if not isCreated:
-        os.makedirs(os.path.join(work_path, 'infer'))
+        os.makedirs(infer_path)
 
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -84,10 +89,20 @@ if __name__ == "__main__":
     # load data
     ################################################################
 
-    # infer_data_name = '../DENO4pytorch/Demo/Turbulence_3d+t/data/vel_{:d}-{:d}g_600p_gap200_LES64.npy'.format(181, 200)
-    # infer_data_name = '../DENO4pytorch/Demo/Turbulence_3d+t/data/HIT_vel_50g_600p_gap200_32.npy'
+    spatial_resolution = args.spatial_resolution
+    if spatial_resolution == 64:
+        infer_data_name = './Demo/Turbulence_3d+t/data/vel_{:d}-{:d}g_600p_gap200_LES64.npy'.format(181, 200)
+    elif spatial_resolution == 32: 
+        infer_data_name = './Demo/Turbulence_3d+t/data/HIT_vel_50g_600p_gap200_32.npy'
+    elif spatial_resolution == 128:
+        infer_data_name = './Demo/Turbulence_3d+t/data/vel_46-50g_300p_grid128.npy'
+    else:
+        Logger.error("{:d} not support".format(spatial_resolution))
+
     infer_data = np.load(infer_data_name)  #默认 181-200 为测试集
     total_infer_cases = infer_data.shape[0]
+
+    Logger.info("resolution is: {:d}".format(spatial_resolution))
 
     s = infer_data.shape[2]
     r1 = 1
@@ -145,12 +160,12 @@ if __name__ == "__main__":
         # Logger.warning("model doesn't exist!")
 
 
-    xx = torch.randn(total_infer_cases, s, s, s, in_dim, steps).to(device)
-    yy = torch.randn(total_infer_cases, s, s, s, out_dim).to(device)
+    xx = torch.randn(args.infer_batch_size, s, s, s, in_dim, steps).to(device)
+    # yy = torch.randn(args.infer_batch_size, s, s, s, out_dim).to(device)
     input_sizes = list(xx.shape)
     xx = xx.reshape(input_sizes[:-2] + [-1, ])
     xx = xx.to(device)
-    yy = yy.to(device)
+    # yy = yy.to(device)
     grid = feature_transform(xx)
     model_statistics = summary(Net_model, input_data=[xx, grid], device=device, verbose=0)
     Logger.write(str(model_statistics))
@@ -167,38 +182,52 @@ if __name__ == "__main__":
     # infer process
     ################################################################
 
-    initial_input = infer_data[:, :steps]
-
+    
+    Net_model.eval() # 切换模型为评估模式
     preds = []
     truth = infer_data[:, steps:total_infer_steps + steps]
-    Net_model.eval() # 切换模型为评估模式
-    with torch.no_grad():
-        for t in range(total_infer_steps):
-            star_time = time.time()
-            if t == 0:
-                x = torch.tensor(initial_input.transpose((0, 2, 3, 4, 5, 1)), dtype=torch.float32).to(device)
-                input_sizes = list(x.shape)
-            else:
-                x = torch.cat((x[..., -steps + 1:], yy), dim=-1)
 
-            xx = x.reshape(input_sizes[:-2] + [-1, ])
-            grid = feature_transform(xx)
-            yy = Net_model(xx, grid).unsqueeze(-1)
-            preds.append(yy.cpu().numpy())
+    print(total_infer_cases)
 
-            Logger.info("time step: {:d}, cost: {:.2f}".format(t, time.time() - star_time))
+    for batch_index in range(total_infer_cases//args.infer_batch_size+1):
+        pred = []
+        batch_sta = batch_index * args.infer_batch_size
+        batch_end = batch_sta + args.infer_batch_size
+        if batch_sta >= total_infer_cases:
+            break
+        initial_input = infer_data[batch_sta:batch_end, :steps].transpose((0, 2, 3, 4, 5, 1))
+        with torch.no_grad():
+            for t in tqdm(range(total_infer_steps)):
+                star_time = time.time()
+                if t == 0:
+                    x = torch.tensor(initial_input, dtype=torch.float32).to(device)
+                    input_sizes = list(x.shape)
+                else:
+                    x = torch.cat((x[..., -steps + 1:], yy), dim=-1)
 
-    preds = np.concatenate(preds, axis=-1).transpose((0, 5, 1, 2, 3, 4))
-    coord = grid.cpu().numpy()
+                xx = x.reshape(input_sizes[:-2] + [-1, ])
+                grid = feature_transform(xx)
+                yy = Net_model(xx, grid).unsqueeze(-1)
+                pred.append(yy.cpu().numpy())
+
+                # Logger.info("time step: {:d}, cost: {:.2f}".format(t, time.time() - star_time))
+
+        pred = np.concatenate(pred, axis=-1).transpose((0, 5, 1, 2, 3, 4))
+        preds.append(pred)
+
+    preds = np.concatenate(preds, axis=0)
+    print(preds.shape)
     L2_error = []
     for t in range(total_infer_steps):
-        L2_error.append(Loss_metirc(preds[:, t].reshape([input_sizes[0], -1, 1]),
-                                 truth[:, t].reshape([input_sizes[0], -1, 1])))
+        L2_error.append(Loss_metirc(preds[:, t].reshape([total_infer_cases, -1, 1]),
+                                    truth[:, t].reshape([total_infer_cases, -1, 1])))
 
     L2_error = np.stack(L2_error, axis=1)
     print(L2_error.shape)
     avg_error = np.mean(L2_error, axis=0)
     std_error = np.std(L2_error, axis=0)
+
+    coord = grid.cpu().numpy()
 
     np.savetxt(os.path.join(work_path, '{}.txt'.format('time_lploss')), np.concatenate((avg_error, std_error), axis=-1))
 
@@ -230,18 +259,18 @@ if __name__ == "__main__":
         for time_id in range(0, total_infer_steps, 50):
             fig, axs = plt.subplots(3, 3, figsize=(25, 25), num=1, layout='constrained')
             Visual.plot_fields_ms(fig, axs, truth[case_id, time_id, ..., s//2, :],
-                                  preds[case_id, time_id, ..., s//2, :], coord[case_id, ..., s//2, :2],
+                                  preds[case_id, time_id, ..., s//2, :], coord[0, ..., s//2, :2],
                                   titles=['fDNS', model_name, 'error'])
             title = 'case_{:d}_step_{:d}: l2error: {:.3e}'.format(case_id, time_id, float(L2_error[case_id, time_id]))
             print(title)
             fig.suptitle(title)
-            fig.savefig(os.path.join(work_path, 'infer', 'velocity_case_{}_step_{}.jpg'.format(case_id, time_id)))
+            fig.savefig(os.path.join(infer_path, 'velocity_case_{}_step_{}.jpg'.format(case_id, time_id)))
             plt.close(fig)
 
             truth_spectrum.append(calc_spectra3d(truth[case_id, time_id], kk, Nx))
             preds_spectrum.append(calc_spectra3d(preds[case_id, time_id], kk, Nx))
 
-            np.savetxt(os.path.join(work_path, 'infer','spectrum_case_{}_step_{}.txt'.format(case_id, time_id)),
+            np.savetxt(os.path.join(infer_path,'spectrum_case_{}_step_{}.txt'.format(case_id, time_id)),
                        np.concatenate((truth_spectrum[-1], preds_spectrum[-1]), axis=-1))
 
             fig, axs = plt.subplots(1, 1, figsize=(8, 8), num=2, layout='constrained')
@@ -249,7 +278,7 @@ if __name__ == "__main__":
                               axis_log=(True, True), xylabels=('k', 'E(k)'))
             Visual.plot_value(fig, axs, preds_spectrum[-1][:, 0], preds_spectrum[-1][:, 1], label=model_name, 
                               axis_log=(True, True), xylabels=('k', 'E(k)'))
-            fig.savefig(os.path.join(work_path, 'infer', 'spectrum_case_{}_step_{}.jpg'.format(case_id, time_id)))
+            fig.savefig(os.path.join(infer_path, 'spectrum_case_{}_step_{}.jpg'.format(case_id, time_id)))
             plt.close(fig)
 
 
@@ -270,5 +299,5 @@ if __name__ == "__main__":
                                     std=preds_spectrum[:, time_id//50, :, 1].std(axis=0), label='preds_E(k)',
                                     axis_log=(True, True), xylabels=('k', 'E(k)'))
 
-        fig.savefig(os.path.join(work_path, 'infer', 'spectrum_mean_step_{}.jpg'.format(time_id)))
+        fig.savefig(os.path.join(infer_path, 'spectrum_mean_step_{}.jpg'.format(time_id)))
         plt.close(fig)

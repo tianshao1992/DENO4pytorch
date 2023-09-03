@@ -265,6 +265,9 @@ class SpectralConv3d(nn.Module):
             self.weights3 = nn.Parameter(
                 self.scale * torch.rand(in_dim, out_dim, self.modes1, self.modes2, self.modes3,
                                         dtype=torch.cfloat))
+            self.weights4 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim,
+                                                                 self.modes1, self.modes2, self.modes3, 2,
+                                                                 dtype=torch.float32))
 
         else:
             self.weights1 = nn.Parameter(self.scale * torch.rand(in_dim, out_dim,
