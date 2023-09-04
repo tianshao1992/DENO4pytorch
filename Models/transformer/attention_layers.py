@@ -156,7 +156,7 @@ class RotaryEmbedding(nn.Module):
     def __init__(self, dim, min_freq, scale=1.):
         super().__init__()
         inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))
-        self.min_freq = min_freq
+        self.min_freq = 1 / min_freq
         self.scale = scale
         self.register_buffer('inv_freq', inv_freq)
 

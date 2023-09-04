@@ -403,7 +403,7 @@ class SpectralRegressor(nn.Module):
             self.spectral_conv[-1].activation = Identity()
 
         self.n_grid = n_grid  # dummy for debug
-        self.dim_feedforward = default(dim_feedforward, 2 * spacial_dim * freq_dim)
+        self.dim_feedforward = default(dim_feedforward, spacial_dim * freq_dim)
         self.regressor = nn.Sequential(
             nn.Linear(freq_dim, self.dim_feedforward),
             self.activation,
